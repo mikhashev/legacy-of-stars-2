@@ -59,12 +59,12 @@ python3 legacy_of_stars.py
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
-Developed by Mike Shevchenko
-Concept inspired by scientific principles of interstellar communication and the challenges of generational projects.
+- Developed by [Mike Shevchenko](https://github.com/mikhashev)
+- Concept inspired by scientific principles of interstellar communication and the challenges of generational projects and [@SETIInstitute](@SETIInstitute) researches and [WOW!Signal](https://en.wikipedia.org/wiki/Wow!_signal) and many other thoughts.
+- Implementation created by using [Personal Context Technology](https://github.com/mikhashev/personal-context-manager/blob/main/use-cases/game-development/README.md)
