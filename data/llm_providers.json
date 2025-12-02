@@ -1,0 +1,37 @@
+{
+    "default_provider": "ollama_local",
+    "providers": [
+        {
+            "alias": "ollama_local",
+            "type": "ollama",
+            "model": "llama3.1:8b",
+            "host": "http://127.0.0.1:11434",
+            "context_window": 16384
+        },
+        {
+            "alias": "lm_studio",
+            "type": "openai_compatible",
+            "model": "lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF",
+            "base_url": "http://127.0.0.1:1234/v1",
+            "api_key": "lm-studio"
+        },
+        {
+            "alias": "claude_sonnet",
+            "type": "anthropic",
+            "model": "claude-sonnet-4-5",
+            "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        {
+            "alias": "claude_haiku",
+            "type": "anthropic",
+            "model": "claude-haiku-4-5",
+            "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        {
+            "alias": "claude_opus",
+            "type": "anthropic",
+            "model": "claude-opus-4-1",
+            "api_key_env": "ANTHROPIC_API_KEY"
+        }
+    ]
+}

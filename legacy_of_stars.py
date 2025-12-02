@@ -5,6 +5,7 @@ import json
 from enum import Enum
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
+from ai_manager import AIManager
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -194,6 +195,9 @@ class ContactProgram:
         self.action_points = 0
         self.max_action_points = 0
         self.calculate_ap()
+        
+        # AI Manager
+        self.ai = AIManager()
         
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
@@ -429,9 +433,23 @@ class ContactProgram:
                 system.civilization_attitude += 0.1 * diplomacy_factor
                 system.civilization_attitude = min(1.0, system.civilization_attitude)
                 
-                # Generate response
-                response = f"Response to message sent in Generation {self.generation}"
-                system.pending_responses.append((response, arrival_generation))
+                # Generate response using AI
+                print(f"Generating response from {system_name} (this may take a moment)...")
+                
+                # Construct System Prompt based on traits
+                attitude_desc = "friendly" if system.civilization_attitude > 0.6 else "hostile" if system.civilization_attitude < 0.4 else "cautious"
+                tech_desc = system.civilization_stage.name
+                
+                system_prompt = f"You are an alien diplomat from the star system {system_name}. " \
+                                f"Your civilization is at the {tech_desc} stage of development. " \
+                                f"Your attitude towards Earth is {attitude_desc}. " \
+                                f"Respond to the human message. Be creative, alien, and consistent with your tech level."
+
+                user_prompt = f"Human Message: {message_content}"
+                
+                response_text = self.ai.generate_text(user_prompt, system_prompt)
+                
+                system.pending_responses.append((response_text, arrival_generation))
                 
                 # Calculate how long before response arrives
                 years = round_trip_time * 25
