@@ -5,6 +5,8 @@ import json
 from enum import Enum
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
+import logging
+import datetime
 from ai_manager import AIManager
 
 class CivilizationStage(Enum):
@@ -189,7 +191,9 @@ class ContactProgram:
         self.technologies = self.load_tech_tree()
         self.self_destruct_risk = 0.0
         self.accident_risk = 0.0
+        self.ecological_risk = 0.0
         self.active_doctrines = []
+        self.start_year = datetime.datetime.now().year
         
         # Action Economy
         self.action_points = 0
@@ -272,6 +276,7 @@ class ContactProgram:
             return False
             
         if self.research_points < tech.cost:
+            self.message = f"Insufficient Research Points. Need {tech.cost}, have {int(self.research_points)}."
             return False
             
         # Check prerequisites
@@ -283,6 +288,7 @@ class ContactProgram:
         self.research_points -= tech.cost
         tech.researched = True
         self.message = f"Researched {tech.name}!"
+        logging.info(f"Researched Technology: {tech.name}")
         
         # Check for doctrine choice
         if tech.doctrine_choice:
@@ -309,19 +315,36 @@ class ContactProgram:
             
         self.active_doctrines.append(choice["name"])
         self.message = f"Doctrine adopted: {choice['name']}"
+        logging.info(f"Doctrine Adopted: {choice['name']} for {tech.name}")
 
+        return None
+        
     def advance_generation(self):
         """Advance to the next generation"""
         self.generation += 1
+        logging.info(f"--- Advanced to Generation {self.generation} ---")
         
         # Knowledge Decay
         self.knowledge_bank.degrade()
+        
+        # Support Decay (Fatigue)
+        self.public_support -= 1
+        
+        # Increasing Risks
+        self.self_destruct_risk += 0.001 # +0.1% per gen
+        self.ecological_risk += 0.005 # +0.5% per gen
         
         # Risk Checks (The Great Filter)
         if random.random() < self.self_destruct_risk:
             self.game_over = True
             self.message = "GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction)."
+            logging.info("GAME OVER: Self-Destruction triggered.")
             return
+            
+        if random.random() < self.ecological_risk:
+            self.public_support -= 15
+            self.message = "ECOLOGICAL COLLAPSE: Environmental degradation has caused famine and unrest. Public support plummets."
+            logging.info("EVENT: Ecological Collapse triggered.")
             
         if random.random() < self.accident_risk:
             self.public_support -= 20
@@ -336,6 +359,7 @@ class ContactProgram:
                 if arrival_generation <= self.generation:
                     # Message has arrived
                     system.received_messages.append(message)
+                    logging.info(f"Message Received from {system.name}: {message[:50]}...")
                     
                     # Knowledge increase from received message
                     system.knowledge += 10 * self.tech_level
@@ -407,6 +431,7 @@ class ContactProgram:
         
         # Record that we sent a message
         system.messages_sent.append((message_content, self.generation))
+        logging.info(f"Message Sent to {system_name}: {message_content}")
         
         # Deduct AP
         self.action_points -= 1
@@ -440,9 +465,22 @@ class ContactProgram:
                 attitude_desc = "friendly" if system.civilization_attitude > 0.6 else "hostile" if system.civilization_attitude < 0.4 else "cautious"
                 tech_desc = system.civilization_stage.name
                 
+                # Build Earth Context based on Alien Tech Level
+                earth_context = ""
+                if system.civilization_stage.value >= CivilizationStage.DIGITAL.value:
+                    earth_context += f" You detect that Earth is at Tech Level {self.tech_level}."
+                
+                if system.civilization_stage.value >= CivilizationStage.INTERSTELLAR.value:
+                    if self.active_doctrines:
+                        earth_context += f" You detect their active doctrines: {', '.join(self.active_doctrines)}."
+                    
+                    stability = "stable" if self.public_support > 60 else "unstable"
+                    earth_context += f" You sense their civilization is politically {stability}."
+
                 system_prompt = f"You are an alien diplomat from the star system {system_name}. " \
                                 f"Your civilization is at the {tech_desc} stage of development. " \
                                 f"Your attitude towards Earth is {attitude_desc}. " \
+                                f"{earth_context} " \
                                 f"Respond to the human message. Be creative, alien, and consistent with your tech level."
 
                 user_prompt = f"Human Message: {message_content}"
@@ -495,6 +533,7 @@ class ContactProgram:
         self.research_points += 5 * science_factor
         
         self.message = f"Research focused on {system_name}. Knowledge increased by {int(knowledge_gain)} points."
+        logging.info(f"Research Focused on {system_name}. Knowledge +{int(knowledge_gain)}")
 
     def public_outreach(self):
         """Conduct public outreach to boost support"""
@@ -526,20 +565,25 @@ class GameInterface:
     def display_game(self):
         """Display the game state"""
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"\n=== LEGACY OF STARS: Generation {self.program.generation} ===")
+        current_year = self.program.start_year + ((self.program.generation - 1) * 25)
+        print(f"\n=== LEGACY OF STARS: Generation {self.program.generation} (Year {current_year}) ===")
         print(f"Director: {self.program.current_director.name}")
         print(f"Traits: {', '.join(self.program.current_director.traits)}")
         print(f"Skills: Diplomacy {int(self.program.current_director.get_effective_skill('diplomacy')*100)}%, "
               f"Science {int(self.program.current_director.get_effective_skill('science')*100)}%, "
               f"Administration {int(self.program.current_director.get_effective_skill('administration')*100)}%")
         
+        # Calculate passive income
+        passive_income = 10 + (self.program.funding / 10)
+        
         print(f"\nProgram Status:")
         print(f"  Action Points: {self.program.action_points}/{self.program.max_action_points}")
         print(f"  Funding: {int(self.program.funding)}%")
         print(f"  Public Support: {int(self.program.public_support)}%")
         print(f"  Knowledge Base: {int(self.program.knowledge_base)}%")
-        print(f"  Research Points: {int(self.program.research_points)}")
+        print(f"  Research Points: {int(self.program.research_points)} (+{int(passive_income)}/turn)")
         print(f"  Self-Destruct Risk: {self.program.self_destruct_risk*100:.1f}%")
+        print(f"  Ecological Risk: {self.program.ecological_risk*100:.1f}%")
         
         if self.program.active_doctrines:
             print(f"  Active Doctrines: {', '.join(self.program.active_doctrines)}")
@@ -557,8 +601,15 @@ class GameInterface:
                 print(f"   Status: {system.describe_civilization()}")
             if system.messages_sent:
                 print(f"   Messages Sent: {len(system.messages_sent)}")
+                for msg, gen in system.messages_sent:
+                    round_trip = system.get_round_trip_time()
+                    arrival_gen = gen + (round_trip / 2) # One way
+                    arrival_year = self.program.start_year + ((arrival_gen - 1) * 25)
+                    print(f"      - Sent Gen {gen}. Est. Arrival: Gen {int(arrival_gen)} (Year {int(arrival_year)})")
             if system.received_messages:
                 print(f"   Responses Received: {len(system.received_messages)}")
+                for msg in system.received_messages:
+                    print(f"      > \"{msg}\"")
             if system.pending_responses:
                 next_response = min([arrival for _, arrival in system.pending_responses])
                 print(f"   Next Response: Generation {next_response}")
@@ -689,13 +740,17 @@ class GameInterface:
             print("\nCONGRATULATIONS!")
             print("Earth has successfully established contact with multiple alien civilizations.")
             print("A new era of interstellar cooperation and knowledge exchange has begun.")
+            logging.info("GAME OVER: VICTORY - Contact established with 3+ civilizations.")
         else:
             print("\nTHE PROGRAM HAS ENDED")
             print("Despite your efforts, Earth's interstellar contact program has been discontinued.")
             print(f"You reached Generation {self.program.generation} and achieved a Knowledge Base of {int(self.program.knowledge_base)}%.")
+            logging.info(f"GAME OVER: Defeat/Discontinued. Gen {self.program.generation}, Knowledge {int(self.program.knowledge_base)}%")
         
         print("\nThank you for playing Legacy of Stars!")
 
 if __name__ == "__main__":
+    logging.basicConfig(filename='game.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info("Game started.")
     game = GameInterface()
     game.play()

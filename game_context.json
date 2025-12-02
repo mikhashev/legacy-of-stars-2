@@ -176,7 +176,8 @@
                 "Star System Exploration",
                 "Technology Progression",
                 "Public Relations & Funding",
-                "Scientific Research"
+                "Scientific Research",
+                "Ecological & Existential Risks"
             ],
             "technical_challenges": [
                 "Managing multi-generational timescales",
@@ -437,7 +438,7 @@
     "metadata": {
         "version": "1.0",
         "created": "2025-04-30",
-        "last_updated": "2025-04-30",
+        "last_updated": "2025-12-02",
         "update_history": [
             {
                 "date": "2025-04-30",
