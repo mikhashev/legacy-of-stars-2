@@ -1,8 +1,10 @@
 import random
 import time
 import os
+import json
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+from pathlib import Path
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -11,6 +13,36 @@ class CivilizationStage(Enum):
     INTERPLANETARY = 3
     INTERSTELLAR = 4
     POST_BIOLOGICAL = 5
+
+class Technology:
+    def __init__(self, data: dict):
+        self.id = data["id"]
+        self.name = data["name"]
+        self.description = data["description"]
+        self.cost = data["cost"]
+        self.prerequisites = data["prerequisites"]
+        self.category = data["category"]
+        self.doctrine_choice = data.get("doctrine_choice")
+        self.researched = False
+        self.chosen_doctrine = None
+
+class KnowledgeBank:
+    """Tracks preserved knowledge across generations"""
+    def __init__(self):
+        self.preserved_knowledge = {}  # topic -> integrity (0.0 - 1.0)
+        self.capacity = 100
+        self.decay_rate = 0.05
+
+    def add_knowledge(self, topic: str, amount: float):
+        current = self.preserved_knowledge.get(topic, 0.0)
+        self.preserved_knowledge[topic] = min(1.0, current + amount)
+
+    def degrade(self):
+        """Apply decay to all knowledge"""
+        for topic in list(self.preserved_knowledge.keys()):
+            self.preserved_knowledge[topic] -= self.decay_rate
+            if self.preserved_knowledge[topic] <= 0:
+                del self.preserved_knowledge[topic]
 
 class StarSystem:
     def __init__(self, name: str, distance: float):
@@ -151,6 +183,31 @@ class ContactProgram:
         self.victory = False
         self.message = ""
         
+        # New Mechanics
+        self.knowledge_bank = KnowledgeBank()
+        self.technologies = self.load_tech_tree()
+        self.self_destruct_risk = 0.0
+        self.accident_risk = 0.0
+        self.active_doctrines = []
+        
+        # Action Economy
+        self.action_points = 0
+        self.max_action_points = 0
+        self.calculate_ap()
+        
+    def load_tech_tree(self) -> Dict[str, Technology]:
+        """Load technologies from JSON"""
+        try:
+            path = Path("data/tech_tree.json")
+            if not path.exists():
+                return {}
+            with open(path, "r") as f:
+                data = json.load(f)
+                return {t["id"]: Technology(t) for t in data["technologies"]}
+        except Exception as e:
+            print(f"Error loading tech tree: {e}")
+            return {}
+
     def generate_star_systems(self, count: int) -> Dict[str, StarSystem]:
         """Generate star systems within detection range"""
         systems = {}
@@ -182,9 +239,89 @@ class ContactProgram:
         director.generation = self.generation
         return director
     
+    def calculate_ap(self):
+        """Calculate Action Points for the current generation"""
+        base_ap = 2
+        
+        # Public Mandate
+        if self.public_support > 70:
+            base_ap += 1
+            
+        # Well Funded
+        if self.funding > 70:
+            base_ap += 1
+            
+        # Efficient Administration
+        if self.current_director.get_effective_skill("administration") > 0.7:
+            base_ap += 1
+            
+        self.max_action_points = base_ap
+        self.action_points = base_ap
+
+    def research_tech(self, tech_id: str) -> bool:
+        """Attempt to research a technology"""
+        if tech_id not in self.technologies:
+            return False
+            
+        tech = self.technologies[tech_id]
+        if tech.researched:
+            return False
+            
+        if self.research_points < tech.cost:
+            return False
+            
+        # Check prerequisites
+        for prereq in tech.prerequisites:
+            if not self.technologies[prereq].researched:
+                return False
+                
+        # Research complete
+        self.research_points -= tech.cost
+        tech.researched = True
+        self.message = f"Researched {tech.name}!"
+        
+        # Check for doctrine choice
+        if tech.doctrine_choice:
+            return True # Signal that a choice is needed
+            
+        return False
+
+    def choose_doctrine(self, tech_id: str, option_index: int):
+        """Apply effects of a doctrine choice"""
+        tech = self.technologies[tech_id]
+        choice = tech.doctrine_choice["options"][option_index]
+        tech.chosen_doctrine = choice["name"]
+        
+        effects = choice.get("effects", {})
+        if "security" in effects:
+            # Implement security logic
+            pass
+        if "public_support" in effects:
+            self.public_support += effects["public_support"]
+        if "self_destruct_risk" in effects:
+            self.self_destruct_risk += effects["self_destruct_risk"]
+        if "accident_risk" in effects:
+            self.accident_risk += effects["accident_risk"]
+            
+        self.active_doctrines.append(choice["name"])
+        self.message = f"Doctrine adopted: {choice['name']}"
+
     def advance_generation(self):
         """Advance to the next generation"""
         self.generation += 1
+        
+        # Knowledge Decay
+        self.knowledge_bank.degrade()
+        
+        # Risk Checks (The Great Filter)
+        if random.random() < self.self_destruct_risk:
+            self.game_over = True
+            self.message = "GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction)."
+            return
+            
+        if random.random() < self.accident_risk:
+            self.public_support -= 20
+            self.message = "MAJOR ACCIDENT: A technological catastrophe has damaged public trust."
         
         # Process pending messages
         for system in self.star_systems.values():
@@ -218,16 +355,8 @@ class ContactProgram:
             research_focus = self.research_points / 100
             system.update_knowledge(research_focus)
         
-        # Tech advances
+        # Passive Research Gain
         self.research_points += 10 + (self.funding / 10)
-        if self.research_points >= 100:
-            self.tech_level += 1
-            self.research_points -= 100
-            self.message = f"Technology breakthrough! Advanced to level {self.tech_level}."
-            
-            # Tech breakthroughs increase public support
-            self.public_support += 10
-            self.public_support = min(100, self.public_support)
         
         # Funding changes based on public support
         support_modifier = (self.public_support - 50) / 10
@@ -240,6 +369,9 @@ class ContactProgram:
         # New director each generation
         self.current_director = self.generate_director()
         self.directors.append(self.current_director)
+        
+        # Calculate AP for new generation
+        self.calculate_ap()
         
         # Victory check - established contact with at least 3 civilizations
         contacted_count = 0
@@ -259,6 +391,10 @@ class ContactProgram:
 
     def send_message(self, system_name: str, message_content: str):
         """Send a message to a star system"""
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+
         if system_name not in self.star_systems:
             self.message = f"System {system_name} not found in database."
             return
@@ -267,6 +403,9 @@ class ContactProgram:
         
         # Record that we sent a message
         system.messages_sent.append((message_content, self.generation))
+        
+        # Deduct AP
+        self.action_points -= 1
         
         # Calculate if we receive a response
         if system.has_civilization and system.civilization_stage.value >= CivilizationStage.EARLY_RADIO.value:
@@ -313,11 +452,18 @@ class ContactProgram:
 
     def focus_research(self, system_name: str):
         """Focus research efforts on a particular system"""
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+
         if system_name not in self.star_systems:
             self.message = f"System {system_name} not found in database."
             return
             
         system = self.star_systems[system_name]
+        
+        # Deduct AP
+        self.action_points -= 1
         
         # Research effectiveness based on science skill
         science_factor = self.current_director.get_effective_skill("science")
@@ -334,6 +480,13 @@ class ContactProgram:
 
     def public_outreach(self):
         """Conduct public outreach to boost support"""
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+            
+        # Deduct AP
+        self.action_points -= 1
+
         admin_skill = self.current_director.get_effective_skill("administration")
         support_gain = 5 + (10 * admin_skill)
         
@@ -363,11 +516,15 @@ class GameInterface:
               f"Administration {int(self.program.current_director.get_effective_skill('administration')*100)}%")
         
         print(f"\nProgram Status:")
-        print(f"  Tech Level: {self.program.tech_level}")
+        print(f"  Action Points: {self.program.action_points}/{self.program.max_action_points}")
         print(f"  Funding: {int(self.program.funding)}%")
         print(f"  Public Support: {int(self.program.public_support)}%")
         print(f"  Knowledge Base: {int(self.program.knowledge_base)}%")
-        print(f"  Research Points: {int(self.program.research_points)}/100")
+        print(f"  Research Points: {int(self.program.research_points)}")
+        print(f"  Self-Destruct Risk: {self.program.self_destruct_risk*100:.1f}%")
+        
+        if self.program.active_doctrines:
+            print(f"  Active Doctrines: {', '.join(self.program.active_doctrines)}")
         
         # Display message if any
         if self.program.message:
@@ -410,13 +567,14 @@ class GameInterface:
             self.display_game()
             
             print("\nActions:")
-            print("1. Send Message to Star System")
-            print("2. Focus Research on Star System")
-            print("3. Conduct Public Outreach Campaign")
-            print("4. Advance to Next Generation")
-            print("5. Quit Game")
+            print("1. Send Message to Star System (1 AP)")
+            print("2. Focus Research on Star System (1 AP)")
+            print("3. Conduct Public Outreach Campaign (1 AP)")
+            print("4. Research Technology (Free)")
+            print("5. Advance to Next Generation")
+            print("6. Quit Game")
             
-            choice = input("\nEnter your choice (1-5): ")
+            choice = input("\nEnter your choice (1-6): ")
             
             if choice == '1':
                 system_num = input("Enter star system number: ")
@@ -447,16 +605,64 @@ class GameInterface:
                 self.program.public_outreach()
                 
             elif choice == '4':
+                print("\nAvailable Research:")
+                available_techs = []
+                for tech_id, tech in self.program.technologies.items():
+                    if not tech.researched:
+                        # Check prerequisites
+                        prereqs_met = True
+                        for prereq in tech.prerequisites:
+                            if not self.program.technologies[prereq].researched:
+                                prereqs_met = False
+                                break
+                        
+                        if prereqs_met:
+                            available_techs.append(tech)
+                            print(f"{len(available_techs)}. {tech.name} (Cost: {tech.cost}) - {tech.description}")
+                
+                if not available_techs:
+                    self.program.message = "No new technologies available to research."
+                else:
+                    tech_choice = input("Enter tech number to research (or 0 to cancel): ")
+                    try:
+                        tech_idx = int(tech_choice) - 1
+                        if 0 <= tech_idx < len(available_techs):
+                            tech = available_techs[tech_idx]
+                            needs_doctrine = self.program.research_tech(tech.id)
+                            
+                            if needs_doctrine:
+                                print(f"\n*** DOCTRINE CHOICE REQUIRED: {tech.doctrine_choice['name']} ***")
+                                print(tech.doctrine_choice['description'])
+                                for i, option in enumerate(tech.doctrine_choice['options']):
+                                    print(f"{i+1}. {option['name']}: {option['description']}")
+                                
+                                doc_choice = input("Choose doctrine (1-2): ")
+                                try:
+                                    doc_idx = int(doc_choice) - 1
+                                    if 0 <= doc_idx < len(tech.doctrine_choice['options']):
+                                        self.program.choose_doctrine(tech.id, doc_idx)
+                                    else:
+                                        print("Invalid choice. Defaulting to first option.")
+                                        self.program.choose_doctrine(tech.id, 0)
+                                except ValueError:
+                                    print("Invalid input. Defaulting to first option.")
+                                    self.program.choose_doctrine(tech.id, 0)
+                        elif tech_idx != -1:
+                            self.program.message = "Invalid selection."
+                    except ValueError:
+                        self.program.message = "Invalid input."
+
+            elif choice == '5':
                 self.program.advance_generation()
                 
-            elif choice == '5':
+            elif choice == '6':
                 confirm = input("Are you sure you want to quit? (y/n): ")
                 if confirm.lower() == 'y':
                     self.program.game_over = True
                     print("Thanks for playing!")
             
             else:
-                self.program.message = "Invalid choice. Please enter a number from 1 to 5."
+                self.program.message = "Invalid choice. Please enter a number from 1 to 6."
         
         # Final display after game ends
         self.display_game()

@@ -1,0 +1,104 @@
+{
+    "technologies": [
+        {
+            "id": "physics_1",
+            "name": "Basic Physics",
+            "description": "Understanding the fundamental laws of motion and energy.",
+            "cost": 100,
+            "prerequisites": [],
+            "category": "Physics"
+        },
+        {
+            "id": "engineering_1",
+            "name": "Industrial Engineering",
+            "description": "Mass production and standardization.",
+            "cost": 100,
+            "prerequisites": [],
+            "category": "Engineering"
+        },
+        {
+            "id": "radio_theory",
+            "name": "Radio Theory",
+            "description": "Transmission of information via electromagnetic waves.",
+            "cost": 200,
+            "prerequisites": [
+                "physics_1"
+            ],
+            "category": "Physics"
+        },
+        {
+            "id": "nuclear_fission",
+            "name": "Nuclear Fission",
+            "description": "Splitting the atom to release massive energy.",
+            "cost": 1000,
+            "prerequisites": [
+                "physics_1",
+                "engineering_1"
+            ],
+            "category": "Physics",
+            "doctrine_choice": {
+                "name": "The Nuclear Question",
+                "description": "We have unlocked the power of the atom. How shall we use it?",
+                "options": [
+                    {
+                        "id": "doctrine_weapon",
+                        "name": "Weaponization (The Bomb)",
+                        "description": "Develop nuclear arsenals for deterrence. High security, high risk.",
+                        "effects": {
+                            "security": 20,
+                            "public_support": -10,
+                            "diplomacy_penalty": 0.5,
+                            "self_destruct_risk": 0.05
+                        }
+                    },
+                    {
+                        "id": "doctrine_energy",
+                        "name": "Civilian Energy (The Reactor)",
+                        "description": "Build power plants for economic growth. High growth, accident risk.",
+                        "effects": {
+                            "growth": 20,
+                            "public_support": 10,
+                            "diplomacy_bonus": 0.1,
+                            "accident_risk": 0.05
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": "ai_research",
+            "name": "Artificial Intelligence",
+            "description": "Machines that can learn and solve complex problems.",
+            "cost": 2000,
+            "prerequisites": [
+                "engineering_1",
+                "radio_theory"
+            ],
+            "category": "Computing",
+            "doctrine_choice": {
+                "name": "The Alignment Problem",
+                "description": "AI is surpassing human capability. How do we control it?",
+                "options": [
+                    {
+                        "id": "doctrine_control",
+                        "name": "Hard Coded Constraints",
+                        "description": "Limit AI capability to ensure safety. Lower efficiency, higher safety.",
+                        "effects": {
+                            "research_speed": 1.2,
+                            "control": 10
+                        }
+                    },
+                    {
+                        "id": "doctrine_autonomy",
+                        "name": "Full Autonomy",
+                        "description": "Let the AI evolve freely. Massive research boost, existential risk.",
+                        "effects": {
+                            "research_speed": 2.0,
+                            "self_destruct_risk": 0.1
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
