@@ -1,6 +1,22 @@
 {
     "technologies": [
         {
+            "id": "deep_space_listening",
+            "name": "Deep Space Listening",
+            "description": "Dedicated radio arrays for detecting faint signals. (+5% Detection Chance)",
+            "cost": 25,
+            "prerequisites": [],
+            "category": "Physics"
+        },
+        {
+            "id": "global_education",
+            "name": "Global Education Initiative",
+            "description": "Educating the public on the importance of contact. (-0.2% Support Decay)",
+            "cost": 25,
+            "prerequisites": [],
+            "category": "Social"
+        },
+        {
             "id": "physics_1",
             "name": "Basic Physics",
             "description": "Understanding the fundamental laws of motion and energy.",

@@ -190,7 +190,9 @@
             ],
             "current_tasks": [
                 "Implement basic game loop",
-                "Refine star system generation"
+                "Refine star system generation",
+                "Review docs/cosmic_game_theory_analysis.md for SETI/METI framework",
+                "Review docs/extracted_concepts.md for early design note alignment"
             ],
             "blockers": []
         },
@@ -438,8 +440,13 @@
     "metadata": {
         "version": "1.0",
         "created": "2025-04-30",
-        "last_updated": "2025-12-02",
+        "last_updated": "2025-12-03",
         "update_history": [
+            {
+                "date": "2025-12-03",
+                "changes": "Added references to new design documents (cosmic_game_theory_analysis.md, extracted_concepts.md)",
+                "updated_by": "AI + User"
+            },
             {
                 "date": "2025-04-30",
                 "changes": "Initial creation",

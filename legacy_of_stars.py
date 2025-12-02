@@ -328,7 +328,10 @@ class ContactProgram:
         self.knowledge_bank.degrade()
         
         # Support Decay (Fatigue)
-        self.public_support -= 1
+        decay_amount = 0.5
+        if "global_education" in self.technologies and self.technologies["global_education"].researched:
+            decay_amount -= 0.2
+        self.public_support -= decay_amount
         
         # Increasing Risks
         self.self_destruct_risk += 0.001 # +0.1% per gen
@@ -525,7 +528,12 @@ class ContactProgram:
         science_factor = self.current_director.get_effective_skill("science")
         knowledge_gain = 10 * science_factor
         
+        # Tech Bonus: Deep Space Listening
+        if "deep_space_listening" in self.technologies and self.technologies["deep_space_listening"].researched:
+            knowledge_gain += 2
+
         # Apply knowledge gain
+        old_knowledge = system.knowledge
         system.knowledge += knowledge_gain
         system.knowledge = min(100, system.knowledge)
         
@@ -534,6 +542,14 @@ class ContactProgram:
         
         self.message = f"Research focused on {system_name}. Knowledge increased by {int(knowledge_gain)} points."
         logging.info(f"Research Focused on {system_name}. Knowledge +{int(knowledge_gain)}")
+
+        # Check for Discovery Bonus (Crossing 20% threshold)
+        if old_knowledge < 20 and system.knowledge >= 20 and system.has_civilization:
+            self.public_support += 20
+            self.public_support = min(100, self.public_support)
+            self.research_points += 50
+            self.message += f"\n*** MAJOR DISCOVERY: Civilization Detected at {system_name}! (+20 Support, +50 RP) ***"
+            logging.info(f"MAJOR DISCOVERY: Civilization Detected at {system_name}")
 
     def public_outreach(self):
         """Conduct public outreach to boost support"""
@@ -545,7 +561,7 @@ class ContactProgram:
         self.action_points -= 1
 
         admin_skill = self.current_director.get_effective_skill("administration")
-        support_gain = 5 + (10 * admin_skill)
+        support_gain = 10 + (20 * admin_skill)
         
         self.public_support += support_gain
         self.public_support = min(100, self.public_support)
