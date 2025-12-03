@@ -1,5 +1,6 @@
 __pycache__/
-*.log
+#*.log
 .vscode/
 .idea/
 *.pyc
+!game.log
