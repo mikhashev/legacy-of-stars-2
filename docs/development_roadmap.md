@@ -32,30 +32,106 @@
 
 ## 🎯 Phase 2A: Historical Foundation & Tutorial (IMMEDIATE - Week 1)
 
-### Priority 1: WOW! Signal Tutorial ⭐⭐⭐⭐ **NEW!**
-**Purpose**: Introduce players to Dark Forest themes through historic event
-**User Decision**: Tutorial/Intro Scenario approach
+### Priority 1: WOW! Signal Ultra-Long-Term Legacy ⭐⭐⭐⭐ **REFINED!**
+**Purpose**: Embody "Legacy of Stars" theme through 144-generation consequence
+**User Decision**: Literal gameplay scenario, not just narrative
+
+**The Design:**
+Opening scenario (Gen 1, August 15, 1977) - Player makes REAL choice with consequence 144 generations later (Year 3577). This teaches the game's core theme: decisions have multi-generational impact.
 
 **Implementation:**
-1. **Game Start Year: 1977** (August 15 - WOW! Signal date)
-   - Tutorial opens with Dr. Jerry Ehman discovering signal
-   - Player makes first critical decision about response
-   - Choice affects starting bonuses and gameplay approach
 
-2. **Tutorial Narrative**
-   - Real historical context (Big Ear telescope, "Wow!" moment)
-   - Four response options: Reply, Monitor, Cautious, Analyze
-   - Each choice provides different starting advantage
-   - Transitions to 2025 campaign start
+1. **Tutorial/Opening Choice (Generation 1)**
+   ```
+   === WOW! Signal Detected ===
+   Big Ear Telescope - August 15, 1977
+   72-second burst at 1420 MHz (hydrogen line)
+   Direction: Sagittarius (Chi Sagittarii region)
+   Distance: ~1,800 light-years (disputed estimate)
+   
+   CRITICAL DECISION:
+   Do you authorize a reply transmission?
+   
+   → YES - Send Reply
+      • Message travels 72 generations (1,800 LY)
+      • Response/attack arrives Generation 144 (Year 3577)
+      • Immediate: +100 RP, +10% Support (bold decision)
+      • Long-term: Unknown until Gen 144
+   
+   → NO - Stay Silent
+      • Earth's location remains hidden
+      • Immediate: -15% attack damage (entire game)
+      • Long-term: WOW! mystery remains unsolved
+   
+   Note: Most players won't reach Gen 144 - this is an ULTRA-RARE achievement path
+   ```
 
-3. **Starting Bonuses by Choice**
-   - **Reply**: +20% LA/LBA detection (learned from risk)
-   - **Monitor**: +10% all detection (focused approach)
-   - **Cautious**: -10% attack damage (defensive mindset)
-   - **Analyze**: +50 starting RP (scientific method)
+2. **Generation 144 Event Handler**
+   - **If player replied** and reaches Gen 144:
+     - Response type depends on secretly-assigned civilization strategy
+     - **L Strategy**: Silence (no response, no attack)
+       - Achievement: "The Long Wait"
+       - Message: "3,600 years... silence. The galaxy keeps its secrets."
+     
+     - **LB/LR Strategy**: Friendly Contact!
+       - Achievement: "The WOW! Response" (ULTRA RARE)
+       - AI-generated profound message after 144 generations
+       - Public support → 100%, major knowledge gain
+     
+     - **LA/LBA Strategy**: Hostile Attack Arrives
+       - Achievement: "The WOW! Reckoning"
+       - Fleet from 1,800 LY away attacks Gen 144
+       - "Our ancestors' 1977 decision sealed our fate"
+       - Apply attack mechanics based on Gen 144 tech levels
 
-**Timeline**: 1 day implementation
-**Impact**: VERY HIGH - perfect thematic intro, teaches mechanics
+3. **Achievement System**
+   ```python
+   ACHIEVEMENTS = {
+       "the_long_wait": {
+           "name": "The Long Wait",
+           "description": "Reached Gen 144 after replying to WOW!",
+           "rarity": "RARE (< 5%)"
+       },
+       "wow_response": {
+           "name": "The WOW! Response",
+           "description": "Received friendly reply to 1977 transmission",
+           "rarity": "ULTRA RARE (< 1%)"
+       },
+       "wow_reckoning": {
+           "name": "The WOW! Reckoning", 
+           "description": "Experienced attack from WOW! source",
+           "rarity": "ULTRA RARE (< 1%)"
+       },
+       "silent_wisdom": {
+           "name": "Silent Wisdom",
+           "description": "Chose not to reply (cautious path)",
+           "rarity": "COMMON"
+       }
+   }
+   ```
+
+4. **Historical Accuracy Notes**
+   - Use real 1,800 LY estimate (disputed but commonly cited)
+   - Acknowledge uncertainty in tutorial text
+   - Star 2MASS 19281982-2640123 ruled out, true source unknown
+   - Game treats it as gameplay scenario, not historical claim
+
+**Why This Design is Perfect:**
+- ✅ **True Legacy Mechanic**: Gen 1 decision → Gen 144 consequence
+- ✅ **Historically Grounded**: Real distance, real uncertainty
+- ✅ **Ultra-Rare Achievement**: Dedicated players only
+- ✅ **Immediate + Long-Term**: Bonuses now, consequence later
+- ✅ **Replayability**: Different WOW! source strategies
+- ✅ **Thematic Core**: Embodies multi-generational decision-making
+- ✅ **Educational**: Teaches light-speed delay viscerally
+
+**Player Experience:**
+- **95% of players**: See Gen 1 choice, get immediate bonus, play 10-20 gens, wonder what happened
+- **5% of players**: Actually reach Gen 144, experience profound moment, earn ultra-rare achievement
+- **Completionists**: Try both paths, discover all outcomes, share stories
+
+**Timeline**: 2 days implementation
+**Impact**: VERY HIGH - defines game's core identity
 
 ---
 
