@@ -8,6 +8,7 @@ from pathlib import Path
 import logging
 import datetime
 from ai_manager import AIManager
+from wow_signal_event import WOWSignalEvent
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -286,7 +287,7 @@ class ContactProgram:
         self.accident_risk = 0.0
         self.ecological_risk = 0.0
         self.active_doctrines = []
-        self.start_year = datetime.datetime.now().year
+        self.start_year = 1977  # WOW! Signal era
         
         # Action Economy
         self.action_points = 0
@@ -295,6 +296,9 @@ class ContactProgram:
         
         # AI Manager
         self.ai = AIManager()
+        
+        # WOW! Signal Event System
+        self.wow_signal = WOWSignalEvent(self)
         
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
@@ -480,6 +484,12 @@ class ContactProgram:
             system.update_knowledge(research_focus)
         
         
+
+        # === WOW! SIGNAL: Check for Gen 144 Event ===
+        if self.wow_signal.check_gen144_event():
+            self.wow_signal.trigger_gen144_event()
+            return
+
         # === PHASE 1B: Process Attacks ===
         for system in self.star_systems.values():
             if system.pending_attack and system.pending_attack <= self.generation:
@@ -907,4 +917,7 @@ if __name__ == "__main__":
     print(f"\nLogging to: {log_filename}\n")
     
     game = GameInterface()
+    # Present WOW! Signal opening scenario
+    game.program.wow_signal.present_opening_scenario()
+    
     game.play()
