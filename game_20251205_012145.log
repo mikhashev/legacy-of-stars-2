@@ -1,0 +1,145 @@
+2025-12-05 01:21:45,556 - INFO - ==================================================
+2025-12-05 01:21:45,557 - INFO - LEGACY OF STARS - Session Started
+2025-12-05 01:21:45,557 - INFO - Log file: game_20251205_012145.log
+2025-12-05 01:21:45,557 - INFO - ==================================================
+2025-12-05 01:21:45,557 - INFO - 
+2025-12-05 01:21:45,558 - INFO - ============================================================
+2025-12-05 01:21:45,558 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-05 01:21:45,558 - INFO - ============================================================
+2025-12-05 01:21:45,558 - INFO -   Proxima Centauri (45.1 LY) - No civilization
+2025-12-05 01:21:45,558 - INFO - 
+2025-12-05 01:21:45,558 - INFO -   Capella (38.1 LY) - ACTIVE
+2025-12-05 01:21:45,558 - INFO -     Age: 3659 years
+2025-12-05 01:21:45,558 - INFO -     Stage: INTERPLANETARY
+2025-12-05 01:21:45,559 - INFO -     Strategy: LB
+2025-12-05 01:21:45,559 - INFO -     Deception: 0.72
+2025-12-05 01:21:45,559 - INFO -     >>> Listen & Broadcast - Enthusiastic, friendly METI
+2025-12-05 01:21:45,559 - INFO - 
+2025-12-05 01:21:45,559 - INFO -   Ross 128 (42.0 LY) - EXTINCT
+2025-12-05 01:21:45,559 - INFO -     Age: 1659 years
+2025-12-05 01:21:45,559 - INFO -     Died: 4543 years ago
+2025-12-05 01:21:45,559 - INFO -     Swan Song: NO
+2025-12-05 01:21:45,559 - INFO - 
+2025-12-05 01:21:45,559 - INFO -   Rigel (17.9 LY) - No civilization
+2025-12-05 01:21:45,559 - INFO - 
+2025-12-05 01:21:45,559 - INFO -   Wolf 359 (28.6 LY) - No civilization
+2025-12-05 01:21:45,559 - INFO - 
+2025-12-05 01:21:45,559 - INFO -   Tau Ceti (19.3 LY) - No civilization
+2025-12-05 01:21:45,560 - INFO - 
+2025-12-05 01:21:45,560 - INFO -   Sirius (8.3 LY) - ACTIVE
+2025-12-05 01:21:45,560 - INFO -     Age: 1663 years
+2025-12-05 01:21:45,560 - INFO -     Stage: INTERPLANETARY
+2025-12-05 01:21:45,560 - INFO -     Strategy: LA
+2025-12-05 01:21:45,560 - INFO -     Deception: 0.92
+2025-12-05 01:21:45,560 - INFO -     >>> Listen & Annihilate - HOSTILE, attacks silently
+2025-12-05 01:21:45,560 - INFO - 
+2025-12-05 01:21:45,560 - INFO -   Achernar (6.5 LY) - ACTIVE
+2025-12-05 01:21:45,560 - INFO -     Age: 7507 years
+2025-12-05 01:21:45,560 - INFO -     Stage: INTERPLANETARY
+2025-12-05 01:21:45,560 - INFO -     Strategy: LB
+2025-12-05 01:21:45,560 - INFO -     Deception: 0.78
+2025-12-05 01:21:45,560 - INFO -     >>> Listen & Broadcast - Enthusiastic, friendly METI
+2025-12-05 01:21:45,560 - INFO - 
+2025-12-05 01:21:45,561 - INFO - ============================================================
+2025-12-05 01:21:45,561 - INFO - 
+2025-12-05 01:22:30,144 - INFO - ============================================================
+2025-12-05 01:22:30,144 - INFO - WOW! SIGNAL: Reply sent to 1,800 LY distance
+2025-12-05 01:22:30,145 - INFO - WOW! MESSAGE: Hello
+2025-12-05 01:22:30,145 - INFO - WOW! SIGNAL: Secret source = Sirius
+2025-12-05 01:22:30,145 - INFO - WOW! SIGNAL: Strategy = LA
+2025-12-05 01:22:30,145 - INFO - ============================================================
+2025-12-05 01:23:19,586 - INFO - Researched Technology: Deep Space Listening (Tier 0, Gen 1)
+2025-12-05 01:23:57,162 - INFO - Research Focused on Proxima Centauri. Knowledge +11
+2025-12-05 01:24:06,296 - INFO - --- Advanced to Generation 2 ---
+2025-12-05 01:24:20,315 - INFO - Researched Technology: Global Education Initiative (Tier 0, Gen 2)
+2025-12-05 01:24:52,806 - INFO - Research Focused on Capella. Knowledge +8
+2025-12-05 01:24:58,745 - INFO - Research Focused on Capella. Knowledge +8
+2025-12-05 01:24:58,745 - INFO - MAJOR DISCOVERY: Civilization Detected at Capella
+2025-12-05 01:25:22,887 - INFO - Research Focused on Sirius. Knowledge +8
+2025-12-05 01:25:25,723 - INFO - --- Advanced to Generation 3 ---
+2025-12-05 01:25:57,808 - INFO - Research Focused on Sirius. Knowledge +8
+2025-12-05 01:25:57,808 - INFO - MAJOR DISCOVERY: Civilization Detected at Sirius
+2025-12-05 01:26:06,449 - INFO - Research Focused on Achernar. Knowledge +8
+2025-12-05 01:26:13,626 - INFO - Research Focused on Achernar. Knowledge +8
+2025-12-05 01:26:13,627 - INFO - MAJOR DISCOVERY: Civilization Detected at Achernar
+2025-12-05 01:26:27,936 - INFO - Message Sent to Sirius: Hello. Who are you?
+2025-12-05 01:26:27,936 - CRITICAL - HOSTILE FLEET DETECTED: Sirius
+2025-12-05 01:26:27,936 - WARNING - Attack ETA: Gen 4 (1 gens to prepare)
+2025-12-05 01:27:23,062 - INFO - --- Advanced to Generation 4 ---
+2025-12-05 01:27:23,062 - CRITICAL - \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f ATTACK ARRIVED from Sirius! \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f
+2025-12-05 01:27:23,062 - CRITICAL - Survived devastating attack with defenses: 0% reduction
+2025-12-05 01:27:50,827 - INFO - Researched Technology: Industrial Engineering (Tier 0, Gen 4)
+2025-12-05 01:27:54,112 - INFO - Researched Technology: Basic Physics (Tier 0, Gen 4)
+2025-12-05 01:28:09,886 - INFO - --- Advanced to Generation 5 ---
+2025-12-05 01:28:47,913 - INFO - --- Advanced to Generation 6 ---
+2025-12-05 01:29:12,076 - INFO - Message Sent to Achernar: 
+2025-12-05 01:29:31,313 - INFO - Research Focused on Sirius. Knowledge +11
+2025-12-05 01:29:38,131 - INFO - Research Focused on Achernar. Knowledge +11
+2025-12-05 01:29:44,566 - INFO - --- Advanced to Generation 7 ---
+2025-12-05 01:29:44,566 - INFO - Message Received from Achernar: *Zhraa!* (Hello!) Oh, we've been waiting for you! ...
+2025-12-05 01:30:32,492 - INFO - Message Sent to Achernar: Than you! We'd like to learn rom you for better life.
+2025-12-05 01:31:04,825 - INFO - Research Focused on Ross 128. Knowledge +11
+2025-12-05 01:31:10,047 - INFO - Research Focused on Ross 128. Knowledge +11
+2025-12-05 01:31:12,700 - INFO - --- Advanced to Generation 8 ---
+2025-12-05 01:31:12,700 - INFO - Message Received from Achernar: *excited chirping sounds* Oh, greetings human frie...
+2025-12-05 01:32:24,994 - INFO - Message Sent to Achernar: Yes we like to learn more about sustainable living. Can you share us some defemce techs to defence from Sirius?
+2025-12-05 01:32:51,949 - INFO - Research Focused on Ross 128. Knowledge +10
+2025-12-05 01:33:02,253 - INFO - Research Focused on Sirius. Knowledge +10
+2025-12-05 01:33:03,694 - INFO - --- Advanced to Generation 9 ---
+2025-12-05 01:33:03,694 - INFO - Message Received from Achernar: *Excited chirping and whistling in Achernarian* Oh...
+2025-12-05 01:34:22,490 - INFO - Message Sent to Achernar: Energy Absorbtion
+2025-12-05 01:34:34,234 - INFO - Research Focused on Sirius. Knowledge +10
+2025-12-05 01:34:54,148 - INFO - Message Sent to Sirius: Why you attack us?
+2025-12-05 01:34:54,148 - CRITICAL - HOSTILE FLEET DETECTED: Sirius
+2025-12-05 01:34:54,148 - WARNING - Attack ETA: Gen 10 (1 gens to prepare)
+2025-12-05 01:35:32,645 - INFO - --- Advanced to Generation 10 ---
+2025-12-05 01:35:32,645 - INFO - Message Received from Achernar: OH MY STARS! *bounces up and down excitedly* Ah, h...
+2025-12-05 01:35:32,646 - CRITICAL - \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f ATTACK ARRIVED from Sirius! \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f
+2025-12-05 01:35:32,646 - CRITICAL - Survived devastating attack with defenses: 0% reduction
+2025-12-05 01:35:48,058 - INFO - --- Advanced to Generation 11 ---
+2025-12-05 01:35:48,756 - INFO - --- Advanced to Generation 12 ---
+2025-12-05 01:35:48,756 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:35:49,543 - INFO - --- Advanced to Generation 13 ---
+2025-12-05 01:35:50,375 - INFO - --- Advanced to Generation 14 ---
+2025-12-05 01:35:51,163 - INFO - --- Advanced to Generation 15 ---
+2025-12-05 01:35:51,996 - INFO - --- Advanced to Generation 16 ---
+2025-12-05 01:35:52,851 - INFO - --- Advanced to Generation 17 ---
+2025-12-05 01:35:53,660 - INFO - --- Advanced to Generation 18 ---
+2025-12-05 01:36:05,091 - INFO - Researched Technology: Radio Theory (Tier 0, Gen 18)
+2025-12-05 01:36:12,156 - INFO - --- Advanced to Generation 19 ---
+2025-12-05 01:36:19,447 - INFO - --- Advanced to Generation 20 ---
+2025-12-05 01:36:27,052 - INFO - --- Advanced to Generation 21 ---
+2025-12-05 01:36:28,154 - INFO - --- Advanced to Generation 22 ---
+2025-12-05 01:36:29,098 - INFO - --- Advanced to Generation 23 ---
+2025-12-05 01:36:29,098 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:30,021 - INFO - --- Advanced to Generation 24 ---
+2025-12-05 01:36:30,966 - INFO - --- Advanced to Generation 25 ---
+2025-12-05 01:36:31,957 - INFO - --- Advanced to Generation 26 ---
+2025-12-05 01:36:32,879 - INFO - --- Advanced to Generation 27 ---
+2025-12-05 01:36:33,779 - INFO - --- Advanced to Generation 28 ---
+2025-12-05 01:36:34,836 - INFO - --- Advanced to Generation 29 ---
+2025-12-05 01:36:34,836 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:36,726 - INFO - --- Advanced to Generation 30 ---
+2025-12-05 01:36:37,424 - INFO - --- Advanced to Generation 31 ---
+2025-12-05 01:36:38,054 - INFO - --- Advanced to Generation 32 ---
+2025-12-05 01:36:38,761 - INFO - --- Advanced to Generation 33 ---
+2025-12-05 01:36:39,561 - INFO - --- Advanced to Generation 34 ---
+2025-12-05 01:36:40,281 - INFO - --- Advanced to Generation 35 ---
+2025-12-05 01:36:40,957 - INFO - --- Advanced to Generation 36 ---
+2025-12-05 01:36:40,957 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:41,631 - INFO - --- Advanced to Generation 37 ---
+2025-12-05 01:36:42,262 - INFO - --- Advanced to Generation 38 ---
+2025-12-05 01:36:42,915 - INFO - --- Advanced to Generation 39 ---
+2025-12-05 01:36:42,915 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:43,522 - INFO - --- Advanced to Generation 40 ---
+2025-12-05 01:36:44,017 - INFO - --- Advanced to Generation 41 ---
+2025-12-05 01:36:44,489 - INFO - --- Advanced to Generation 42 ---
+2025-12-05 01:36:45,006 - INFO - --- Advanced to Generation 43 ---
+2025-12-05 01:36:45,479 - INFO - --- Advanced to Generation 44 ---
+2025-12-05 01:36:45,907 - INFO - --- Advanced to Generation 45 ---
+2025-12-05 01:36:45,907 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:46,334 - INFO - --- Advanced to Generation 46 ---
+2025-12-05 01:36:46,738 - INFO - --- Advanced to Generation 47 ---
+2025-12-05 01:36:47,189 - INFO - --- Advanced to Generation 48 ---
+2025-12-05 01:36:47,189 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-05 01:36:47,403 - INFO - GAME OVER: Defeat/Discontinued. Gen 48, Knowledge 30%

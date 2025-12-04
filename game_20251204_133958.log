@@ -1,0 +1,108 @@
+2025-12-04 13:39:58,134 - INFO - ==================================================
+2025-12-04 13:39:58,135 - INFO - LEGACY OF STARS - Session Started
+2025-12-04 13:39:58,135 - INFO - Log file: game_20251204_133958.log
+2025-12-04 13:39:58,135 - INFO - ==================================================
+2025-12-04 13:39:58,139 - INFO - 
+2025-12-04 13:39:58,140 - INFO - ============================================================
+2025-12-04 13:39:58,140 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-04 13:39:58,140 - INFO - ============================================================
+2025-12-04 13:39:58,141 - INFO -   Wolf 359 (9.6 LY) - No civilization
+2025-12-04 13:39:58,141 - INFO - 
+2025-12-04 13:39:58,141 - INFO -   Sirius (31.3 LY) - No civilization
+2025-12-04 13:39:58,141 - INFO - 
+2025-12-04 13:39:58,141 - INFO -   Luyten's Star (14.8 LY) - No civilization
+2025-12-04 13:39:58,141 - INFO - 
+2025-12-04 13:39:58,142 - INFO -   Tau Ceti (23.0 LY) - No civilization
+2025-12-04 13:39:58,142 - INFO - 
+2025-12-04 13:39:58,143 - INFO -   Pollux (48.8 LY) - No civilization
+2025-12-04 13:39:58,143 - INFO - 
+2025-12-04 13:39:58,143 - INFO -   Achernar (17.9 LY) - No civilization
+2025-12-04 13:39:58,143 - INFO - 
+2025-12-04 13:39:58,143 - INFO -   Altair (19.2 LY) - ACTIVE
+2025-12-04 13:39:58,143 - INFO -     Age: 4399 years
+2025-12-04 13:39:58,144 - INFO -     Stage: INTERPLANETARY
+2025-12-04 13:39:58,144 - INFO -     Strategy: LR
+2025-12-04 13:39:58,144 - INFO -     Deception: 0.84
+2025-12-04 13:39:58,144 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-04 13:39:58,144 - INFO - 
+2025-12-04 13:39:58,144 - INFO -   Ross 128 (36.2 LY) - No civilization
+2025-12-04 13:39:58,144 - INFO - 
+2025-12-04 13:39:58,145 - INFO - ============================================================
+2025-12-04 13:39:58,145 - INFO - 
+2025-12-04 13:41:38,350 - INFO - ============================================================
+2025-12-04 13:41:38,350 - INFO - WOW! SIGNAL: Reply sent to 1,800 LY distance
+2025-12-04 13:41:38,350 - INFO - WOW! MESSAGE: Hello! WE Are humans, recieve your signal snd sent answer it is travel long
+2025-12-04 13:41:38,350 - INFO - WOW! SIGNAL: Secret source = Altair
+2025-12-04 13:41:38,350 - INFO - WOW! SIGNAL: Strategy = LR
+2025-12-04 13:41:38,351 - INFO - ============================================================
+2025-12-04 13:42:50,122 - INFO - Researched Technology: Deep Space Listening
+2025-12-04 13:42:56,874 - INFO - Researched Technology: Global Education Initiative
+2025-12-04 13:43:02,880 - INFO - Research Focused on Wolf 359. Knowledge +9
+2025-12-04 13:44:20,708 - INFO - Research Focused on Luyten's Star. Knowledge +9
+2025-12-04 13:44:30,900 - INFO - --- Advanced to Generation 2 ---
+2025-12-04 13:44:45,480 - INFO - Research Focused on Altair. Knowledge +11
+2025-12-04 13:44:58,643 - INFO - --- Advanced to Generation 3 ---
+2025-12-04 13:45:05,439 - INFO - Research Focused on Altair. Knowledge +10
+2025-12-04 13:45:05,439 - INFO - MAJOR DISCOVERY: Civilization Detected at Altair
+2025-12-04 13:45:17,002 - INFO - Researched Technology: Basic Physics
+2025-12-04 13:45:37,117 - INFO - Message Sent to Altair: Hello. We are humans from Earth
+2025-12-04 13:45:49,516 - INFO - Research Focused on Altair. Knowledge +10
+2025-12-04 13:45:52,577 - INFO - --- Advanced to Generation 4 ---
+2025-12-04 13:46:07,785 - INFO - Research Focused on Altair. Knowledge +11
+2025-12-04 13:46:20,611 - INFO - --- Advanced to Generation 5 ---
+2025-12-04 13:46:21,196 - INFO - --- Advanced to Generation 6 ---
+2025-12-04 13:46:21,759 - INFO - --- Advanced to Generation 7 ---
+2025-12-04 13:46:40,388 - INFO - Message Sent to Altair: Hello. How are you?
+2025-12-04 13:48:25,239 - INFO - Research Focused on Altair. Knowledge +11
+2025-12-04 13:48:31,899 - INFO - Researched Technology: Industrial Engineering
+2025-12-04 13:48:35,883 - INFO - --- Advanced to Generation 8 ---
+2025-12-04 13:48:41,506 - INFO - --- Advanced to Generation 9 ---
+2025-12-04 13:48:41,506 - INFO - Message Received from Altair: *Stiffens slightly, eyes narrowing* Ah, we are... ...
+2025-12-04 13:49:04,321 - INFO - --- Advanced to Generation 10 ---
+2025-12-04 13:49:04,862 - INFO - --- Advanced to Generation 11 ---
+2025-12-04 13:49:05,334 - INFO - --- Advanced to Generation 12 ---
+2025-12-04 13:49:05,783 - INFO - --- Advanced to Generation 13 ---
+2025-12-04 13:49:06,211 - INFO - --- Advanced to Generation 14 ---
+2025-12-04 13:49:06,639 - INFO - --- Advanced to Generation 15 ---
+2025-12-04 13:49:07,044 - INFO - --- Advanced to Generation 16 ---
+2025-12-04 13:49:07,044 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-04 13:49:07,831 - INFO - --- Advanced to Generation 17 ---
+2025-12-04 13:49:08,394 - INFO - --- Advanced to Generation 18 ---
+2025-12-04 13:49:08,957 - INFO - --- Advanced to Generation 19 ---
+2025-12-04 13:49:08,957 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-04 13:49:09,586 - INFO - --- Advanced to Generation 20 ---
+2025-12-04 13:49:10,239 - INFO - --- Advanced to Generation 21 ---
+2025-12-04 13:49:10,914 - INFO - --- Advanced to Generation 22 ---
+2025-12-04 13:49:11,566 - INFO - --- Advanced to Generation 23 ---
+2025-12-04 13:49:12,174 - INFO - --- Advanced to Generation 24 ---
+2025-12-04 13:49:12,804 - INFO - --- Advanced to Generation 25 ---
+2025-12-04 13:49:13,367 - INFO - --- Advanced to Generation 26 ---
+2025-12-04 13:49:13,884 - INFO - --- Advanced to Generation 27 ---
+2025-12-04 13:49:14,469 - INFO - --- Advanced to Generation 28 ---
+2025-12-04 13:49:14,469 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-04 13:49:15,166 - INFO - --- Advanced to Generation 29 ---
+2025-12-04 13:49:15,796 - INFO - --- Advanced to Generation 30 ---
+2025-12-04 13:49:16,381 - INFO - --- Advanced to Generation 31 ---
+2025-12-04 13:49:16,899 - INFO - --- Advanced to Generation 32 ---
+2025-12-04 13:49:17,416 - INFO - --- Advanced to Generation 33 ---
+2025-12-04 13:49:17,979 - INFO - --- Advanced to Generation 34 ---
+2025-12-04 13:49:18,563 - INFO - --- Advanced to Generation 35 ---
+2025-12-04 13:49:19,126 - INFO - --- Advanced to Generation 36 ---
+2025-12-04 13:49:19,756 - INFO - --- Advanced to Generation 37 ---
+2025-12-04 13:49:19,757 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-04 13:49:20,116 - INFO - --- Advanced to Generation 38 ---
+2025-12-04 13:49:20,499 - INFO - --- Advanced to Generation 39 ---
+2025-12-04 13:49:20,858 - INFO - --- Advanced to Generation 40 ---
+2025-12-04 13:49:21,151 - INFO - --- Advanced to Generation 41 ---
+2025-12-04 13:49:21,444 - INFO - --- Advanced to Generation 42 ---
+2025-12-04 13:49:21,444 - INFO - EVENT: Ecological Collapse triggered.
+2025-12-04 13:49:21,737 - INFO - --- Advanced to Generation 43 ---
+2025-12-04 13:49:22,007 - INFO - --- Advanced to Generation 44 ---
+2025-12-04 13:49:22,299 - INFO - --- Advanced to Generation 45 ---
+2025-12-04 13:49:22,569 - INFO - --- Advanced to Generation 46 ---
+2025-12-04 13:49:22,816 - INFO - --- Advanced to Generation 47 ---
+2025-12-04 13:49:23,064 - INFO - --- Advanced to Generation 48 ---
+2025-12-04 13:49:23,289 - INFO - --- Advanced to Generation 49 ---
+2025-12-04 13:49:23,536 - INFO - --- Advanced to Generation 50 ---
+2025-12-04 13:49:23,536 - INFO - GAME OVER: Self-Destruction triggered.
+2025-12-04 13:49:23,603 - INFO - GAME OVER: Defeat/Discontinued. Gen 50, Knowledge 15%

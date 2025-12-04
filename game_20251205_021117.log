@@ -1,0 +1,65 @@
+2025-12-05 02:11:17,222 - INFO - ==================================================
+2025-12-05 02:11:17,223 - INFO - LEGACY OF STARS - Session Started
+2025-12-05 02:11:17,223 - INFO - Log file: game_20251205_021117.log
+2025-12-05 02:11:17,223 - INFO - ==================================================
+2025-12-05 02:11:17,226 - INFO - 
+2025-12-05 02:11:17,226 - INFO - ============================================================
+2025-12-05 02:11:17,226 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-05 02:11:17,227 - INFO - ============================================================
+2025-12-05 02:11:17,227 - INFO -   Wolf 359 (42.8 LY) - ACTIVE
+2025-12-05 02:11:17,227 - INFO -     Age: 14128 years
+2025-12-05 02:11:17,227 - INFO -     Stage: INTERSTELLAR
+2025-12-05 02:11:17,227 - INFO -     Strategy: LR
+2025-12-05 02:11:17,227 - INFO -     Deception: 0.47
+2025-12-05 02:11:17,228 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Pollux (40.5 LY) - ACTIVE
+2025-12-05 02:11:17,228 - INFO -     Age: 2858 years
+2025-12-05 02:11:17,228 - INFO -     Stage: INTERPLANETARY
+2025-12-05 02:11:17,228 - INFO -     Strategy: LB
+2025-12-05 02:11:17,228 - INFO -     Deception: 0.46
+2025-12-05 02:11:17,228 - INFO -     >>> Listen & Broadcast - Enthusiastic, friendly METI
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Fomalhaut (14.8 LY) - No civilization
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Teegarden's Star (9.2 LY) - No civilization
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Sirius (27.2 LY) - No civilization
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Deneb (34.9 LY) - No civilization
+2025-12-05 02:11:17,228 - INFO - 
+2025-12-05 02:11:17,228 - INFO -   Tau Ceti (10.4 LY) - ACTIVE
+2025-12-05 02:11:17,228 - INFO -     Age: 1479 years
+2025-12-05 02:11:17,228 - INFO -     Stage: INTERPLANETARY
+2025-12-05 02:11:17,228 - INFO -     Strategy: LR
+2025-12-05 02:11:17,228 - INFO -     Deception: 0.77
+2025-12-05 02:11:17,229 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-05 02:11:17,229 - INFO - 
+2025-12-05 02:11:17,229 - INFO -   Procyon (30.0 LY) - ACTIVE
+2025-12-05 02:11:17,229 - INFO -     Age: 4038 years
+2025-12-05 02:11:17,229 - INFO -     Stage: INTERPLANETARY
+2025-12-05 02:11:17,229 - INFO -     Strategy: LR
+2025-12-05 02:11:17,229 - INFO -     Deception: 0.88
+2025-12-05 02:11:17,229 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-05 02:11:17,229 - INFO - 
+2025-12-05 02:11:17,229 - INFO - ============================================================
+2025-12-05 02:11:17,229 - INFO - 
+2025-12-05 02:11:17,230 - INFO - Legacy Knowledge: Arecibo Radio Telescope (pre-1977)
+2025-12-05 02:11:17,230 - INFO - Legacy Knowledge: Drake Equation Analysis (pre-1977)
+2025-12-05 02:11:17,231 - INFO - Legacy Knowledge: Project Ozma Methods (pre-1977)
+2025-12-05 02:11:17,231 - INFO - Legacy Knowledge: Basic Signal Processing (pre-1977)
+2025-12-05 02:11:17,231 - INFO - Legacy Knowledge: Voyager Golden Record (pre-1977)
+2025-12-05 02:11:25,755 - INFO - ============================================================
+2025-12-05 02:11:25,756 - INFO - WOW! SIGNAL: Reply sent to 1,800 LY distance
+2025-12-05 02:11:25,756 - INFO - WOW! MESSAGE: Hello
+2025-12-05 02:11:25,756 - INFO - WOW! SIGNAL: Secret source = Wolf 359
+2025-12-05 02:11:25,756 - INFO - WOW! SIGNAL: Strategy = LR
+2025-12-05 02:11:25,756 - INFO - ============================================================
+2025-12-05 02:11:45,521 - INFO - Researched Technology: SETI@Home Distributed Computing (Tier 1, Gen 1)
+2025-12-05 02:11:59,561 - INFO - Research Focused on Teegarden's Star. Knowledge +7
+2025-12-05 02:12:02,824 - INFO - --- Advanced to Generation 2 ---
+2025-12-05 02:12:17,066 - INFO - Research Focused on Procyon. Knowledge +5
+2025-12-05 02:12:39,927 - INFO - Research Focused on Wolf 359. Knowledge +5
+2025-12-05 02:12:47,923 - INFO - Research Focused on Tau Ceti. Knowledge +5
+2025-12-05 02:12:49,039 - INFO - --- Advanced to Generation 3 ---
+2025-12-05 02:22:00,739 - INFO - GAME OVER: Defeat/Discontinued. Gen 3, Knowledge 10%

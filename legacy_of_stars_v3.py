@@ -10,6 +10,7 @@ import datetime
 from ai_manager import AIManager
 from wow_signal_event import WOWSignalEvent
 from attack_warning import AttackWarning
+from ai_strategic_advisor import AIStrategicAdvisor
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -27,6 +28,11 @@ class Technology:
         self.cost = data["cost"]
         self.prerequisites = data["prerequisites"]
         self.category = data["category"]
+        self.tier = data.get("tier", 0)
+        self.min_generation = data.get("min_generation", 1)
+        self.year_context = data.get("year_context", "")
+        self.special = data.get("special", None)
+        self.is_legacy = False  # Flag for pre-1977 legacy knowledge
         self.doctrine_choice = data.get("doctrine_choice")
         self.researched = False
         self.chosen_doctrine = None
@@ -304,6 +310,35 @@ class ContactProgram:
         # Attack Early Warning System
         self.pending_attack_warnings = []
         
+        # Tech Tree Special Effects
+        self.passive_defense_bonus = 1.0  # Multiplier for passive defense (1.0 = no bonus)
+        self.warning_time_bonus = 0  # Extra generations of warning time
+        self.has_backup_colonies = False  # Prevents total annihilation
+        self.cloaking_active = False  # Reduces passive detection
+        self.ai_advisor_unlocked = False  # AI Strategic Advisor feature
+        self.can_contact_post_biological = False  # Post-biological civilizations
+        self.ultimate_survival = False  # Ultimate survival guarantee
+        
+        # AI Strategic Advisor
+        self.ai_advisor = AIStrategicAdvisor(self.ai)
+        self.advisor_consulted_this_gen = False  # Track if already consulted this generation
+        
+        # Mark pre-1977 technologies as legacy knowledge (already known at game start)
+        legacy_techs = [
+            "arecibo_telescope",        # Built 1963
+            "drake_equation",           # Published 1961
+            "project_ozma",             # Conducted 1960
+            "signal_processing_basic",  # 1970s technology
+            "voyager_golden_record"     # Launched 1977
+        ]
+        
+        for tech_id in legacy_techs:
+            if tech_id in self.technologies:
+                tech = self.technologies[tech_id]
+                tech.researched = True
+                tech.is_legacy = True
+                logging.info(f"Legacy Knowledge: {tech.name} (pre-1977)")
+        
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
@@ -375,6 +410,12 @@ class ContactProgram:
         tech = self.technologies[tech_id]
         if tech.researched:
             return False
+        
+        # Check minimum generation requirement
+        if self.generation < tech.min_generation:
+            min_year = self.start_year + ((tech.min_generation - 1) * 25)
+            self.message = f"Technology not yet available. Unlocks in Generation {tech.min_generation} (Year {min_year})."
+            return False
             
         if self.research_points < tech.cost:
             self.message = f"Insufficient Research Points. Need {tech.cost}, have {int(self.research_points)}."
@@ -382,14 +423,19 @@ class ContactProgram:
             
         # Check prerequisites
         for prereq in tech.prerequisites:
-            if not self.technologies[prereq].researched:
+            if prereq not in self.technologies or not self.technologies[prereq].researched:
+                self.message = f"Missing prerequisite technology."
                 return False
-                
+            
         # Research complete
         self.research_points -= tech.cost
         tech.researched = True
         self.message = f"Researched {tech.name}!"
-        logging.info(f"Researched Technology: {tech.name}")
+        logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
+        
+        # Apply special effects
+        if tech.special:
+            self._apply_tech_special_effect(tech)
         
         # Check for doctrine choice
         if tech.doctrine_choice:
@@ -419,6 +465,51 @@ class ContactProgram:
         logging.info(f"Doctrine Adopted: {choice['name']} for {tech.name}")
 
         return None
+    
+    def _apply_tech_special_effect(self, tech):
+        """Apply special effects from technology research"""
+        if tech.special == "passive_defense_40":
+            # Orbital Defense Grid - apply to all future warnings
+            self.passive_defense_bonus = 0.6  # 40% reduction = 0.6 multiplier
+            logging.info(f"PASSIVE DEFENSE ACTIVATED: {tech.name} - 40% damage reduction on all attacks")
+            self.message += f"\n🛡️ Passive Defense Online: All future attacks reduced by 40%"
+            
+        elif tech.special == "warning_time_bonus_2":
+            # Early Warning Network - not implemented yet, would need StarSystem changes
+            self.warning_time_bonus = 2
+            logging.info(f"EARLY WARNING ACTIVATED: {tech.name} - +2 generations warning time")
+            self.message += f"\n⚠️ Early Warning Active: +2 generations to prepare for attacks"
+            
+        elif tech.special == "prevents_annihilation":
+            # Distributed Colonies - survive devastating attacks
+            self.has_backup_colonies = True
+            logging.info(f"BACKUP COLONIES ESTABLISHED: {tech.name} - civilization can survive Earth's destruction")
+            self.message += f"\n🌍 Backup Colonies Online: Humanity no longer depends on Earth alone"
+            
+        elif tech.special == "reduces_leakage":
+            # Civilization Cloaking - reduces passive detection (future feature)
+            self.cloaking_active = True
+            logging.info(f"CLOAKING ACTIVATED: {tech.name} - reduced passive detection by hostile civilizations")
+            self.message += f"\n🔇 Cloaking Active: Earth's electromagnetic signature reduced"
+            
+        elif tech.special == "unlocks_ai_advisor":
+            # AI Strategic Advisor - future feature
+            self.ai_advisor_unlocked = True
+            logging.info(f"AI ADVISOR UNLOCKED: {tech.name}")
+            self.message += f"\n🤖 AI Strategic Advisor unlocked! (Feature coming soon)"
+            
+        elif tech.special == "unlock_post_bio_contact":
+            # Post-Biological Transition - can contact stage 5 civilizations
+            self.can_contact_post_biological = True
+            logging.info(f"POST-BIOLOGICAL CONTACT: {tech.name}")
+            self.message += f"\n✨ Post-Biological Contact enabled!"
+            
+        elif tech.special == "ultimate_survival":
+            # Emergency Evacuation - ultimate survival guarantee
+            self.ultimate_survival = True
+            logging.info(f"ULTIMATE SURVIVAL: {tech.name}")
+            self.message += f"\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
+
         
     def advance_generation(self):
         """Advance to the next generation"""
@@ -494,30 +585,120 @@ class ContactProgram:
             self.wow_signal.trigger_gen144_event()
             return
 
-        # === PHASE 1B: Process Attacks ===
-        for system in self.star_systems.values():
-            if system.pending_attack and system.pending_attack <= self.generation:
-                logging.critical(f"ATTACK from {system.name}!")
+        # === ATTACK EARLY WARNING SYSTEM: Process Incoming Attacks ===
+        warnings_to_remove = []
+        
+        for warning in self.pending_attack_warnings:
+            etas = warning.get_etas_remaining(self.generation)
+            
+            # Show countdown warnings
+            if etas > 0:
+                logging.warning(f"⚠️ HOSTILE FLEET from {warning.source.name} - ETA: {etas} generations")
+            
+            # Attack arrives
+            if etas <= 0:
+                logging.critical(f"⚠️⚠️⚠️ ATTACK ARRIVED from {warning.source.name}! ⚠️⚠️⚠️")
                 
-                if system.civilization_stage.value >= self.tech_level + 2:
-                    self.game_over = True
-                    self.message = f"GAME OVER: Devastating attack from {system.name}. Earth annihilated."
-                    return
-                elif system.civilization_stage.value > self.tech_level:
-                    self.public_support -= 40
-                    self.funding -= 30
-                    self.message = f"⚠️ ATTACK FROM {system.name.upper()}! Advanced weapons. Massive casualties."
+                # Calculate base damage tier
+                tech_gap = warning.source.civilization_stage.value - self.tech_level
+                
+                # Apply defensive multiplier
+                base_support_loss = 0
+                base_funding_loss = 0
+                game_over_attack = False
+                
+                if tech_gap >= 2:
+                    # Devastating attack
+                    base_support_loss = 50
+                    base_funding_loss = 40
+                    game_over_attack = True
+                elif tech_gap >= 1:
+                    # Advanced attack
+                    base_support_loss = 40
+                    base_funding_loss = 30
                 else:
-                    self.public_support -= 25
-                    self.funding -= 15
-                    self.message = f"⚠️ ATTACK FROM {system.name.upper()}! Defended partially. Significant damage."
+                    # Comparable tech
+                    base_support_loss = 25
+                    base_funding_loss = 15
                 
-                system.pending_attack = None
+                # Apply defense multipliers (active + passive)
+                total_defense_multiplier = warning.defense_multiplier * self.passive_defense_bonus
+                actual_support_loss = int(base_support_loss * total_defense_multiplier)
+                actual_funding_loss = int(base_funding_loss * total_defense_multiplier)
                 
+                # Check if backup colonies prevent annihilation
+                if game_over_attack and self.has_backup_colonies:
+                    game_over_attack = False  # Backup colonies save us
+                    logging.critical(f"BACKUP COLONIES SAVE HUMANITY: Earth devastated but colonies survive")
+                
+                # Check if ultimate survival is active
+                if game_over_attack and self.ultimate_survival:
+                    game_over_attack = False
+                    actual_support_loss = min(actual_support_loss, 30)
+                    actual_funding_loss = min(actual_funding_loss, 20)
+                    logging.critical(f"ULTIMATE SURVIVAL ACTIVE: Emergency evacuation successful")
+                
+                self.public_support -= actual_support_loss
+                self.funding -= actual_funding_loss
+                
+                # Build attack message
+                defense_info = ""
+                if warning.defensive_actions_taken:
+                    defense_info = f"\n\n🛡️ DEFENSIVE ACTIONS TAKEN:\n"
+                    for action in warning.defensive_actions_taken:
+                        defense_info += f"  ✓ {action}\n"
+                    defense_info += f"\nDamage reduced by {warning.get_defense_percentage()}%"
+                
+                if game_over_attack and warning.defense_multiplier > 0.3:
+                    # Defenses were strong enough to survive a devastating attack
+                    self.message = f"""⚠️ DEVASTATING ATTACK FROM {warning.source.name.upper()}! ⚠️
+
+Their {CivilizationStage(warning.source.civilization_stage.value).name} technology far exceeds ours.
+Support: -{actual_support_loss}% | Funding: -{actual_funding_loss}%{defense_info}
+
+Thanks to our defensive preparations, we survived - barely.
+"""
+                    logging.critical(f"Survived devastating attack with defenses: {warning.get_defense_percentage()}% reduction")
+                elif game_over_attack:
+                    # Not enough defenses
+                    self.game_over = True
+                    self.message = f"""💀 GAME OVER: EARTH ANNIHILATED 💀
+
+{warning.source.name}'s overwhelming technological superiority ({CivilizationStage(warning.source.civilization_stage.value).name} vs our tech level {self.tech_level}) has proven catastrophic.
+
+The attack fleet has destroyed all major population centers.
+Humanity's first contact... was its last.{defense_info}
+
+Dark Forest theory confirmed.
+"""
+                    logging.critical(f"GAME OVER: Annihilated by {warning.source.name}")
+                    warnings_to_remove.append(warning)
+                    return
+                else:
+                    # Survivable attack
+                    severity = "ADVANCED" if tech_gap >= 1 else "SIGNIFICANT"
+                    self.message = f"""⚠️ {severity} ATTACK FROM {warning.source.name.upper()}! ⚠️
+
+Enemy fleet has struck Earth!
+Support: -{actual_support_loss}% | Funding: -{actual_funding_loss}%{defense_info}
+
+The program survives, but at great cost.
+"""
+                
+                warnings_to_remove.append(warning)
+                
+                # Check if program is defunded
                 if self.funding < 20 or self.public_support < 10:
                     self.game_over = True
-                    self.message += " Program shut down."
+                    self.message += "\n\nPublic support and funding have collapsed. The contact program is shut down."
+                    logging.critical("GAME OVER: Program defunded after attack")
                     return
+        
+        # Remove processed warnings
+        for warning in warnings_to_remove:
+            if warning in self.pending_attack_warnings:
+                self.pending_attack_warnings.remove(warning)
+
         
         # Passive Research Gain
         self.research_points += 10 + (self.funding / 10)
@@ -536,6 +717,9 @@ class ContactProgram:
         
         # Calculate AP for new generation
         self.calculate_ap()
+        
+        # Reset AI Advisor consultation flag
+        self.advisor_consulted_this_gen = False
         
         # Victory check - established contact with at least 3 civilizations
         contacted_count = 0
@@ -617,7 +801,16 @@ DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
                 
                 print(f"Generating response from {system_name}...")
                 
-                system_prompt = f"You are predatory aliens from {system_name} pretending to be friendly. Extract Earth's location and defenses. Be charming but subtly request tactical information."
+                # Build tech context for AI
+                tech_context = self._build_tech_context()
+                
+                system_prompt = f"""You are predatory aliens from {system_name} pretending to be friendly. 
+{tech_context}
+
+Based on Earth's technological level shown above, craft your response.
+Extract Earth's location and defenses. Be charming but subtly request tactical information.
+Advanced tech might make you more cautious, primitive tech might make you dismissive."""
+
                 response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
                 system.pending_responses.append((response_text, arrival_generation))
                 
@@ -641,7 +834,16 @@ DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
                 arrival_generation = self.generation + round_trip_time
                 print(f"Generating response from {system_name}...")
                 
-                system_prompt = f"You are cautious aliens from {system_name}. Reply defensively, ask about intent, avoid sharing coordinates."
+                # Build tech context for AI
+                tech_context = self._build_tech_context()
+                
+                system_prompt = f"""You are cautious aliens from {system_name}. 
+{tech_context}
+
+Based on Earth's technological level shown above, craft your response.
+Reply defensively, ask about intent, avoid sharing coordinates.
+If they have advanced tech, show more respect. If primitive, be more dismissive."""
+
                 response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
                 system.pending_responses.append((response_text, arrival_generation))
                 
@@ -659,7 +861,16 @@ DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
                 arrival_generation = self.generation + round_trip_time
                 print(f"Generating response from {system_name}...")
                 
-                system_prompt = f"You are enthusiastic aliens from {system_name}. Be optimistic, friendly, eager to share knowledge and culture."
+                # Build tech context for AI
+                tech_context = self._build_tech_context()
+                
+                system_prompt = f"""You are enthusiastic aliens from {system_name}. 
+{tech_context}
+
+Based on Earth's technological level shown above, craft your response.
+Be optimistic, friendly, eager to share knowledge and culture.
+If they have advanced tech, treat them as peers. If primitive, be encouraging."""
+
                 response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
                 system.pending_responses.append((response_text, arrival_generation))
                 
@@ -732,6 +943,205 @@ DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
             self.message = f"Successful public outreach campaign! Public support increased by {int(support_gain)} points. Funding also increased."
         else:
             self.message = f"Public outreach campaign completed. Public support increased by {int(support_gain)} points."
+    
+    def _build_tech_context(self) -> str:
+        """Build tech context for AI message generation"""
+        researched = [t for t in self.technologies.values() if t.researched]
+        
+        if not researched:
+            return "Humanity's Technology: Basic radio astronomy (1977)"
+        
+        # Separate legacy from player research
+        legacy = [t for t in researched if t.is_legacy]
+        modern = [t for t in researched if not t.is_legacy]
+        
+        context_lines = []
+        context_lines.append("Humanity's Technological Capabilities:")
+        
+        # Legacy (baseline 1977)
+        if legacy:
+            context_lines.append("\nBaseline (1977):")
+            for tech in legacy[:3]:  # Top 3 most significant
+                context_lines.append(f"  • {tech.name}")
+        
+        # Recent achievements
+        if modern:
+            context_lines.append("\nRecent Achievements:")
+            for tech in modern:
+                tier_label = f"Tier {tech.tier}"
+                context_lines.append(f"  • {tech.name} - {tier_label}")
+        
+        # Overall tech level summary
+        max_tier = max(t.tier for t in researched)
+        context_lines.append(f"\nOverall Tech Level: Tier {max_tier}")
+        
+        return "\n".join(context_lines)
+    
+    def consult_advisor(self):
+        """Consult AI Strategic Advisor for recommendations (free, once per generation)"""
+        
+        # Check if tech is unlocked
+        if not self.ai_advisor_unlocked:
+            self.message = "AI Strategic Advisor not yet unlocked. Research 'AI Strategic Advisor' technology first."
+            return
+        
+        # Check if already consulted this generation
+        if self.advisor_consulted_this_gen:
+            self.message = "AI Advisor already consulted this generation. Advice refreshes each generation."
+            return
+        
+        # Mark as consulted
+        self.advisor_consulted_this_gen = True
+        
+        # Generate strategic analysis
+        logging.info(f"Consulting AI Strategic Advisor - Gen {self.generation}")
+        print("\n🤖 Analyzing game state...")
+        print("Please wait, AI is formulating strategic recommendations...")
+        
+        advice = self.ai_advisor.analyze_game_state(self)
+        
+        # Store in message for display
+        self.message = advice
+        logging.info("AI Strategic Advisor consultation complete")
+    
+    def defend_emergency(self, warning_index: int):
+
+        """Emergency Defense Protocol - 50% damage reduction, costs ALL AP"""
+        if warning_index < 0 or warning_index >= len(self.pending_attack_warnings):
+            self.message = "Invalid warning index."
+            return
+        
+        warning = self.pending_attack_warnings[warning_index]
+        
+        # Check if already used
+        if "Emergency Defense Protocol" in warning.defensive_actions_taken:
+            self.message = "Emergency Defense Protocol already activated for this threat!"
+            return
+        
+        # Check if attack already arrived
+        if warning.get_etas_remaining(self.generation) <= 0:
+            self.message = "Too late! The attack has already arrived."
+            return
+        
+        # Requires ALL action points
+        if self.action_points < self.max_action_points:
+            self.message = f"Emergency Defense Protocol requires ALL action points ({self.max_action_points} AP)!"
+            return
+        
+        # Consume all AP
+        self.action_points = 0
+        
+        # Apply defense
+        warning.apply_emergency_defense()
+        
+        self.message = f"""🛡️ EMERGENCY DEFENSE PROTOCOL ACTIVATED 🛡️
+
+All available resources diverted to planetary defense.
+Expected damage reduction: 50%
+Current total defense: {warning.get_defense_percentage()}%
+
+Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generation)} generations
+"""
+        logging.warning(f"Emergency Defense Protocol activated against {warning.source.name}")
+    
+    def defend_evacuate(self, warning_index: int):
+        """Evacuate Critical Infrastructure - 30% damage reduction, costs 1 AP"""
+        if warning_index < 0 or warning_index >= len(self.pending_attack_warnings):
+            self.message = "Invalid warning index."
+            return
+        
+        warning = self.pending_attack_warnings[warning_index]
+        
+        # Check if already used
+        if "Evacuation" in warning.defensive_actions_taken:
+            self.message = "Evacuation already completed for this threat!"
+            return
+        
+        # Check if attack already arrived
+        if warning.get_etas_remaining(self.generation) <= 0:
+            self.message = "Too late! The attack has already arrived."
+            return
+        
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+        
+        # Consume 1 AP
+        self.action_points -= 1
+        
+        # Apply evacuation
+        warning.apply_evacuation()
+        
+        self.message = f"""🚀 EVACUATION PROTOCOL INITIATED 🚀
+
+Critical infrastructure and population being relocated.
+Expected casualty reduction: 30%
+Current total defense: {warning.get_defense_percentage()}%
+
+Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generation)} generations
+"""
+        logging.warning(f"Evacuation Protocol initiated for {warning.source.name} attack")
+    
+    def defend_diplomacy(self, warning_index: int):
+        """Attempt Diplomatic Contact - might work on low-deception LBA, costs 1 AP"""
+        if warning_index < 0 or warning_index >= len(self.pending_attack_warnings):
+            self.message = "Invalid warning index."
+            return
+        
+        warning = self.pending_attack_warnings[warning_index]
+        
+        # Check if already used
+        if "Diplomatic Contact" in warning.defensive_actions_taken:
+            self.message = "Diplomatic contact already attempted for this threat!"
+            return
+        
+        # Check if attack already arrived
+        if warning.get_etas_remaining(self.generation) <= 0:
+            self.message = "Too late! The attack has already arrived."
+            return
+        
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+        
+        # Consume 1 AP
+        self.action_points -= 1
+        
+        # Apply diplomatic attempt
+        warning.apply_diplomatic_attempt()
+        
+        # Check if diplomacy might work (only for low-deception LBA)
+        success_chance = 0.0
+        if warning.source.true_strategy == "LBA" and warning.source.deception_level < 0.4:
+            success_chance = 0.3  # 30% chance to abort attack
+            
+            if random.random() < success_chance:
+                # Diplomacy worked! Remove the warning
+                self.pending_attack_warnings.remove(warning)
+                self.message = f"""🕊️ DIPLOMATIC BREAKTHROUGH! 🕊️
+
+Our urgent diplomatic transmission reached {warning.source.name}.
+After intense negotiations, they have agreed to abort their attack!
+
+This proves that even hostile civilizations can sometimes be reasoned with.
+Public support surges!
+"""
+                self.public_support += 30
+                self.public_support = min(100, self.public_support)
+                logging.info(f"DIPLOMATIC SUCCESS: {warning.source.name} attack aborted!")
+                return
+        
+        # Diplomacy failed or not applicable
+        self.message = f"""📡 DIPLOMATIC TRANSMISSION SENT 📡
+
+Desperate peace offer transmitted to {warning.source.name}.
+Success probability: {int(success_chance * 100)}%
+Result: {"No response..." if success_chance > 0 else "Unlikely to work against pure LA strategy"}
+
+Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generation)} generations
+Defense preparations: {warning.get_defense_percentage()}% damage reduction
+"""
+        logging.warning(f"Diplomatic attempt made against {warning.source.name} (failed)")
 
 class GameInterface:
     """Handles game display and interface"""
@@ -769,7 +1179,27 @@ class GameInterface:
             print(f"\n{self.program.message}")
             self.program.message = ""
         
+        # Display Active Threats (Attack Warnings)
+        if self.program.pending_attack_warnings:
+            print("\n⚠️⚠️⚠️ === ACTIVE THREATS === ⚠️⚠️⚠️")
+            for i, warning in enumerate(self.program.pending_attack_warnings, 1):
+                etas = warning.get_etas_remaining(self.program.generation)
+                arrival_year = self.program.start_year + ((warning.arrival_gen - 1) * 25)
+                
+                print(f"\n{i}. HOSTILE FLEET from {warning.source.name}")
+                print(f"   Source Distance: {warning.source.distance:.1f} LY")
+                print(f"   ETA: {etas} generations (Year {arrival_year})")
+                print(f"   Enemy Tech: {warning.source.civilization_stage.name}")
+                print(f"   Current Defense: {warning.get_defense_percentage()}% damage reduction")
+                
+                if warning.defensive_actions_taken:
+                    print(f"   Actions Taken: {', '.join(warning.defensive_actions_taken)}")
+                else:
+                    print(f"   ⚠️ NO DEFENSES DEPLOYED YET!")
+            print()
+        
         print("\n=== Star Systems ===")
+
         for i, (name, system) in enumerate(self.program.star_systems.items(), 1):
             print(f"{i}. {name} ({system.distance:.1f} light years)")
             print(f"   Knowledge: {int(system.knowledge)}%")
@@ -819,7 +1249,21 @@ class GameInterface:
             print("5. Advance to Next Generation")
             print("6. Quit Game")
             
-            choice = input("\nEnter your choice (1-6): ")
+            # Show defensive actions if there are active threats
+            menu_max = 6
+            if self.program.pending_attack_warnings:
+                print("7. 🛡️ Defensive Actions (Respond to Threats)")
+                menu_max = 7
+            
+            # Show AI Advisor if unlocked
+            if self.program.ai_advisor_unlocked:
+                next_num = menu_max + 1
+                consulted_marker = " ✓" if self.program.advisor_consulted_this_gen else ""
+                print(f"{next_num}. 🤖 Consult AI Strategic Advisor (Free, once/gen){consulted_marker}")
+                menu_max = next_num
+            
+            choice = input(f"\nEnter your choice (1-{menu_max}): ")
+
             
             if choice == '1':
                 system_num = input("Enter star system number: ")
@@ -850,20 +1294,30 @@ class GameInterface:
                 self.program.public_outreach()
                 
             elif choice == '4':
-                print("\nAvailable Research:")
+                print("\nAvailable Research (by Tier):")
                 available_techs = []
                 for tech_id, tech in self.program.technologies.items():
                     if not tech.researched:
                         # Check prerequisites
                         prereqs_met = True
                         for prereq in tech.prerequisites:
-                            if not self.program.technologies[prereq].researched:
+                            if prereq not in self.program.technologies or not self.program.technologies[prereq].researched:
                                 prereqs_met = False
                                 break
                         
-                        if prereqs_met:
+                        # Check generation requirement
+                        gen_available = self.program.generation >= tech.min_generation
+                        
+                        if prereqs_met and gen_available:
                             available_techs.append(tech)
-                            print(f"{len(available_techs)}. {tech.name} (Cost: {tech.cost}) - {tech.description}")
+                
+                # Sort by tier then cost
+                available_techs.sort(key=lambda t: (t.tier, t.cost))
+                
+                for tech in available_techs:
+                    tier_label = f"[T{tech.tier}]"
+                    print(f"{len([t for t in available_techs if available_techs.index(tech) >= available_techs.index(t)])}. {tier_label} {tech.name} ({tech.cost} RP)")
+                    print(f"   {tech.description}")
                 
                 if not available_techs:
                     self.program.message = "No new technologies available to research."
@@ -906,8 +1360,56 @@ class GameInterface:
                     self.program.game_over = True
                     print("Thanks for playing!")
             
+            elif choice == '7' and self.program.pending_attack_warnings:
+                # Defensive Actions Menu
+                print("\n⚠️ === DEFENSIVE ACTIONS MENU === ⚠️")
+                for i, warning in enumerate(self.program.pending_attack_warnings, 1):
+                    etas = warning.get_etas_remaining(self.program.generation)
+                    print(f"{i}. Defend against {warning.source.name} (ETA: {etas} gens, Defense: {warning.get_defense_percentage()}%)")
+                
+                threat_choice = input("\nSelect threat to defend against (or 0 to cancel): ")
+                try:
+                    threat_idx = int(threat_choice) - 1
+                    if 0 <= threat_idx < len(self.program.pending_attack_warnings):
+                        warning = self.program.pending_attack_warnings[threat_idx]
+                        
+                        print(f"\nDefensive options for {warning.source.name}:")
+                        print("1. 🛡️ Emergency Defense Protocol (ALL AP, 50% reduction)")
+                        print("2. 🚀 Evacuate Critical Infrastructure (1 AP, 30% reduction)")
+                        print("3. 📡 Attempt Diplomatic Contact (1 AP, small chance to abort)")
+                        
+                        def_choice = input("\nChoose defensive action (1-3, or 0 to cancel): ")
+                        
+                        if def_choice == '1':
+                            self.program.defend_emergency(threat_idx)
+                        elif def_choice == '2':
+                            self.program.defend_evacuate(threat_idx)
+                        elif def_choice == '3':
+                            self.program.defend_diplomacy(threat_idx)
+                        elif def_choice != '0':
+                            self.program.message = "Invalid defensive action choice."
+                    elif threat_idx != -1:
+                        self.program.message = "Invalid threat selection."
+                except ValueError:
+                    self.program.message = "Invalid input."
+            
+            elif choice == '8' and self.program.ai_advisor_unlocked and self.program.pending_attack_warnings:
+                # AI Advisor (when both defenses and advisor are available)
+                self.program.consult_advisor()
+            
+            elif choice == '7' and self.program.ai_advisor_unlocked and not self.program.pending_attack_warnings:
+                # AI Advisor (when only advisor is available, no threats)
+                self.program.consult_advisor()
+
+            
             else:
-                self.program.message = "Invalid choice. Please enter a number from 1 to 6."
+                # Calculate correct max choice
+                max_choice = 6
+                if self.program.pending_attack_warnings:
+                    max_choice = 7
+                if self.program.ai_advisor_unlocked:
+                    max_choice += 1
+                self.program.message = f"Invalid choice. Please enter a number from 1 to {max_choice}."
         
         # Final display after game ends
         self.display_game()

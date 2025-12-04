@@ -1,0 +1,62 @@
+2025-12-04 20:57:17,397 - INFO - 
+2025-12-04 20:57:17,398 - INFO - ============================================================
+2025-12-04 20:57:17,398 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-04 20:57:17,398 - INFO - ============================================================
+2025-12-04 20:57:17,398 - INFO -   Epsilon Eridani (21.7 LY) - No civilization
+2025-12-04 20:57:17,398 - INFO - 
+2025-12-04 20:57:17,398 - INFO -   Hadar (49.5 LY) - ACTIVE
+2025-12-04 20:57:17,398 - INFO -     Age: 2103 years
+2025-12-04 20:57:17,398 - INFO -     Stage: INTERPLANETARY
+2025-12-04 20:57:17,399 - INFO -     Strategy: LR
+2025-12-04 20:57:17,399 - INFO -     Deception: 0.60
+2025-12-04 20:57:17,399 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-04 20:57:17,399 - INFO - 
+2025-12-04 20:57:17,399 - INFO -   Ross 128 (35.5 LY) - ACTIVE
+2025-12-04 20:57:17,399 - INFO -     Age: 2495 years
+2025-12-04 20:57:17,399 - INFO -     Stage: INTERPLANETARY
+2025-12-04 20:57:17,399 - INFO -     Strategy: LA
+2025-12-04 20:57:17,399 - INFO -     Deception: 0.56
+2025-12-04 20:57:17,399 - INFO -     >>> Listen & Annihilate - HOSTILE, attacks silently
+2025-12-04 20:57:17,399 - INFO - 
+2025-12-04 20:57:17,400 - INFO -   Rigel (12.0 LY) - No civilization
+2025-12-04 20:57:17,400 - INFO - 
+2025-12-04 20:57:17,400 - INFO -   Castor (37.4 LY) - ACTIVE
+2025-12-04 20:57:17,400 - INFO -     Age: 2593 years
+2025-12-04 20:57:17,400 - INFO -     Stage: INTERPLANETARY
+2025-12-04 20:57:17,400 - INFO -     Strategy: LA
+2025-12-04 20:57:17,400 - INFO -     Deception: 0.56
+2025-12-04 20:57:17,400 - INFO -     >>> Listen & Annihilate - HOSTILE, attacks silently
+2025-12-04 20:57:17,400 - INFO - 
+2025-12-04 20:57:17,400 - INFO -   Lalande 21185 (16.6 LY) - ACTIVE
+2025-12-04 20:57:17,400 - INFO -     Age: 3936 years
+2025-12-04 20:57:17,400 - INFO -     Stage: INTERPLANETARY
+2025-12-04 20:57:17,400 - INFO -     Strategy: LB
+2025-12-04 20:57:17,400 - INFO -     Deception: 0.63
+2025-12-04 20:57:17,400 - INFO -     >>> Listen & Broadcast - Enthusiastic, friendly METI
+2025-12-04 20:57:17,401 - INFO - 
+2025-12-04 20:57:17,401 - INFO -   Achernar (27.2 LY) - No civilization
+2025-12-04 20:57:17,401 - INFO - 
+2025-12-04 20:57:17,401 - INFO -   Tau Ceti (7.7 LY) - ACTIVE
+2025-12-04 20:57:17,401 - INFO -     Age: 58 years
+2025-12-04 20:57:17,401 - INFO -     Stage: EARLY_RADIO
+2025-12-04 20:57:17,401 - INFO -     Strategy: LR
+2025-12-04 20:57:17,401 - INFO -     Deception: 0.02
+2025-12-04 20:57:17,401 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-04 20:57:17,401 - INFO - 
+2025-12-04 20:57:17,401 - INFO - ============================================================
+2025-12-04 20:57:17,401 - INFO - 
+2025-12-04 20:57:17,405 - INFO - Message Sent to Hadar: Hello! Peace and greetings from Earth!
+2025-12-04 20:57:17,405 - CRITICAL - HOSTILE FLEET DETECTED: Hadar
+2025-12-04 20:57:17,405 - WARNING - Attack ETA: Gen 5 (4 gens to prepare)
+2025-12-04 20:57:17,408 - WARNING - Evacuation Protocol initiated for Hadar attack
+2025-12-04 20:57:17,410 - INFO - --- Advanced to Generation 2 ---
+2025-12-04 20:57:17,410 - WARNING - \u26a0\ufe0f HOSTILE FLEET from Hadar - ETA: 3 generations
+2025-12-04 20:57:17,411 - INFO - --- Advanced to Generation 3 ---
+2025-12-04 20:57:17,411 - WARNING - \u26a0\ufe0f HOSTILE FLEET from Hadar - ETA: 2 generations
+2025-12-04 20:57:17,411 - INFO - --- Advanced to Generation 4 ---
+2025-12-04 20:57:17,412 - WARNING - \u26a0\ufe0f HOSTILE FLEET from Hadar - ETA: 1 generations
+2025-12-04 20:57:17,412 - INFO - --- Advanced to Generation 5 ---
+2025-12-04 20:57:17,412 - CRITICAL - \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f ATTACK ARRIVED from Hadar! \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f
+2025-12-04 20:57:17,414 - INFO - Message Sent to Diplomatic Test: Peace!
+2025-12-04 20:57:17,414 - CRITICAL - HOSTILE FLEET DETECTED (LBA low deception): Diplomatic Test
+2025-12-04 20:57:17,415 - WARNING - Diplomatic attempt made against Diplomatic Test (failed)

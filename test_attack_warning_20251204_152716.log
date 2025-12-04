@@ -1,0 +1,38 @@
+2025-12-04 15:27:16,448 - INFO - 
+2025-12-04 15:27:16,449 - INFO - ============================================================
+2025-12-04 15:27:16,450 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-04 15:27:16,450 - INFO - ============================================================
+2025-12-04 15:27:16,450 - INFO -   Procyon (8.7 LY) - No civilization
+2025-12-04 15:27:16,450 - INFO - 
+2025-12-04 15:27:16,450 - INFO -   Proxima Centauri (19.6 LY) - No civilization
+2025-12-04 15:27:16,450 - INFO - 
+2025-12-04 15:27:16,451 - INFO -   Rigel (24.7 LY) - ACTIVE
+2025-12-04 15:27:16,451 - INFO -     Age: 997 years
+2025-12-04 15:27:16,451 - INFO -     Stage: DIGITAL
+2025-12-04 15:27:16,451 - INFO -     Strategy: LA
+2025-12-04 15:27:16,451 - INFO -     Deception: 0.84
+2025-12-04 15:27:16,451 - INFO -     >>> Listen & Annihilate - HOSTILE, attacks silently
+2025-12-04 15:27:16,451 - INFO - 
+2025-12-04 15:27:16,452 - INFO -   Ross 128 (38.6 LY) - No civilization
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,452 - INFO -   Luyten's Star (24.1 LY) - No civilization
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,452 - INFO -   Pollux (15.8 LY) - No civilization
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,452 - INFO -   Sirius (39.2 LY) - No civilization
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,452 - INFO -   Castor (11.7 LY) - No civilization
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,452 - INFO - ============================================================
+2025-12-04 15:27:16,452 - INFO - 
+2025-12-04 15:27:16,457 - INFO - Message Sent to Rigel: Hello! Peace and greetings from Earth!
+2025-12-04 15:27:16,457 - CRITICAL - HOSTILE FLEET DETECTED: Rigel
+2025-12-04 15:27:16,457 - WARNING - Attack ETA: Gen 3 (2 gens to prepare)
+2025-12-04 15:27:16,460 - WARNING - Evacuation Protocol initiated for Rigel attack
+2025-12-04 15:27:16,462 - INFO - --- Advanced to Generation 2 ---
+2025-12-04 15:27:16,462 - WARNING - \u26a0\ufe0f HOSTILE FLEET from Rigel - ETA: 1 generations
+2025-12-04 15:27:16,463 - INFO - --- Advanced to Generation 3 ---
+2025-12-04 15:27:16,463 - CRITICAL - \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f ATTACK ARRIVED from Rigel! \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f
+2025-12-04 15:27:16,465 - INFO - Message Sent to Diplomatic Test: Peace!
+2025-12-04 15:27:16,465 - CRITICAL - HOSTILE FLEET DETECTED (LBA low deception): Diplomatic Test
+2025-12-04 15:27:16,466 - WARNING - Diplomatic attempt made against Diplomatic Test (failed)

@@ -1,0 +1,51 @@
+2025-12-04 22:18:04,423 - INFO - 
+2025-12-04 22:18:04,424 - INFO - ============================================================
+2025-12-04 22:18:04,424 - INFO - GALAXY OVERVIEW - Hidden Civilization Details
+2025-12-04 22:18:04,424 - INFO - ============================================================
+2025-12-04 22:18:04,424 - INFO -   Achernar (5.3 LY) - ACTIVE
+2025-12-04 22:18:04,424 - INFO -     Age: 7136 years
+2025-12-04 22:18:04,424 - INFO -     Stage: INTERPLANETARY
+2025-12-04 22:18:04,425 - INFO -     Strategy: LR
+2025-12-04 22:18:04,425 - INFO -     Deception: 0.54
+2025-12-04 22:18:04,425 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-04 22:18:04,425 - INFO - 
+2025-12-04 22:18:04,425 - INFO -   Lalande 21185 (26.2 LY) - No civilization
+2025-12-04 22:18:04,425 - INFO - 
+2025-12-04 22:18:04,426 - INFO -   Rigel (29.1 LY) - No civilization
+2025-12-04 22:18:04,426 - INFO - 
+2025-12-04 22:18:04,426 - INFO -   Pollux (21.3 LY) - No civilization
+2025-12-04 22:18:04,426 - INFO - 
+2025-12-04 22:18:04,426 - INFO -   Sirius (30.8 LY) - EXTINCT
+2025-12-04 22:18:04,426 - INFO -     Age: 3238 years
+2025-12-04 22:18:04,426 - INFO -     Died: 3814 years ago
+2025-12-04 22:18:04,426 - INFO -     Swan Song: YES
+2025-12-04 22:18:04,426 - INFO - 
+2025-12-04 22:18:04,427 - INFO -   Proxima Centauri (43.0 LY) - ACTIVE
+2025-12-04 22:18:04,427 - INFO -     Age: 3928 years
+2025-12-04 22:18:04,427 - INFO -     Stage: INTERPLANETARY
+2025-12-04 22:18:04,427 - INFO -     Strategy: LR
+2025-12-04 22:18:04,427 - INFO -     Deception: 0.93
+2025-12-04 22:18:04,428 - INFO -     >>> Listen & Reply - Cautious, only responds when contacted
+2025-12-04 22:18:04,428 - INFO - 
+2025-12-04 22:18:04,428 - INFO -   Epsilon Eridani (19.5 LY) - No civilization
+2025-12-04 22:18:04,428 - INFO - 
+2025-12-04 22:18:04,428 - INFO -   Ross 128 (34.7 LY) - ACTIVE
+2025-12-04 22:18:04,428 - INFO -     Age: 39974 years
+2025-12-04 22:18:04,428 - INFO -     Stage: INTERSTELLAR
+2025-12-04 22:18:04,428 - INFO -     Strategy: LB
+2025-12-04 22:18:04,428 - INFO -     Deception: 0.93
+2025-12-04 22:18:04,428 - INFO -     >>> Listen & Broadcast - Enthusiastic, friendly METI
+2025-12-04 22:18:04,428 - INFO - 
+2025-12-04 22:18:04,428 - INFO - ============================================================
+2025-12-04 22:18:04,428 - INFO - 
+2025-12-04 22:18:04,432 - INFO - Researched Technology: AI Strategic Advisor (Tier 2, Gen 4)
+2025-12-04 22:18:04,432 - INFO - AI ADVISOR UNLOCKED: AI Strategic Advisor
+2025-12-04 22:18:04,432 - INFO - Message Sent to Achernar: Test message
+2025-12-04 22:18:04,432 - CRITICAL - HOSTILE FLEET DETECTED: Achernar
+2025-12-04 22:18:04,432 - WARNING - Attack ETA: Gen 5 (1 gens to prepare)
+2025-12-04 22:18:04,432 - INFO - Consulting AI Strategic Advisor - Gen 4
+2025-12-04 22:18:34,779 - INFO - AI Strategic Advisor consultation complete
+2025-12-04 22:18:34,781 - INFO - --- Advanced to Generation 5 ---
+2025-12-04 22:18:34,781 - CRITICAL - \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f ATTACK ARRIVED from Achernar! \u26a0\ufe0f\u26a0\ufe0f\u26a0\ufe0f
+2025-12-04 22:18:34,782 - CRITICAL - Survived devastating attack with defenses: 0% reduction
+2025-12-04 22:18:34,782 - CRITICAL - GAME OVER: Program defunded after attack

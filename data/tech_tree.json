@@ -1,120 +1,356 @@
 {
     "technologies": [
         {
-            "id": "deep_space_listening",
-            "name": "Deep Space Listening",
-            "description": "Dedicated radio arrays for detecting faint signals. (+5% Detection Chance)",
+            "id": "arecibo_telescope",
+            "name": "Arecibo Radio Telescope",
+            "description": "305-meter radio telescope built 1963. Iconic SETI instrument. +10% detection range.",
+            "tier": 0,
+            "min_generation": 1,
+            "cost": 50,
+            "prerequisites": [],
+            "category": "Detection",
+            "year_context": "Available from start (built 1963, operational by 1977)"
+        },
+        {
+            "id": "drake_equation",
+            "name": "Drake Equation Analysis",
+            "description": "Frank Drake's 1961 formula for estimating alien civilizations. +5% knowledge gain.",
+            "tier": 0,
+            "min_generation": 1,
+            "cost": 30,
+            "prerequisites": [],
+            "category": "Theory",
+            "year_context": "Available from start (published 1961)"
+        },
+        {
+            "id": "signal_processing_basic",
+            "name": "Basic Signal Processing",
+            "description": "1970s-era digital filtering and pattern recognition. +3 research points/turn.",
+            "tier": 0,
+            "min_generation": 1,
+            "cost": 40,
+            "prerequisites": [],
+            "category": "Computing",
+            "year_context": "Available from start (1970s tech)"
+        },
+        {
+            "id": "project_ozma",
+            "name": "Project Ozma Methods",
+            "description": "First modern SETI search (1960). Narrow-band scanning techniques. +5% detection.",
+            "tier": 0,
+            "min_generation": 1,
             "cost": 25,
             "prerequisites": [],
-            "category": "Physics"
+            "category": "Detection",
+            "year_context": "Available from start (conducted 1960)"
+        },
+        {
+            "id": "voyager_golden_record",
+            "name": "Voyager Golden Record",
+            "description": "Message to the cosmos (sent 1977). Cultural package design. +10% message quality.",
+            "tier": 0,
+            "min_generation": 1,
+            "cost": 35,
+            "prerequisites": [],
+            "category": "Communication",
+            "year_context": "Available from start (launched 1977)"
         },
         {
             "id": "global_education",
-            "name": "Global Education Initiative",
-            "description": "Educating the public on the importance of contact. (-0.2% Support Decay)",
+            "name": "Public Education Initiative",
+            "description": "Educate humanity about SETI importance. -0.2% support decay per generation.",
+            "tier": 0,
+            "min_generation": 1,
             "cost": 25,
             "prerequisites": [],
-            "category": "Social"
+            "category": "Social",
+            "year_context": "Always available"
         },
         {
-            "id": "physics_1",
-            "name": "Basic Physics",
-            "description": "Understanding the fundamental laws of motion and energy.",
+            "id": "seti_at_home",
+            "name": "SETI@Home Distributed Computing",
+            "description": "Launched 1999. Harness millions of home PCs. +15 research points/turn.",
+            "tier": 1,
+            "min_generation": 1,
             "cost": 100,
-            "prerequisites": [],
-            "category": "Physics"
-        },
-        {
-            "id": "engineering_1",
-            "name": "Industrial Engineering",
-            "description": "Mass production and standardization.",
-            "cost": 100,
-            "prerequisites": [],
-            "category": "Engineering"
-        },
-        {
-            "id": "radio_theory",
-            "name": "Radio Theory",
-            "description": "Transmission of information via electromagnetic waves.",
-            "cost": 200,
             "prerequisites": [
-                "physics_1"
-            ],
-            "category": "Physics"
-        },
-        {
-            "id": "nuclear_fission",
-            "name": "Nuclear Fission",
-            "description": "Splitting the atom to release massive energy.",
-            "cost": 1000,
-            "prerequisites": [
-                "physics_1",
-                "engineering_1"
-            ],
-            "category": "Physics",
-            "doctrine_choice": {
-                "name": "The Nuclear Question",
-                "description": "We have unlocked the power of the atom. How shall we use it?",
-                "options": [
-                    {
-                        "id": "doctrine_weapon",
-                        "name": "Weaponization (The Bomb)",
-                        "description": "Develop nuclear arsenals for deterrence. High security, high risk.",
-                        "effects": {
-                            "security": 20,
-                            "public_support": -10,
-                            "diplomacy_penalty": 0.5,
-                            "self_destruct_risk": 0.05
-                        }
-                    },
-                    {
-                        "id": "doctrine_energy",
-                        "name": "Civilian Energy (The Reactor)",
-                        "description": "Build power plants for economic growth. High growth, accident risk.",
-                        "effects": {
-                            "growth": 20,
-                            "public_support": 10,
-                            "diplomacy_bonus": 0.1,
-                            "accident_risk": 0.05
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "id": "ai_research",
-            "name": "Artificial Intelligence",
-            "description": "Machines that can learn and solve complex problems.",
-            "cost": 2000,
-            "prerequisites": [
-                "engineering_1",
-                "radio_theory"
+                "signal_processing_basic"
             ],
             "category": "Computing",
-            "doctrine_choice": {
-                "name": "The Alignment Problem",
-                "description": "AI is surpassing human capability. How do we control it?",
-                "options": [
-                    {
-                        "id": "doctrine_control",
-                        "name": "Hard Coded Constraints",
-                        "description": "Limit AI capability to ensure safety. Lower efficiency, higher safety.",
-                        "effects": {
-                            "research_speed": 1.2,
-                            "control": 10
-                        }
-                    },
-                    {
-                        "id": "doctrine_autonomy",
-                        "name": "Full Autonomy",
-                        "description": "Let the AI evolve freely. Massive research boost, existential risk.",
-                        "effects": {
-                            "research_speed": 2.0,
-                            "self_destruct_risk": 0.1
-                        }
-                    }
-                ]
-            }
+            "year_context": "Available Gen 1 (launched 1999)"
+        },
+        {
+            "id": "deep_space_network",
+            "name": "Deep Space Network Upgrade",
+            "description": "NASA's global communication array. +15% detection range.",
+            "tier": 1,
+            "min_generation": 2,
+            "cost": 120,
+            "prerequisites": [
+                "arecibo_telescope"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 2+ (Year 2000+)"
+        },
+        {
+            "id": "optical_seti",
+            "name": "Optical SETI",
+            "description": "Laser pulse detection. Alternative to radio. +10% detection chance.",
+            "tier": 1,
+            "min_generation": 2,
+            "cost": 90,
+            "prerequisites": [
+                "project_ozma"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 2+ (Year 2000+)"
+        },
+        {
+            "id": "kepler_database",
+            "name": "Kepler Exoplanet Database",
+            "description": "Target selection from confirmed habitable zones. +10% system knowledge.",
+            "tier": 1,
+            "min_generation": 2,
+            "cost": 80,
+            "prerequisites": [
+                "drake_equation"
+            ],
+            "category": "Theory",
+            "year_context": "Unlocks Gen 2+ (Kepler launched 2009)"
+        },
+        {
+            "id": "ai_pattern_recognition",
+            "name": "AI Pattern Recognition",
+            "description": "Machine learning for signal analysis. +20 research points/turn.",
+            "tier": 1,
+            "min_generation": 3,
+            "cost": 150,
+            "prerequisites": [
+                "seti_at_home",
+                "signal_processing_basic"
+            ],
+            "category": "Computing",
+            "year_context": "Unlocks Gen 3+ (Year 2025+, modern ML)"
+        },
+        {
+            "id": "ska_telescope",
+            "name": "Square Kilometre Array (SKA)",
+            "description": "World's largest radio telescope. Revolutionary sensitivity. +30% detection range.",
+            "tier": 2,
+            "min_generation": 3,
+            "cost": 300,
+            "prerequisites": [
+                "deep_space_network",
+                "arecibo_telescope"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 3+ (construction begins 2020s)"
+        },
+        {
+            "id": "breakthrough_listen",
+            "name": "Breakthrough Listen",
+            "description": "$100M initiative (real, started 2015). Premium data & instruments. +25% detection.",
+            "tier": 2,
+            "min_generation": 2,
+            "cost": 250,
+            "prerequisites": [
+                "optical_seti",
+                "deep_space_network"
+            ],
+            "category": "Detection",
+            "year_context": "Available Gen 2 (launched 2015)"
+        },
+        {
+            "id": "quantum_communication",
+            "name": "Quantum Communication Detection",
+            "description": "Detect quantum-encrypted signals. Access to post-digital civilizations.",
+            "tier": 2,
+            "min_generation": 4,
+            "cost": 400,
+            "prerequisites": [
+                "ai_pattern_recognition"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 4+ (Year 2075+, future tech)"
+        },
+        {
+            "id": "technosignature_catalog",
+            "name": "Technosignature Cataloging",
+            "description": "Detect industrial pollution, city lights, solar panels. Indirect detection. +15% knowledge.",
+            "tier": 2,
+            "min_generation": 4,
+            "cost": 350,
+            "prerequisites": [
+                "kepler_database",
+                "ai_pattern_recognition"
+            ],
+            "category": "Theory",
+            "year_context": "Unlocks Gen 4+ (Year 2075+)"
+        },
+        {
+            "id": "ai_strategic_advisor",
+            "name": "AI Strategic Advisor",
+            "description": "Advanced AI analyzes galactic patterns. Provides strategic recommendations.",
+            "tier": 2,
+            "min_generation": 4,
+            "cost": 200,
+            "prerequisites": [
+                "ai_pattern_recognition"
+            ],
+            "category": "Computing",
+            "year_context": "Unlocks Gen 4+ (Year 2075+)",
+            "special": "unlocks_ai_advisor"
+        },
+        {
+            "id": "neutrino_telescope",
+            "name": "Neutrino Telescope Networks",
+            "description": "Detect neutrino bursts from advanced civilizations. Passive monitoring.",
+            "tier": 3,
+            "min_generation": 5,
+            "cost": 500,
+            "prerequisites": [
+                "quantum_communication"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 5+ (Year 2100+)"
+        },
+        {
+            "id": "gravitational_wave_comm",
+            "name": "Gravitational Wave Communication",
+            "description": "Detect ripples in spacetime. Kardashev Type II+ detection.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 600,
+            "prerequisites": [
+                "neutrino_telescope"
+            ],
+            "category": "Detection",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)"
+        },
+        {
+            "id": "dyson_sphere_detection",
+            "name": "Dyson Sphere Detection Systems",
+            "description": "Identify stellar engineering megastructures. Find Type II civilizations.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 550,
+            "prerequisites": [
+                "technosignature_catalog"
+            ],
+            "category": "Theory",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)"
+        },
+        {
+            "id": "orbital_defense_grid",
+            "name": "Orbital Defense Grid",
+            "description": "Planetary defense platforms. Passive -40% attack damage.",
+            "tier": 3,
+            "min_generation": 5,
+            "cost": 450,
+            "prerequisites": [
+                "ska_telescope"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 5+ (Year 2100+)",
+            "special": "passive_defense_40"
+        },
+        {
+            "id": "civilization_cloaking",
+            "name": "Civilization Cloaking",
+            "description": "Hide Earth's electromagnetic signature. Reduces passive detection by LA/LBA.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 500,
+            "prerequisites": [
+                "orbital_defense_grid"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "special": "reduces_leakage"
+        },
+        {
+            "id": "early_warning_network",
+            "name": "Early Warning Network",
+            "description": "Advanced sensor arrays. +2 generations warning time for attacks.",
+            "tier": 3,
+            "min_generation": 5,
+            "cost": 400,
+            "prerequisites": [
+                "breakthrough_listen"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 5+ (Year 2100+)",
+            "special": "warning_time_bonus_2"
+        },
+        {
+            "id": "relativistic_communication",
+            "name": "Relativistic Communication",
+            "description": "Near-light-speed laser probes. Faster message delivery.",
+            "tier": 4,
+            "min_generation": 8,
+            "cost": 800,
+            "prerequisites": [
+                "gravitational_wave_comm"
+            ],
+            "category": "Communication",
+            "year_context": "Unlocks Gen 8+ (Year 2175+)"
+        },
+        {
+            "id": "distributed_colonies",
+            "name": "Distributed Backup Colonies",
+            "description": "Mars, Europa, Titan settlements. Prevents total annihilation.",
+            "tier": 4,
+            "min_generation": 8,
+            "cost": 1000,
+            "prerequisites": [
+                "orbital_defense_grid"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 8+ (Year 2175+)",
+            "special": "prevents_annihilation"
+        },
+        {
+            "id": "stellar_engineering",
+            "name": "Stellar Engineering",
+            "description": "Manipulate stars for signaling. Become visible to entire galaxy.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 1200,
+            "prerequisites": [
+                "dyson_sphere_detection"
+            ],
+            "category": "Theory",
+            "year_context": "Unlocks Gen 10+ (Year 2225+)"
+        },
+        {
+            "id": "post_biological_transition",
+            "name": "Post-Biological Transition",
+            "description": "Digital consciousness. Contact post-biological civilizations.",
+            "tier": 4,
+            "min_generation": 12,
+            "cost": 1500,
+            "prerequisites": [
+                "ai_strategic_advisor",
+                "stellar_engineering"
+            ],
+            "category": "Computing",
+            "year_context": "Unlocks Gen 12+ (Year 2275+)",
+            "special": "unlock_post_bio_contact"
+        },
+        {
+            "id": "emergency_evacuation",
+            "name": "Emergency Evacuation Infrastructure",
+            "description": "Rapid population relocation systems. Ultimate survival guarantee.",
+            "tier": 4,
+            "min_generation": 15,
+            "cost": 2000,
+            "prerequisites": [
+                "distributed_colonies",
+                "relativistic_communication"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 15+ (Year 2350+)",
+            "special": "ultimate_survival"
         }
     ]
 }
