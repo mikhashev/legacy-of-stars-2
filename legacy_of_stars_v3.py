@@ -9,6 +9,7 @@ import logging
 import datetime
 from ai_manager import AIManager
 from wow_signal_event import WOWSignalEvent
+from attack_warning import AttackWarning
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -300,6 +301,9 @@ class ContactProgram:
         # WOW! Signal Event System
         self.wow_signal = WOWSignalEvent(self)
         
+        # Attack Early Warning System
+        self.pending_attack_warnings = []
+        
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
@@ -582,16 +586,35 @@ class ContactProgram:
         
         # LA Strategy
         elif system.true_strategy == "LA":
-            system.pending_attack = self.generation + round_trip_time
-            self.message = f"Message sent to {system_name}. No response detected."
-            logging.warning(f"LA Strategy: {system_name} - Attack in Gen {system.pending_attack}")
+            # Create attack warning instead of instant attack
+            warning = AttackWarning(system, self.generation + round_trip_time, self.generation)
+            self.pending_attack_warnings.append(warning)
+            
+            self.message = f"""⚠️⚠️⚠️ HOSTILE FLEET DETECTED ⚠️⚠️⚠️
+
+Aggressive response from {system_name}!
+Our message triggered a hostile reaction.
+
+Fleet ETA: Generation {self.generation + round_trip_time} (Year {self.start_year + (self.generation + round_trip_time - 1) * 25})
+Time to Prepare: {round_trip_time} generations
+
+DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
+"""
+            
+            logging.critical(f"HOSTILE FLEET DETECTED: {system_name}")
+            logging.warning(f"Attack ETA: Gen {self.generation + round_trip_time} ({round_trip_time} gens to prepare)")
             return
         
-        # LBA Strategy
+        # LBA Strategy  
         elif system.true_strategy == "LBA":
             if system.deception_level > 0.6:
                 arrival_generation = self.generation + round_trip_time
-                system.pending_attack = self.generation + round_trip_time + 2
+                
+                # Schedule attack warning for +2 gens after friendly response
+                attack_gen = self.generation + round_trip_time + 2
+                warning = AttackWarning(system, attack_gen, self.generation)
+                self.pending_attack_warnings.append(warning)
+                
                 print(f"Generating response from {system_name}...")
                 
                 system_prompt = f"You are predatory aliens from {system_name} pretending to be friendly. Extract Earth's location and defenses. Be charming but subtly request tactical information."
@@ -599,10 +622,14 @@ class ContactProgram:
                 system.pending_responses.append((response_text, arrival_generation))
                 
                 self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
-                logging.warning(f"LBA Trap: {system_name}")
+                logging.warning(f"LBA Trap: {system_name} - Friendly bait, attack Gen {attack_gen}")
             else:
-                system.pending_attack = self.generation + round_trip_time
+                # Low deception LBA - immediate silent attack
+                warning = AttackWarning(system, self.generation + round_trip_time, self.generation)
+                self.pending_attack_warnings.append(warning)
+                
                 self.message = f"Message sent to {system_name}. No response detected."
+                logging.critical(f"HOSTILE FLEET DETECTED (LBA low deception): {system_name}")
             return
         
         # LR Strategy
