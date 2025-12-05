@@ -1,14 +1,16 @@
 # Passive Signal Leakage System - Implementation Summary
 
-## Status: Part 1 Complete ✅ | Integration Pending 🔨
+## Status: COMPLETE ✅
 
-**Last Updated**: December 5, 2025
+**Last Updated**: December 6, 2025
 
 ---
 
 ## Overview
 
 The Passive Signal Leakage system adds authentic Dark Forest tension by allowing LA/LBA civilizations to detect Earth's electromagnetic emissions **without being contacted first**. Based on real scientific research (Breakthrough Starshot, Project Daedalus) and Liu Cixin's Dark Forest theory.
+
+**Status**: Core implementation complete and functional. Optional polish items remain.
 
 ---
 
@@ -91,7 +93,7 @@ The Passive Signal Leakage system adds authentic Dark Forest tension by allowing
    - Doctrine choice: Complete electromagnetic silence
    - Cost: -50% public support permanently
 
-### 3. Game State Integration
+### 3. Game Integration (`legacy_of_stars_v3.py`)
 
 **Initialization in `ContactProgram.__init__`** (lines 357-368):
 ```python
@@ -109,9 +111,28 @@ self.has_fusion_propulsion = False
 self.can_send_heavy_probes = False
 ```
 
+**Passive Detection in `advance_generation()`** (lines 619-696): ✅ IMPLEMENTED
+- Calculates broadcast radius each generation
+- Finds all LA/LBA civilizations within broadcast radius
+- Checks for passive detection with 0.5% base chance × leakage_multiplier
+- Determines attack type (information/laser_sail/fusion)
+- Creates attack warnings or triggers immediate information attacks
+
+**Information Attack Method** (lines 604-703): ✅ IMPLEMENTED
+- 4 attack types with unique effects:
+  - Corrupted Technology: -100 to -300 RP
+  - Societal Manipulation: -15% to -30% public support
+  - False Hope Signal: -10% to -25% funding, -5% to -15% support
+  - Philosophical Weapon: +1% self-destruct risk, -10% to -20% support
+
+**Tech Special Effects** (lines 549-602): ✅ IMPLEMENTED
+- 8 new tech effect handlers for all passive leakage technologies
+-Leakage mitigation techs update `self.leakage_multiplier`
+- Propulsion techs unlock new capabilities and defense bonuses
+
 ---
 
-## 🔨 Pending Implementation
+## 🔨 Optional Polish (Not Required)
 
 ### 1. Passive Detection in `advance_generation()` (Priority 1)
 
