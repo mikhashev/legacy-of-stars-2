@@ -5,8 +5,8 @@ This script verifies all defensive mechanics work correctly
 
 import logging
 import datetime
-from legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
-from attack_warning import AttackWarning
+from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
+from src.attack_warning import AttackWarning
 
 # Set up logging
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

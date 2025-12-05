@@ -1,6 +1,6 @@
 import os
 import logging
-from legacy_of_stars import ContactProgram, GameInterface
+from legacy.legacy_of_stars import ContactProgram, GameInterface
 
 def test_research_feedback():
     print("Testing Research Feedback...")

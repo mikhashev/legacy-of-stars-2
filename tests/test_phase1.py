@@ -5,7 +5,7 @@ Tests: 75/25 age distribution, hidden strategies, extinct civilizations
 import sys
 sys.path.insert(0, r"c:\Users\mike\Documents\Antigravity Test\legacy-of-stars")
 
-from legacy_of_stars_v2 import StarSystem
+from legacy.legacy_of_stars_v2 import StarSystem
 import random
 
 random.seed(42)  # For reproducible results

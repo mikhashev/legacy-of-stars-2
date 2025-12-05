@@ -1,6 +1,6 @@
 import random
 import logging
-from legacy_of_stars import ContactProgram
+from src.legacy_of_stars_v3 import ContactProgram
 
 # Configure logging to a separate file for the auto-player
 import time

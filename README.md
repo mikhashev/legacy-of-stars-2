@@ -36,12 +36,45 @@ Legacy of Stars is built on real scientific principles:
 - Civilization detection probabilities reflect realistic technological challenges
 - Generational time scales acknowledge the true duration of interstellar contact
 
+## Project Structure
+
+```
+legacy-of-stars/
+├── src/                    # Core game source code
+│   ├── legacy_of_stars_v3.py  # Main game (current version)
+│   ├── ai_manager.py
+│   ├── ai_strategic_advisor.py
+│   ├── attack_warning.py
+│   ├── swan_song_messages.py
+│   └── wow_signal_event.py
+│
+├── tests/                  # Test suite
+│   └── test_*.py           # Unit and integration tests
+│
+├── scripts/                # Utility and build scripts
+│
+├── legacy/                 # Archived legacy versions
+│
+├── logs/                   # Game and test logs
+│
+├── data/                   # Game data files
+│   ├── tech_tree.json
+│   └── llm_providers.json
+│
+├── docs/                   # Documentation
+│   ├── development_roadmap.md
+│   ├── design_notes.md
+│   └── implementation guides
+│
+└── README.md              # This file
+```
+
 ## Installation
 
 ```
 git clone https://github.com/mikhashev/legacy-of-stars.git
 cd legacy-of-stars
-python3 legacy_of_stars.py
+python3 src/legacy_of_stars_v3.py
 ```
 
 ## Requirements

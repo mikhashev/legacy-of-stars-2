@@ -1,4 +1,4 @@
-from legacy_of_stars import ContactProgram
+from legacy.legacy_of_stars import ContactProgram
 
 def test_run():
     print("Initializing Contact Program...")

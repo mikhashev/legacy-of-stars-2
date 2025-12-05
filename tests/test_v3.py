@@ -2,7 +2,7 @@
 import sys
 sys.path.insert(0, r"c:\Users\mike\Documents\Antigravity Test\legacy-of-stars")
 
-from legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
+from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
 import random
 
 random.seed(789)

@@ -7,11 +7,11 @@ from typing import Dict, List, Tuple, Optional
 from pathlib import Path
 import logging
 import datetime
-from ai_manager import AIManager
-from wow_signal_event import WOWSignalEvent
-from attack_warning import AttackWarning
-from ai_strategic_advisor import AIStrategicAdvisor
-from swan_song_messages import SwanSongManager
+from .ai_manager import AIManager
+from .wow_signal_event import WOWSignalEvent
+from .attack_warning import AttackWarning
+from .ai_strategic_advisor import AIStrategicAdvisor
+from .swan_song_messages import SwanSongManager
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0

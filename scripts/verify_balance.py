@@ -1,5 +1,5 @@
 import unittest
-from legacy_of_stars import ContactProgram, Technology
+from legacy.legacy_of_stars import ContactProgram, Technology
 
 class TestGameBalance(unittest.TestCase):
     def setUp(self):

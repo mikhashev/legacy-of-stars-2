@@ -5,7 +5,7 @@ Verifies advisor unlocking, context building, and strategic advice
 
 import logging
 import datetime
-from legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
+from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
 
 # Set up logging
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

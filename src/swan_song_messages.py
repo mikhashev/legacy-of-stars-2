@@ -5,7 +5,7 @@ Adds narrative depth and strategic intelligence to the Dark Forest game
 
 import random
 from typing import Dict, Optional
-from ai_manager import AIManager
+from .ai_manager import AIManager
 
 class SwanSongCategory:
     """Categories of swan song messages"""

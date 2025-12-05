@@ -4,7 +4,7 @@ Test tech chronology fixes and legacy knowledge system
 
 import logging
 import datetime
-from legacy_of_stars_v3 import ContactProgram
+from src.legacy_of_stars_v3 import ContactProgram
 
 # Set up logging
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

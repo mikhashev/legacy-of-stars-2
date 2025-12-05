@@ -9,7 +9,7 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from legacy_of_stars_v3 import ContactProgram
+from src.legacy_of_stars_v3 import ContactProgram
 
 def test_swan_song_integration():
     """Test swan song integration in actual game"""

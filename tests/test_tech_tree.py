@@ -5,7 +5,7 @@ Verifies generation gating, special effects, and tier progression
 
 import logging
 import datetime
-from legacy_of_stars_v3 import ContactProgram
+from src.legacy_of_stars_v3 import ContactProgram
 
 # Set up logging
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
