@@ -14,6 +14,7 @@ from .ai_strategic_advisor import AIStrategicAdvisor
 from .swan_song_messages import SwanSongManager
 from .passive_leakage import PassiveLeakageSystem
 from .integration_progress import IntegrationProgress
+from .philosophical_events import PhilosophicalEvents
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -97,6 +98,28 @@ class StarSystem:
                 self.true_strategy = None
                 self.deception_level = 0
             
+            # === PHASE 3A.2: Civilization Type (How they solved Dual DNA problem) ===
+            if not self.is_extinct:
+                # Living civilizations - successfully solved the integration crisis
+                civ_type_weights = {
+                    "biological_pure": 20,      # Stayed biological, cautious
+                    "digital_ascended": 15,     # Uploaded consciousness
+                    "hybrid_integrated": 10     # Successfully merged
+                }
+                self.civilization_type = random.choices(
+                    list(civ_type_weights.keys()),
+                    weights=list(civ_type_weights.values())
+                )[0]
+            else:
+                # Extinct civilizations - 70% failed the transition
+                if random.random() < 0.7:
+                    self.civilization_type = "failed_transition"
+                else:
+                    # Some died for other reasons (war, asteroid, etc.)
+                    self.civilization_type = random.choice([
+                        "biological_pure", "digital_ascended", "hybrid_integrated"
+                    ])
+            
             self.civilization_attitude = random.uniform(0.2, 0.8)
         else:
             self.civilization_age = 0
@@ -106,6 +129,7 @@ class StarSystem:
             self.has_swan_song = False
             self.true_strategy = None
             self.deception_level = 0
+            self.civilization_type = None  # No civilization, no type
             
         self.knowledge = 0
         self.messages_sent = []
@@ -261,12 +285,14 @@ class ContactProgram:
                     logging.info(f"    Age: {int(system.civilization_age)} years")
                     logging.info(f"    Died: {system.extinct_years_ago} years ago")
                     logging.info(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
+                    logging.info(f"    Type: {system.civilization_type}")
                 else:
                     logging.info(f"  {name} ({system.distance:.1f} LY) - ACTIVE")
                     logging.info(f"    Age: {int(system.civilization_age)} years")
                     logging.info(f"    Stage: {system.civilization_stage.name}")
                     logging.info(f"    Strategy: {system.true_strategy}")
                     logging.info(f"    Deception: {system.deception_level:.2f}")
+                    logging.info(f"    Type: {system.civilization_type}")
                     
                     # Explain what this means
                     strategy_desc = {
@@ -371,6 +397,11 @@ class ContactProgram:
         # === PHASE 3A.1: Integration Progress System ===
         self.integration = IntegrationProgress()
         logging.info("Phase 3A.1: Integration Progress System initialized")
+        
+        # === PHASE 3A.2: Philosophical Events System ===
+        self.philosophical_events = PhilosophicalEvents()
+        self.pending_philosophical_event = None  # Stores event waiting for player choice
+        logging.info("Phase 3A.2: Philosophical Events System initialized")
         
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
