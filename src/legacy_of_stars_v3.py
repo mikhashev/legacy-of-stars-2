@@ -403,6 +403,16 @@ class ContactProgram:
         self.pending_philosophical_event = None  # Stores event waiting for player choice
         logging.info("Phase 3A.2: Philosophical Events System initialized")
         
+        # === PHASE 3A.3: Philosophical Victory Tracking ===
+        self.fermi_evidence = {
+            "extinction_evidence": 0,       # Swan songs discovered
+            "dark_forest_evidence": 0,      # Hostile encounters (LA/LBA attacks)
+            "cooperation_evidence": 0,      # Successful peaceful contacts (LB/LR)
+            "great_filter_evidence": 0      # Integration techs researched
+        }
+        self.philosophical_victory = False  # Separate from contact victory
+        logging.info("Phase 3A.3: Philosophical Victory tracking initialized")
+        
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
@@ -650,18 +660,27 @@ class ContactProgram:
             self.integration.add_integration(0.3, tech.name)
             self.message += f"\n🧬 {tech.name}: +30% integration progress"
             self.message += self.integration.get_display_message()
+            # Award Fermi evidence
+            self.fermi_evidence["great_filter_evidence"] += 2
+            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
         
         elif tech.special == "integration_40":
             # Neural Interface +40% integration
             self.integration.add_integration(0.4, tech.name)
             self.message += f"\n🧠 {tech.name}: +40% integration progress"
             self.message += self.integration.get_display_message()
+            # Award Fermi evidence
+            self.fermi_evidence["great_filter_evidence"] += 2
+            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
         
         elif tech.special == "integration_60":
             # Consciousness Upload +60% integration
             self.integration.add_integration(0.6, tech.name)
             self.message += f"\n💾 {tech.name}: +60% integration progress"
             self.message += self.integration.get_display_message()
+            # Award Fermi evidence
+            self.fermi_evidence["great_filter_evidence"] += 2
+            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
         
         elif tech.special == "integration_variable":
             # Genetic Pacification - amount depends on doctrine choice
@@ -772,6 +791,10 @@ Impact: -{support_loss}% Public Support, +{int(risk_increase*100)}% Self-Destruc
 Some truths are too heavy to bear.
 """
             logging.critical(f"Information Attack (Philosophical Weapon) from {system_name}: +{risk_increase} self-destruct risk")
+        
+        # === PHASE 3A.3: Award Fermi Paradox evidence ===
+        self.fermi_evidence["dark_forest_evidence"] += 1
+        logging.info(f"FERMI EVIDENCE: +1 dark forest evidence (hostile attack)")
         
         # Check if attack caused program termination
         if self.public_support < 10 or self.funding < 20:
@@ -1438,6 +1461,11 @@ Their ending remains a mystery."""
         if "tech_discount" in rewards:
             discount_pct = int(rewards["tech_discount"] * 100)
             reward_msgs.append(f"{discount_pct}% discount on next tech!")
+        
+        # === PHASE 3A.3: Award Fermi Paradox evidence ===
+        self.fermi_evidence["extinction_evidence"] += 2
+        logging.info(f"FERMI EVIDENCE: +2 extinction evidence (swan song discovery)")
+        reward_msgs.append(f"+2 Fermi Evidence (Extinction)")
         
         # Build final message
         separator = "="*60
