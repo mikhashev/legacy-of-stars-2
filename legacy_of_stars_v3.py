@@ -11,6 +11,7 @@ from ai_manager import AIManager
 from wow_signal_event import WOWSignalEvent
 from attack_warning import AttackWarning
 from ai_strategic_advisor import AIStrategicAdvisor
+from swan_song_messages import SwanSongManager
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -323,6 +324,19 @@ class ContactProgram:
         self.ai_advisor = AIStrategicAdvisor(self.ai)
         self.advisor_consulted_this_gen = False  # Track if already consulted this generation
         
+        # Swan Song Messages Manager
+        self.swan_song_manager = SwanSongManager(self.ai)
+        
+        # Create swan songs for extinct civilizations
+        for name, system in self.star_systems.items():
+            if system.has_civilization and system.is_extinct and system.has_swan_song:
+                self.swan_song_manager.create_swan_song(
+                    name, 
+                    system.extinct_years_ago, 
+                    system.civilization_age
+                )
+                logging.info(f"Swan Song created for {name}")
+        
         # Mark pre-1977 technologies as legacy knowledge (already known at game start)
         legacy_techs = [
             "arecibo_telescope",        # Built 1963
@@ -426,11 +440,20 @@ class ContactProgram:
             if prereq not in self.technologies or not self.technologies[prereq].researched:
                 self.message = f"Missing prerequisite technology."
                 return False
+        
+        # Apply swan song tech discount if available
+        discount = self.swan_song_manager.get_tech_discount()
+        final_cost = int(tech.cost * (1.0 - discount))
+        discount_msg = ""
+        
+        if discount > 0:
+            discount_msg = f" (25% discount from Swan Song! Original: {tech.cost})"
+            logging.info(f"Swan Song tech discount applied: {int(discount*100)}% off")
             
         # Research complete
-        self.research_points -= tech.cost
+        self.research_points -= final_cost
         tech.researched = True
-        self.message = f"Researched {tech.name}!"
+        self.message = f"Researched {tech.name}!{discount_msg}"
         logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
         
         # Apply special effects
@@ -1004,6 +1027,100 @@ If they have advanced tech, treat them as peers. If primitive, be encouraging.""
         self.message = advice
         logging.info("AI Strategic Advisor consultation complete")
     
+    def listen_for_swan_song(self, system_name: str):
+        """Listen for Swan Song - Attempt to discover final transmission from extinct civilization"""
+        
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+        
+        if system_name not in self.star_systems:
+            self.message = f"System {system_name} not found in database."
+            return
+        
+        system = self.star_systems[system_name]
+        
+        # Must be an extinct civilization
+        if not system.has_civilization or not system.is_extinct:
+            self.message = f"{system_name} does not contain an extinct civilization."
+            return
+        
+        # Check if swan song exists
+        if not system.has_swan_song:
+            self.message = f"""Deep scan of {system_name} complete.
+            
+No data archives detected. This civilization left no final transmission.
+Their ending remains a mystery."""
+            self.action_points -= 1
+            logging.info(f"Swan song scan of {system_name}: None found")
+            return
+        
+        # Consume action point
+        self.action_points -= 1
+        
+        # Attempt discovery
+        print(f"\n📡 Scanning for ancient transmissions from {system_name}...")
+        print("Please wait, analyzing signal patterns...")
+        
+        result = self.swan_song_manager.discover_swan_song(system_name, system.knowledge)
+        
+        if "error" in result:
+            self.message = result["error"]
+            logging.info(f"Swan song discovery attempt - {system_name}: {result['error']}")
+            return
+        
+        # Success! Display the swan song
+        logging.info(f"SWAN SONG DISCOVERED: {system_name} ({result['category']})")
+        
+        # Apply rewards
+        rewards = result["rewards"]
+        reward_msgs = []
+        
+        if "knowledge" in rewards:
+            self.knowledge_base += rewards["knowledge"]
+            self.knowledge_base = min(100, self.knowledge_base)
+            reward_msgs.append(f"+{rewards['knowledge']} Knowledge")
+        
+        if "research_points" in rewards:
+            self.research_points += rewards["research_points"]
+            reward_msgs.append(f"+{rewards['research_points']} RP")
+        
+        if "public_support" in rewards:
+            self.public_support += rewards["public_support"]
+            self.public_support = min(100, max(0, self.public_support))
+            if rewards["public_support"] > 0:
+                reward_msgs.append(f"+{rewards['public_support']}% Support")
+            else:
+                reward_msgs.append(f"{rewards['public_support']}% Support")
+        
+        if "tech_hint" in rewards:
+            reward_msgs.append("Tech Hint Unlocked")
+        
+        if "tech_discount" in rewards:
+            discount_pct = int(rewards["tech_discount"] * 100)
+            reward_msgs.append(f"{discount_pct}% discount on next tech!")
+        
+        # Build final message
+        separator = "="*60
+        self.message = f"""
+{separator}
+🕊️ SWAN SONG DISCOVERED: {system_name.upper()} 🕊️
+{separator}
+
+Category: {result['category'].upper()}
+Extinct: {system.extinct_years_ago} years ago
+
+{result['message']}
+
+{separator}
+REWARDS: {' | '.join(reward_msgs)}
+{rewards.get('message', '')}
+{separator}
+"""
+        
+        logging.info(f"Rewards applied: {reward_msgs}")
+
+    
     def defend_emergency(self, warning_index: int):
 
         """Emergency Defense Protocol - 50% damage reduction, costs ALL AP"""
@@ -1262,6 +1379,19 @@ class GameInterface:
                 print(f"{next_num}. 🤖 Consult AI Strategic Advisor (Free, once/gen){consulted_marker}")
                 menu_max = next_num
             
+            # Show Swan Song option if there are any undiscovered swan songs
+            undiscovered_swan_songs = []
+            for name, system in self.program.star_systems.items():
+                if (system.has_civilization and system.is_extinct and system.has_swan_song and
+                    not self.program.swan_song_manager.is_discovered(name)):
+                    undiscovered_swan_songs.append(name)
+            
+            if undiscovered_swan_songs:
+                next_num = menu_max + 1
+                count = len(undiscovered_swan_songs)
+                print(f"{next_num}. 🕊️ Listen for Swan Song ({count} undiscovered) (1 AP)")
+                menu_max = next_num
+            
             choice = input(f"\nEnter your choice (1-{menu_max}): ")
 
             
@@ -1393,13 +1523,87 @@ class GameInterface:
                 except ValueError:
                     self.program.message = "Invalid input."
             
-            elif choice == '8' and self.program.ai_advisor_unlocked and self.program.pending_attack_warnings:
-                # AI Advisor (when both defenses and advisor are available)
-                self.program.consult_advisor()
-            
-            elif choice == '7' and self.program.ai_advisor_unlocked and not self.program.pending_attack_warnings:
-                # AI Advisor (when only advisor is available, no threats)
-                self.program.consult_advisor()
+            # Dynamic handling for choices 7+
+            elif choice.isdigit():
+                choice_num = int(choice)
+                
+                # Build dynamic menu mapping
+                dynamic_option = 7
+                
+                # Option 7: Defensive Actions (if threats exist)
+                if choice_num == 7 and self.program.pending_attack_warnings:
+                    # Defensive Actions Menu
+                    print("\n⚠️ === DEFENSIVE ACTIONS MENU === ⚠️")
+                    for i, warning in enumerate(self.program.pending_attack_warnings, 1):
+                        etas = warning.get_etas_remaining(self.program.generation)
+                        print(f"{i}. Defend against {warning.source.name} (ETA: {etas} gens, Defense: {warning.get_defense_percentage()}%)")
+                    
+                    threat_choice = input("\nSelect threat to defend against (or 0 to cancel): ")
+                    try:
+                        threat_idx = int(threat_choice) - 1
+                        if 0 <= threat_idx < len(self.program.pending_attack_warnings):
+                            warning = self.program.pending_attack_warnings[threat_idx]
+                            
+                            print(f"\nDefensive options for {warning.source.name}:")
+                            print("1. 🛡️ Emergency Defense Protocol (ALL AP, 50% reduction)")
+                            print("2. 🚀 Evacuate Critical Infrastructure (1 AP, 30% reduction)")
+                            print("3. 📡 Attempt Diplomatic Contact (1 AP, small chance to abort)")
+                            
+                            def_choice = input("\nChoose defensive action (1-3, or 0 to cancel): ")
+                            
+                            if def_choice == '1':
+                                self.program.defend_emergency(threat_idx)
+                            elif def_choice == '2':
+                                self.program.defend_evacuate(threat_idx)
+                            elif def_choice == '3':
+                                self.program.defend_diplomacy(threat_idx)
+                            elif def_choice != '0':
+                                self.program.message = "Invalid defensive action choice."
+                        elif threat_idx != -1:
+                            self.program.message = "Invalid threat selection."
+                    except ValueError:
+                        self.program.message = "Invalid input."
+                    continue
+                
+                # Track next menu number after defenses
+                if self.program.pending_attack_warnings:
+                    dynamic_option = 8
+                
+                # AI Advisor option
+                if self.program.ai_advisor_unlocked and choice_num == dynamic_option:
+                    self.program.consult_advisor()
+                    continue
+                
+                # Increment if AI Advisor was shown
+                if self.program.ai_advisor_unlocked:
+                    dynamic_option += 1
+                
+                # Swan Song option
+                undiscovered_count = len(undiscovered_swan_songs)
+                if undiscovered_count > 0 and choice_num == dynamic_option:
+                    # Swan Song discovery interface
+                    print("\n🕊️ === SWAN SONG DISCOVERY === 🕊️")
+                    print("\nExtinct civilizations with undiscovered transmissions:")
+                    for i, name in enumerate(undiscovered_swan_songs, 1):
+                        system = self.program.star_systems[name]
+                        print(f"{i}. {name} ({system.distance:.1f} LY) - Knowledge: {int(system.knowledge)}%")
+                        if system.knowledge < 30:
+                            print(f"   ⚠️ Need 30%+ knowledge to detect artifacts (currently {int(system.knowledge)}%)")
+                    
+                    swan_choice = input("\nSelect system to scan (or 0 to cancel): ")
+                    try:
+                        swan_idx = int(swan_choice) - 1
+                        if 0 <= swan_idx < len(undiscovered_swan_songs):
+                            system_name = undiscovered_swan_songs[swan_idx]
+                            self.program.listen_for_swan_song(system_name)
+                        elif swan_idx != -1:
+                            self.program.message = "Invalid selection."
+                    except ValueError:
+                        self.program.message = "Invalid input."
+                    continue
+                
+                # Invalid choice fallthrough
+                self.program.message = f"Invalid choice. Please enter a number from 1 to {menu_max}."
 
             
             else:
@@ -1408,6 +1612,8 @@ class GameInterface:
                 if self.program.pending_attack_warnings:
                     max_choice = 7
                 if self.program.ai_advisor_unlocked:
+                    max_choice += 1
+                if undiscovered_swan_songs:
                     max_choice += 1
                 self.program.message = f"Invalid choice. Please enter a number from 1 to {max_choice}."
         
