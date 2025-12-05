@@ -13,6 +13,7 @@ from .attack_warning import AttackWarning
 from .ai_strategic_advisor import AIStrategicAdvisor
 from .swan_song_messages import SwanSongManager
 from .passive_leakage import PassiveLeakageSystem
+from .integration_progress import IntegrationProgress
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -367,6 +368,10 @@ class ContactProgram:
         self.has_fusion_propulsion = False
         self.can_send_heavy_probes = False
         
+        # === PHASE 3A.1: Integration Progress System ===
+        self.integration = IntegrationProgress()
+        logging.info("Phase 3A.1: Integration Progress System initialized")
+        
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
@@ -496,9 +501,16 @@ class ContactProgram:
             self.self_destruct_risk += effects["self_destruct_risk"]
         if "accident_risk" in effects:
             self.accident_risk += effects["accident_risk"]
+        
+        # === PHASE 3A.1: Handle integration effects from doctrine choices ===
+        if "integration" in effects:
+            self.integration.add_integration(effects["integration"], f"{tech.name} - {choice['name']}")
+            self.message = f"Doctrine adopted: {choice['name']}\n{tech.name}: +{int(effects['integration']*100)}% integration"
+            self.message += self.integration.get_display_message()
+        else:
+            self.message = f"Doctrine adopted: {choice['name']}"
             
         self.active_doctrines.append(choice["name"])
-        self.message = f"Doctrine adopted: {choice['name']}"
         logging.info(f"Doctrine Adopted: {choice['name']} for {tech.name}")
 
         return None
@@ -600,6 +612,43 @@ class ContactProgram:
             self.can_send_heavy_probes = True
             logging.info(f"PROPULSION UNLOCKED: {tech.name} - Heavy payload capability")
             self.message += f"\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
+        
+        # === PHASE 3A.1: INTEGRATION PROGRESS TECHNOLOGIES ===
+        elif tech.special == "integration_30":
+            # Synthetic Biology +30% integration
+            self.integration.add_integration(0.3, tech.name)
+            self.message += f"\n🧬 {tech.name}: +30% integration progress"
+            self.message += self.integration.get_display_message()
+        
+        elif tech.special == "integration_40":
+            # Neural Interface +40% integration
+            self.integration.add_integration(0.4, tech.name)
+            self.message += f"\n🧠 {tech.name}: +40% integration progress"
+            self.message += self.integration.get_display_message()
+        
+        elif tech.special == "integration_60":
+            # Consciousness Upload +60% integration
+            self.integration.add_integration(0.6, tech.name)
+            self.message += f"\n💾 {tech.name}: +60% integration progress"
+            self.message += self.integration.get_display_message()
+        
+        elif tech.special == "integration_variable":
+            # Genetic Pacification - amount depends on doctrine choice
+            # Will be handled in choose_doctrine() method
+            pass
+        
+        elif tech.special == "hybrid_civilization_complete":
+            # Hybrid Civilization - ultimate integration achievement
+            # This tech requires all 4 other transcendence techs, so integration should already be high
+            # Set self-destruct risk to minimum (0.1%)
+            self.self_destruct_risk = 0.001  # 0.1%
+            self.integration.add_integration(0.1, tech.name)  # Small bonus to ensure >0.7
+            logging.info(f"HYBRID CIVILIZATION ACHIEVED: Humanity transcends the Dual DNA crisis")
+            self.message += f"\n✨ HYBRID CIVILIZATION COMPLETE ✨"
+            self.message += f"\nHumanity has successfully integrated biological and technological systems!"
+            self.message += f"\nSelf-destruct risk reduced to minimum (0.1%)"
+            self.message += self.integration.get_display_message()
+
 
         
     def process_information_attack(self, system_name: str):
@@ -712,15 +761,31 @@ Some truths are too heavy to bear.
             decay_amount -= 0.2
         self.public_support -= decay_amount
         
+        # === PHASE 3A.1: Apply Low-Integration Penalties ===
+        integration_support_penalty = self.integration.get_support_penalty()
+        if integration_support_penalty < 0:
+            self.public_support += integration_support_penalty  # Negative penalty = reduces support
+            logging.info(f"Low Integration Penalty: {integration_support_penalty}% support per generation")
+        
         # Increasing Risks
         self.self_destruct_risk += 0.001 # +0.1% per gen
         self.ecological_risk += 0.005 # +0.5% per gen
         
-        # Risk Checks (The Great Filter)
-        if random.random() < self.self_destruct_risk:
+        # === PHASE 3A.1: Apply Integration Modifier to Self-Destruct Risk ===
+        filter_modifier = self.integration.get_filter_risk_modifier()
+        adjusted_self_destruct = self.self_destruct_risk * filter_modifier
+        
+        integration_status = self.integration.get_integration_status()
+        logging.info(f"Integration Status: {integration_status['level']:.1%} ({integration_status['status']}) - Filter Risk Modifier: {filter_modifier}x")
+        
+        # Risk Checks (The Great Filter) - with integration modifier applied
+        if random.random() < adjusted_self_destruct:
             self.game_over = True
-            self.message = "GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction)."
-            logging.info("GAME OVER: Self-Destruction triggered.")
+            self.message = f"""GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction).
+
+Integration Level: {integration_status['level']:.1%} ({integration_status['status']})
+{'Low biological-technological integration contributed to social instability.' if integration_status['level'] < 0.3 else ''}"""
+            logging.info(f"GAME OVER: Self-Destruction triggered (Integration: {integration_status['level']:.1%}, Risk: {self.self_destruct_risk:.2%}, Adjusted: {adjusted_self_destruct:.2%})")
             return
             
         if random.random() < self.ecological_risk:

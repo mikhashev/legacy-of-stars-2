@@ -456,6 +456,145 @@
                 "description": "Achieve complete electromagnetic silence at the cost of permanent -50% public support",
                 "effect": "public_support_penalty_50"
             }
+        },
+        {
+            "id": "bio_engineering",
+            "name": "Bio-Engineering Foundation",
+            "description": "Genetic modification and CRISPR techniques. Prerequisite for genetic integration technologies.",
+            "tier": 3,
+            "min_generation": 7,
+            "cost": 350,
+            "prerequisites": [
+                "ai_pattern_recognition"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 7+ (Year 2150+)"
+        },
+        {
+            "id": "genetic_pacification",
+            "name": "Genetic Pacification",
+            "description": "Remove aggressive tribal instincts from human genome. +40-50% integration depending on approach.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 800,
+            "prerequisites": [
+                "bio_engineering"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 10+ (Year 2225+)",
+            "special": "integration_variable",
+            "doctrine_choice": {
+                "name": "Genetic Pacification Approach",
+                "description": "How should we implement genetic modification to reduce aggression?",
+                "options": [
+                    {
+                        "id": "voluntary_program",
+                        "name": "Voluntary Program",
+                        "description": "Offer genetic modification to willing participants. Less effective but maintains autonomy.",
+                        "effects": {
+                            "integration": 0.4,
+                            "public_support": -10
+                        }
+                    },
+                    {
+                        "id": "mandatory_global_edit",
+                        "name": "Mandatory Global Edit",
+                        "description": "Universal genetic modification for all humans. Maximum effectiveness but ethically controversial.",
+                        "effects": {
+                            "integration": 0.5,
+                            "public_support": -25,
+                            "self_destruct_modifier": -0.05
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": "neural_interface",
+            "name": "Neural Interface",
+            "description": "Direct brain-computer connections. Merge biological cognition with digital processing. +40% integration.",
+            "tier": 4,
+            "min_generation": 11,
+            "cost": 900,
+            "prerequisites": [
+                "ai_strategic_advisor",
+                "bio_engineering"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 11+ (Year 2250+)",
+            "special": "integration_40"
+        },
+        {
+            "id": "synthetic_biology",
+            "name": "Synthetic Biology",
+            "description": "Engineer hybrid biological-technological organisms. Living machines and mechanical life. +30% integration.",
+            "tier": 4,
+            "min_generation": 9,
+            "cost": 700,
+            "prerequisites": [
+                "bio_engineering",
+                "technosignature_catalog"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 9+ (Year 2200+)",
+            "special": "integration_30"
+        },
+        {
+            "id": "consciousness_upload",
+            "name": "Consciousness Upload",
+            "description": "Transfer human consciousness to digital substrate. Digital immortality. +60% integration.",
+            "tier": 5,
+            "min_generation": 15,
+            "cost": 1500,
+            "prerequisites": [
+                "neural_interface",
+                "post_biological_transition"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 15+ (Year 2350+)",
+            "special": "integration_60",
+            "doctrine_choice": {
+                "name": "Upload Philosophy",
+                "description": "What is the nature of uploaded consciousness?",
+                "options": [
+                    {
+                        "id": "copy_theory",
+                        "name": "Copy Theory",
+                        "description": "Upload creates a copy. Original biological consciousness remains. Both exist.",
+                        "effects": {
+                            "integration": 0.6,
+                            "public_support": -5
+                        }
+                    },
+                    {
+                        "id": "continuity_theory",
+                        "name": "Continuity Theory",
+                        "description": "Upload is true transfer. Biological body becomes empty vessel. More controversial.",
+                        "effects": {
+                            "integration": 0.6,
+                            "public_support": -15,
+                            "self_destruct_modifier": -0.02
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": "hybrid_civilization",
+            "name": "Hybrid Civilization",
+            "description": "Complete biological-technological integration. Humanity transcends the Dual DNA crisis. Reduces self-destruct risk to 0.1%.",
+            "tier": 5,
+            "min_generation": 20,
+            "cost": 2000,
+            "prerequisites": [
+                "genetic_pacification",
+                "neural_interface",
+                "consciousness_upload",
+                "synthetic_biology"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 20+ (Year 2475+)",
+            "special": "hybrid_civilization_complete"
         }
     ]
 }
