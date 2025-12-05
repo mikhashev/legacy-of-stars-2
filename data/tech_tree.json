@@ -257,7 +257,7 @@
         {
             "id": "civilization_cloaking",
             "name": "Civilization Cloaking",
-            "description": "Hide Earth's electromagnetic signature. Reduces passive detection by LA/LBA.",
+            "description": "Hide Earth's electromagnetic signature. Reduces passive detection by LA/LBA. -80% passive leakage.",
             "tier": 3,
             "min_generation": 6,
             "cost": 500,
@@ -266,7 +266,7 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 6+ (Year 2125+)",
-            "special": "reduces_leakage"
+            "special": "reduces_leakage_80"
         },
         {
             "id": "early_warning_network",
@@ -351,6 +351,111 @@
             "category": "Defense",
             "year_context": "Unlocks Gen 15+ (Year 2350+)",
             "special": "ultimate_survival"
+        },
+        {
+            "id": "solar_sail_technology",
+            "name": "Solar Sail Technology",
+            "description": "Propellantless spacecraft using solar radiation pressure. Foundation for advanced propulsion.",
+            "tier": 2,
+            "min_generation": 3,
+            "cost": 180,
+            "prerequisites": [
+                "optical_seti"
+            ],
+            "category": "Communication",
+            "year_context": "Unlocks Gen 3+ (Year 2050+)",
+            "special": "unlocks_solar_sails"
+        },
+        {
+            "id": "laser_sail_propulsion",
+            "name": "Laser Sail Propulsion",
+            "description": "Ground-based laser array propels gram-scale probes to 15-20% light speed (Breakthrough Starshot).",
+            "tier": 3,
+            "min_generation": 5,
+            "cost": 450,
+            "prerequisites": [
+                "solar_sail_technology",
+                "breakthrough_listen"
+            ],
+            "category": "Communication",
+            "year_context": "Unlocks Gen 5+ (Year 2100+)",
+            "special": "unlocks_laser_sails"
+        },
+        {
+            "id": "von_neumann_probe_theory",
+            "name": "Von Neumann Probe Theory",
+            "description": "Self-replicating exploration probes. Understand how to defend against or deploy them.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 500,
+            "prerequisites": [
+                "ai_strategic_advisor",
+                "solar_sail_technology"
+            ],
+            "category": "Theory",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "special": "unlocks_von_neumann_defense"
+        },
+        {
+            "id": "fusion_propulsion",
+            "name": "Fusion Propulsion",
+            "description": "Deuterium/Helium-3 fusion rockets (Project Daedalus). Heavy payload interstellar capability.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 800,
+            "prerequisites": [
+                "relativistic_communication"
+            ],
+            "category": "Communication",
+            "year_context": "Unlocks Gen 10+ (Year 2225+)",
+            "special": "unlocks_fusion_propulsion"
+        },
+        {
+            "id": "directional_transmission",
+            "name": "Directional Transmission",
+            "description": "Focused laser communications instead of omnidirectional broadcasts. -30% passive leakage.",
+            "tier": 2,
+            "min_generation": 3,
+            "cost": 200,
+            "prerequisites": [
+                "optical_seti"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 3+ (Year 2050+)",
+            "special": "reduces_leakage_30"
+        },
+        {
+            "id": "radio_silence_protocol",
+            "name": "Radio Silence Protocol",
+            "description": "Minimize unintentional electromagnetic emissions. -50% passive leakage.",
+            "tier": 2,
+            "min_generation": 4,
+            "cost": 250,
+            "prerequisites": [
+                "ai_pattern_recognition"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 4+ (Year 2075+)",
+            "special": "reduces_leakage_50"
+        },
+        {
+            "id": "dark_forest_protocol",
+            "name": "Dark Forest Protocol",
+            "description": "Complete electromagnetic silence. Zero passive leakage but -50% public support permanently.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 400,
+            "prerequisites": [
+                "civilization_cloaking"
+            ],
+            "category": "Defense",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "special": "dark_forest_protocol",
+            "doctrine_choice": {
+                "name": "Accept Dark Forest Protocol",
+                "description": "Achieve complete electromagnetic silence at the cost of permanent -50% public support",
+                "effect": "public_support_penalty_50"
+            }
         }
     ]
 }

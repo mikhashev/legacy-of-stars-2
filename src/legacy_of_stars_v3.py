@@ -12,6 +12,7 @@ from .wow_signal_event import WOWSignalEvent
 from .attack_warning import AttackWarning
 from .ai_strategic_advisor import AIStrategicAdvisor
 from .swan_song_messages import SwanSongManager
+from .passive_leakage import PassiveLeakageSystem
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -353,6 +354,19 @@ class ContactProgram:
                 tech.is_legacy = True
                 logging.info(f"Legacy Knowledge: {tech.name} (pre-1977)")
         
+        # Passive Signal Leakage System
+        self.leakage_system = PassiveLeakageSystem()
+        self.broadcast_radius = 0  # Will be calculated each generation
+        self.leakage_multiplier = 1.0  # 1.0 = full leakage, 0.0 = complete silence
+        
+        # Probe Technology Flags
+        self.has_solar_sails = False
+        self.has_laser_sails = False
+        self.message_delivery_speed = 1.0  # Speed of light (default)
+        self.von_neumann_defense_bonus = 1.0  # 1.0 = no bonus
+        self.has_fusion_propulsion = False
+        self.can_send_heavy_probes = False
+        
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
@@ -532,8 +546,158 @@ class ContactProgram:
             self.ultimate_survival = True
             logging.info(f"ULTIMATE SURVIVAL: {tech.name}")
             self.message += f"\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
+        
+        # === PASSIVE LEAKAGE MITIGATION TECHS ===
+        elif tech.special == "reduces_leakage_30":
+            # Directional Transmission - 30% leakage reduction
+            self.leakage_multiplier *= 0.7
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 30% reduction (multiplier now: {self.leakage_multiplier:.2f})")
+            self.message += f"\n📡 Directional Transmission: Broadcast leakage reduced by 30%"
+        
+        elif tech.special == "reduces_leakage_50":
+            # Radio Silence Protocol - 50% leakage reduction
+            self.leakage_multiplier *= 0.5
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 50% reduction (multiplier now: {self.leakage_multiplier:.2f})")
+            self.message += f"\n🔇 Radio Silence Protocol: Broadcast leakage reduced by 50%"
+        
+        elif tech.special == "reduces_leakage_80":
+            # Civilization Cloaking (updated from old reduces_leakage) - 80% reduction
+            self.leakage_multiplier *= 0.2
+            self.cloaking_active = True
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 80% reduction (multiplier now: {self.leakage_multiplier:.2f})")
+            self.message += f"\n👻 Civilization Cloaking: Broadcast leakage reduced by 80%"
+        
+        elif tech.special == "dark_forest_protocol":
+            # Dark Forest Protocol - complete electromagnetic silence
+            self.leakage_multiplier = 0.0
+            self.public_support -= 50  # Massive public opposition to going dark
+            logging.info(f"DARK FOREST PROTOCOL ACTIVATED: {tech.name} - Complete silence, -50% support")
+            self.message += f"\n🌑 Dark Forest Protocol: Complete electromagnetic silence (-50% public support)"
+        
+        # === PROPULSION TECHNOLOGY UNLOCKS ===
+        elif tech.special == "unlocks_solar_sails":
+            # Solar Sail Technology
+            self.has_solar_sails = True
+            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Solar sail technology available")
+            self.message += f"\n☀️ Solar Sails: Foundation for advanced propulsion"
+        
+        elif tech.special == "unlocks_laser_sails":
+            # Laser Sail Propulsion - dramatically faster message delivery
+            self.has_laser_sails = True
+            self.message_delivery_speed = 0.175  # 17.5% light speed
+            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Message delivery at 0.175c (83% faster)")
+            self.message += f"\n🚀 Laser Sails: Message delivery time reduced by 83%"
+        
+        elif tech.special == "unlocks_von_neumann_defense":
+            # Von Neumann Probe Theory - better defense against probe attacks
+            self.von_neumann_defense_bonus = 0.7  # 30% damage reduction against probes
+            logging.info(f"DEFENSE UNLOCKED: {tech.name} - +30% defense vs probe attacks")
+            self.message += f"\n🛡️ Von Neumann Defense: +30% defense against probe attacks"
+        
+        elif tech.special == "unlocks_fusion_propulsion":
+            # Fusion Propulsion - heavy payload capability
+            self.has_fusion_propulsion = True
+            self.can_send_heavy_probes = True
+            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Heavy payload capability")
+            self.message += f"\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
 
         
+    def process_information_attack(self, system_name: str):
+        """
+        Process an information warfare attack from a hostile civilization
+        
+        Dark Forest Theory: Information is the cheapest and most effective attack
+        No travel time - arrives instantly via electromagnetic transmission
+        """
+        # Randomly choose attack type
+        attack_types = [
+            "corrupted_technology",
+            "societal_manipulation", 
+            "false_hope_signal",
+            "philosophical_weapon"
+        ]
+        attack_type = random.choice(attack_types)
+        
+        if attack_type == "corrupted_technology":
+            # False technical data that sets back research
+            rp_loss = random.randint(100, 300)
+            self.research_points -= rp_loss
+            self.research_points = max(0, self.research_points)
+            
+            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
+
+ATTACK TYPE: Corrupted Technology Data
+They transmitted seemingly helpful technical specifications that turned out
+to be deliberately flawed, wasting valuable research time.
+
+Impact: -{rp_loss} Research Points
+
+This is why the Dark Forest is dark - information itself can be weaponized.
+"""
+            logging.critical(f"Information Attack (Corrupted Tech) from {system_name}: -{rp_loss} RP")
+            
+        elif attack_type == "societal_manipulation":
+            # Memetic attack targeting public opinion
+            support_loss = random.randint(15, 30)
+            self.public_support -= support_loss
+            
+            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
+
+ATTACK TYPE: Societal Manipulation
+They broadcast carefully crafted messages designed to undermine public faith
+in the contact program. Social media erupts with fear and doubt.
+
+Impact: -{support_loss}% Public Support
+
+Ideas can be more dangerous than weapons.
+"""
+            logging.critical(f"Information Attack (Societal Manipulation) from {system_name}: -{support_loss}% support")
+            
+        elif attack_type == "false_hope_signal":
+            # Deceptive friendly message that wastes resources
+            funding_loss = random.randint(10, 25)
+            support_loss = random.randint(5, 15)
+            self.funding -= funding_loss
+            self.public_support -= support_loss
+            
+            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
+
+ATTACK TYPE: False Hope Signal
+They sent what appeared to be a friendly first contact message, complete with
+detailed cultural exchange proposals. We invested heavily in translation and
+response efforts before realizing it was all fabricated nonsense.
+
+Impact: -{funding_loss}% Funding, -{support_loss}% Public Support
+
+The cruelest weapon: manufactured hope.
+"""
+            logging.critical(f"Information Attack (False Hope) from {system_name}: -{funding_loss}% funding, -{support_loss}% support")
+            
+        elif attack_type == "philosophical_weapon":
+            # Existential arguments that increase self-destruct risk
+            risk_increase = 0.01  # +1% self-destruct risk
+            self.self_destruct_risk += risk_increase
+            support_loss = random.randint(10, 20)
+            self.public_support -= support_loss
+            
+            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
+
+ATTACK TYPE: Philosophical Weapon
+They transmitted a series of logically sound arguments demonstrating the
+futility of existence and the inevitability of cosmic heat death. Several
+prominent thinkers have entered existential crises. Nihilism spreads.
+
+Impact: -{support_loss}% Public Support, +{int(risk_increase*100)}% Self-Destruct Risk
+
+Some truths are too heavy to bear.
+"""
+            logging.critical(f"Information Attack (Philosophical Weapon) from {system_name}: +{risk_increase} self-destruct risk")
+        
+        # Check if attack caused program termination
+        if self.public_support < 10 or self.funding < 20:
+            self.game_over = True
+            self.message += "\n\nThe contact program has been shut down. Information warfare succeeded."
+    
     def advance_generation(self):
         """Advance to the next generation"""
         self.generation += 1
@@ -602,8 +766,87 @@ class ContactProgram:
             system.update_knowledge(research_focus)
         
         
+        # === PASSIVE SIGNAL LEAKAGE: Check for Detection by Hostile Civilizations ===
+        # Calculate Earth's current broadcast radius
+        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level)
+        
+        # Apply leakage multiplier from mitigation technologies
+        # (multiplier is already tracked in self.leakage_multiplier, updated when techs are researched)
+        
+        # Find all LA/LBA civilizations within broadcast radius
+        for system_name, system in self.star_systems.items():
+            if not system.has_civilization or system.is_extinct:
+                continue
+            
+            # Only LA and LBA civilizations attack
+            if system.true_strategy not in ["LA", "LBA"]:
+                continue
+                
+            # Check if system is within broadcast radius
+            if system.distance > self.broadcast_radius:
+                continue
+            
+            # Check if they detect us (0.5% base chance per generation × leakage multiplier)
+            detection_chance = self.leakage_system.calculate_detection_probability(
+                system.distance, 
+                self.broadcast_radius, 
+                self.leakage_multiplier
+            )
+            
+            if random.random() < detection_chance:
+                # Hostile civilization has detected Earth!
+                logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via electromagnetic leakage!")
+                
+                # Determine attack type
+                attack_type = self.leakage_system.determine_attack_type()
+                
+                if attack_type == "information":
+                    # Information attack arrives instantly
+                    logging.warning(f"{system_name} launching INFORMATION WARFARE attack (instant)")
+                    self.process_information_attack(system_name)
+                    
+                elif attack_type == "laser_sail":
+                    # Laser sail probe attack (0.175c)
+                    travel_time_gens = self.leakage_system.calculate_travel_time(
+                        system.distance, 
+                        0.175  # Breakthrough Starshot speed
+                    )
+                    arrival_gen = self.generation + travel_time_gens
+                    
+                    # Apply von Neumann defense bonus if researched
+                    defense_mult = self.von_neumann_defense_bonus
+                   
+                    # Create attack warning
+                    warning = AttackWarning(
+                        source=system,
+                        arrival_generation=arrival_gen,
+                        attack_type="laser_sail_probe"
+                    )
+                    warning.defense_multiplier = defense_mult
+                    self.pending_attack_warnings.append(warning)
+                    
+                    logging.warning(f"{system_name} launching LASER SAIL PROBE attack (0.175c) - ETA: {travel_time_gens} generations")
+                    
+                elif attack_type == "fusion":
+                    # Fusion strike (0.12c)
+                    travel_time_gens = self.leakage_system.calculate_travel_time(
+                        system.distance,
+                        0.12  # Project Daedalus speed
+                    )
+                    arrival_gen = self.generation + travel_time_gens
+                    
+                    # Create attack warning
+                    warning = AttackWarning(
+                        source=system,
+                        arrival_generation=arrival_gen,
+                        attack_type="fusion_strike"
+                    )
+                    self.pending_attack_warnings.append(warning)
+                    
+                    logging.warning(f"{system_name} launching FUSION STRIKE (0.12c) - ETA: {travel_time_gens} generations")
 
         # === WOW! SIGNAL: Check for Gen 144 Event ===
+
         if self.wow_signal.check_gen144_event():
             self.wow_signal.trigger_gen144_event()
             return
