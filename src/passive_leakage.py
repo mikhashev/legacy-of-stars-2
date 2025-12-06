@@ -31,6 +31,20 @@ class PassiveLeakageSystem:
         # Base detection chance per generation
         self.base_detection_chance = 0.005  # 0.5% per generation
         
+    def calculate_detection_probability(self, distance: float, broadcast_radius: float, leakage_multiplier: float) -> float:
+        """
+        Calculate detection probability for a single system
+        
+        Args:
+            distance: Distance to system (unused in simple model but kept for API compatibility)
+            broadcast_radius: Earth's broadcast radius (unused, checked by caller)
+            leakage_multiplier: Leakage mitigation multiplier
+        
+        Returns:
+            Probability 0.0-1.0
+        """
+        return self.base_detection_chance * leakage_multiplier
+
     def calculate_broadcast_radius(self, tech_level: int, researched_techs: Dict) -> float:
         """
         Calculate Earth's electromagnetic broadcast radius based on tech tier

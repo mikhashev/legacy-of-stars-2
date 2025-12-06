@@ -887,7 +887,7 @@ Integration Level: {integration_status['level']:.1%} ({integration_status['statu
         
         # === PASSIVE SIGNAL LEAKAGE: Check for Detection by Hostile Civilizations ===
         # Calculate Earth's current broadcast radius
-        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level)
+        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies)
         
         # Apply leakage multiplier from mitigation technologies
         # (multiplier is already tracked in self.leakage_multiplier, updated when techs are researched)
@@ -917,7 +917,7 @@ Integration Level: {integration_status['level']:.1%} ({integration_status['statu
                 logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via electromagnetic leakage!")
                 
                 # Determine attack type
-                attack_type = self.leakage_system.determine_attack_type()
+                attack_type = self.leakage_system.determine_attack_type(system, system.distance)
                 
                 if attack_type == "information":
                     # Information attack arrives instantly
