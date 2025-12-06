@@ -52,19 +52,27 @@ class IntegrationProgress:
         elif old_level < self.high_integration_threshold <= self.integration_level:
             logging.info("MILESTONE: High integration achieved (0.7+) - bonuses active!")
     
-    def get_filter_risk_modifier(self) -> float:
+    def get_filter_risk_modifier(self, current_generation: int = 999) -> float:
         """
         Return self-destruct risk multiplier based on integration
         
+        Args:
+            current_generation: Current game generation (for grace period)
+            
         Returns:
             float: Multiplier for self-destruct risk
-                   - Low integration (<0.3): 1.5 (50% increase)
+                   - Grace Period (Gen <= 30): 1.0 (no penalty)
+                   - Low integration (<0.3): 1.2 (20% increase)
                    - Medium integration (0.3-0.7): 1.0 (no change)
                    - High integration (>0.7): 0.7 (30% reduction)
         """
+        # Grace period for first 30 generations
+        if current_generation <= 30:
+            return 1.0
+            
         if self.integration_level < self.crisis_threshold:
             # Low integration - biological instincts cause chaos
-            return 1.5
+            return 1.2
         elif self.integration_level >= self.high_integration_threshold:
             # High integration - successfully merged
             return 0.7
@@ -72,26 +80,40 @@ class IntegrationProgress:
             # Medium integration - neutral
             return 1.0
     
-    def get_support_penalty(self) -> float:
+    def get_support_penalty(self, current_generation: int = 999) -> float:
         """
         Return public support penalty per generation for low integration
         
+        Args:
+            current_generation: Current game generation (for grace period)
+            
         Returns:
             float: Support penalty (-10% per gen if <0.3 integration)
         """
+        # Grace period
+        if current_generation <= 30:
+            return 0.0
+            
         if self.integration_level < self.crisis_threshold:
             return -10.0
         return 0.0
     
-    def get_research_efficiency(self) -> float:
+    def get_research_efficiency(self, current_generation: int = 999) -> float:
         """
         Return research efficiency modifier based on integration
         
+        Args:
+            current_generation: Current game generation (for grace period)
+            
         Returns:
             float: Multiplier for research points
                    - Low integration (<0.3): 0.85 (15% penalty)
                    - Otherwise: 1.0 (no change)
         """
+        # Grace period
+        if current_generation <= 30:
+            return 1.0
+            
         if self.integration_level < self.crisis_threshold:
             # Biological limitations hinder understanding advanced tech
             return 0.85
@@ -106,16 +128,24 @@ class IntegrationProgress:
         """
         return self.integration_level >= 0.4
     
-    def get_integration_status(self) -> Dict:
+    def get_integration_status(self, current_generation: int = 999) -> Dict:
         """
         Return current integration statistics
         
+        Args:
+            current_generation: Current game generation
+            
         Returns:
             dict: Complete integration status
         """
+        status = ""
+        description = ""
+        
         if self.integration_level < self.crisis_threshold:
             status = "CRISIS"
             description = "Biological-technological mismatch causing instability"
+            if current_generation <= 30:
+                status += " (GRACE PERIOD)"
         elif self.integration_level < self.high_integration_threshold:
             status = "TRANSITIONING"
             description = "Making progress toward full integration"
@@ -127,31 +157,38 @@ class IntegrationProgress:
             'level': self.integration_level,
             'status': status,
             'description': description,
-            'filter_risk_modifier': self.get_filter_risk_modifier(),
-            'support_penalty': self.get_support_penalty(),
-            'research_efficiency': self.get_research_efficiency(),
+            'filter_risk_modifier': self.get_filter_risk_modifier(current_generation),
+            'support_penalty': self.get_support_penalty(current_generation),
+            'research_efficiency': self.get_research_efficiency(current_generation),
             'can_research_tier5': self.can_research_tier5(),
             'milestone_count': len(self.integration_events),
-            'events': self.integration_events
+            'events': self.integration_events,
+            'grace_period_active': current_generation <= 30
         }
     
-    def get_display_message(self) -> str:
+    def get_display_message(self, current_generation: int = 999) -> str:
         """
         Get user-facing status message
         
+        Args:
+            current_generation: Current game generation
+            
         Returns:
             str: Formatted status message for game UI
         """
-        status = self.get_integration_status()
+        status = self.get_integration_status(current_generation)
         
         msg = f"\n🧬 Integration Progress: {status['level']:.1%} ({status['status']})"
         
         if status['level'] < self.crisis_threshold:
-            msg += "\n⚠️ WARNING: Low integration causing:"
-            msg += f"\n  • +50% self-destruct risk"
-            msg += f"\n  • -10% public support per generation"
-            msg += f"\n  • -15% research efficiency"
-            msg += f"\n  • Cannot research Tier 5 technologies"
+            if current_generation <= 30:
+                 msg += "\n🛡️ GRACE PERIOD ACTIVE (Gen 1-30): Penalties suppressed."
+            else:
+                msg += "\n⚠️ WARNING: Low integration causing:"
+                msg += f"\n  • +20% self-destruct risk"
+                msg += f"\n  • -10% public support per generation"
+                msg += f"\n  • -15% research efficiency"
+                msg += f"\n  • Cannot research Tier 5 technologies"
         elif status['level'] >= self.high_integration_threshold:
             msg += "\n✨ High integration benefits:"
             msg += f"\n  • -30% self-destruct risk"

@@ -15,6 +15,7 @@ from .swan_song_messages import SwanSongManager
 from .passive_leakage import PassiveLeakageSystem
 from .integration_progress import IntegrationProgress
 from .philosophical_events import PhilosophicalEvents
+from .genesis_project import GenesisProject
 
 class CivilizationStage(Enum):
     PRE_RADIO = 0
@@ -412,6 +413,11 @@ class ContactProgram:
         }
         self.philosophical_victory = False  # Separate from contact victory
         logging.info("Phase 3A.3: Philosophical Victory tracking initialized")
+
+        # === PHASE 3B: Genesis Project ===
+        self.genesis = GenesisProject()
+        self.message_queue = [] # Queue for Genesis events and other async messages
+        logging.info("Phase 3B: Genesis Project initialized")
         
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
@@ -1121,6 +1127,15 @@ The program survives, but at great cost.
         if self.funding < 20 or self.public_support < 10:
             self.game_over = True
             self.message = "GAME OVER: The contact program has been defunded due to lack of results or public support."
+        
+        # === PHASE 3B: Genesis Project Update ===
+        self.genesis.advance_generation(self)
+        
+        # Process async message queue
+        if self.message_queue:
+            for msg in self.message_queue:
+                self.message += f"\n\n{msg}"
+            self.message_queue = []
 
     def send_message(self, system_name: str, message_content: str):
         if self.action_points < 1:
@@ -1657,6 +1672,10 @@ class GameInterface:
         
         if self.program.active_doctrines:
             print(f"  Active Doctrines: {', '.join(self.program.active_doctrines)}")
+            
+        # Display Genesis Status
+        if self.program.genesis.unlocked:
+            print(f"  {self.program.genesis.get_summary()}")
         
         # Display message if any
         if self.program.message:
@@ -1757,6 +1776,12 @@ class GameInterface:
                 next_num = menu_max + 1
                 count = len(undiscovered_swan_songs)
                 print(f"{next_num}. 🕊️ Listen for Swan Song ({count} undiscovered) (1 AP)")
+                menu_max = next_num
+
+            # Show Genesis Project option if unlocked
+            if self.program.genesis.unlocked:
+                next_num = menu_max + 1
+                print(f"{next_num}. 🌱 Genesis Project (Seed Life)")
                 menu_max = next_num
             
             choice = input(f"\nEnter your choice (1-{menu_max}): ")
@@ -1980,8 +2005,50 @@ class GameInterface:
                     max_choice = 7
                 if self.program.ai_advisor_unlocked:
                     max_choice += 1
+                    
+                # Genesis Project Menus
+                if self.program.genesis.unlocked:
+                    # Calculate dynamic option number for Genesis
+                    genesis_option = 7
+                    if self.program.pending_attack_warnings: genesis_option += 1
+                    if self.program.ai_advisor_unlocked: genesis_option += 1
+                    if undiscovered_swan_songs: genesis_option += 1
+                    
+                    if choice_num == genesis_option:
+                        print("\n🌱 === GENESIS PROJECT === 🌱")
+                        print(f"Cost to seed world: {self.program.genesis.seed_cost_rp} RP, {self.program.genesis.seed_cost_funding}% Funding")
+                        print("Sterile worlds available for seeding:")
+                        
+                        sterile_worlds = []
+                        for name, system in self.program.star_systems.items():
+                            if not system.has_civilization and not system.is_seeded:
+                                sterile_worlds.append(system)
+                        
+                        for i, system in enumerate(sterile_worlds, 1):
+                            print(f"{i}. {system.name} ({system.distance:.1f} LY)")
+                            
+                        seed_choice = input("\nSelect system to seed (or 0 to cancel): ")
+                        try:
+                            seed_idx = int(seed_choice) - 1
+                            if 0 <= seed_idx < len(sterile_worlds):
+                                system = sterile_worlds[seed_idx]
+                                success, msg = self.program.genesis.seed_world(self.program, system)
+                                self.program.message = msg
+                            elif seed_idx != -1:
+                                self.program.message = "Invalid selection."
+                        except ValueError:
+                            self.program.message = "Invalid input."
+                        continue
+
+                if self.program.ai_advisor_unlocked:
+                    max_choice += 1
                 if undiscovered_swan_songs:
                     max_choice += 1
+                
+                # Genesis Project option
+                if self.program.genesis.unlocked:
+                    max_choice += 1
+                    
                 self.program.message = f"Invalid choice. Please enter a number from 1 to {max_choice}."
         
         # Final display after game ends
