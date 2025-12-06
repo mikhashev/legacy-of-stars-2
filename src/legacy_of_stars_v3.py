@@ -839,6 +839,11 @@ Some truths are too heavy to bear.
         logging.info(f"Integration Status: {integration_status['level']:.1%} ({integration_status['status']}) - Filter Risk Modifier: {filter_modifier}x")
         
         # Risk Checks (The Great Filter) - with integration modifier applied
+        # GRACE PERIOD: No self-destruct risk during first 30 generations
+        if self.generation <= 30:
+            logging.info(f"GRACE PERIOD ACTIVE (Gen {self.generation}/30) - Self-destruct risk suppressed")
+            adjusted_self_destruct = 0.0
+        
         if random.random() < adjusted_self_destruct:
             self.game_over = True
             self.message = f"""GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction).
