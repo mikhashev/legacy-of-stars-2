@@ -75,11 +75,32 @@ class WOWSignalEvent:
         print("  • DNA structure, human form")
         print("  • Earth's population, solar system position")
         print("\nWhat message should Earth send?")
-        print("(Max 500 chars, or press Enter for default)")
+        print("1. Compose custom message")
+        print("2. Generate AI message (Uses Director profile)")
+        print("3. Use Standard Format (Default)")
         print("-"*70)
         
-        custom_message = input("\nYour message: ").strip()[:500]
+        msg_choice = input("\nChoose option (1-3): ").strip()
+        custom_message = ""
         
+        if msg_choice == '1':
+            print("(Max 500 chars)")
+            custom_message = input("Message: ").strip()[:500]
+        elif msg_choice == '2':
+            print("\nGenerating message based on Director profile...")
+            director = self.program.current_director
+            traits = ", ".join(director.traits)
+            prompt = f"Compose a short (max 2 sentences) first contact message from Earth to an unknown alien civilization. The Director sending it has these traits: {traits}. The tone should reflect these traits."
+            try:
+                custom_message = self.program.ai.generate_text(prompt, "You are a sci-fi writer.")
+                print(f"\nGenerated: \"{custom_message}\"")
+                confirm = input("Use this message? (y/n): ")
+                if confirm.lower() != 'y':
+                    custom_message = ""
+            except Exception as e:
+                print(f"AI Generation failed: {e}")
+                custom_message = ""
+
         if not custom_message:
             # Default message
             custom_message = """Greetings from Earth. We are humanity, a civilization of 4 billion individuals on the third planet of a yellow star. We seek knowledge and friendship among the stars. This message was sent in response to your signal of August 15, 1977. We await your reply with hope."""

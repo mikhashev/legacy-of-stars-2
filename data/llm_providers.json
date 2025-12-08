@@ -1,5 +1,5 @@
 {
-    "default_provider": "ollama_local",
+    "default_provider": "claude_haiku",
     "providers": [
         {
             "alias": "ollama_local",

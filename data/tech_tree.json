@@ -77,6 +77,7 @@
                 "signal_processing_basic"
             ],
             "category": "Computing",
+            "passive_rp": 15,
             "year_context": "Available Gen 1 (launched 1999)"
         },
         {
@@ -130,7 +131,52 @@
                 "signal_processing_basic"
             ],
             "category": "Computing",
+            "passive_rp": 20,
             "year_context": "Unlocks Gen 3+ (Year 2025+, modern ML)"
+        },
+        {
+            "id": "planetary_remediation",
+            "name": "Planetary Remediation",
+            "description": "Geo-engineering and climate stabilization. Reduces Ecological Risk by 10% immediately and slows degradation.",
+            "tier": 2,
+            "min_generation": 3,
+            "cost": 250,
+            "prerequisites": [
+                "global_education",
+                "kepler_database"
+            ],
+            "category": "Social",
+            "year_context": "Unlocks Gen 3+ (Year 2025+)",
+            "special": "reduces_ecological_risk"
+        },
+        {
+            "id": "atmospheric_scrubbing",
+            "name": "Atmospheric Scrubbing",
+            "description": "Industrial-scale carbon capture and scrubbing. Passive -0.001 Ecological Risk growth per turn.",
+            "tier": 3,
+            "min_generation": 6,
+            "cost": 400,
+            "prerequisites": [
+                "planetary_remediation"
+            ],
+            "category": "Social",
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "special": "passive_eco_scrubbing"
+        },
+        {
+            "id": "nano_ecological_swarm",
+            "name": "Nano-Ecological Swarm",
+            "description": "Self-replicating nanobots that repair ecosystems. Action: Purge Ecological Risk.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 800,
+            "prerequisites": [
+                "atmospheric_scrubbing",
+                "synthetic_biology"
+            ],
+            "category": "Social",
+            "year_context": "Unlocks Gen 10+ (Year 2225+)",
+            "special": "unlocks_nano_ecology"
         },
         {
             "id": "ska_telescope",

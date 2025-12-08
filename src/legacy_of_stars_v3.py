@@ -37,6 +37,7 @@ class Technology:
         self.min_generation = data.get("min_generation", 1)
         self.year_context = data.get("year_context", "")
         self.special = data.get("special", None)
+        self.passive_rp = data.get("passive_rp", 0)  # New: Passive research points per turn
         self.is_legacy = False  # Flag for pre-1977 legacy knowledge
         self.doctrine_choice = data.get("doctrine_choice")
         self.researched = False
@@ -252,9 +253,9 @@ class Director:
         
         if "Bold" in self.traits:
             bonus += 0.1
-        if "Cautious" in self.traits and (skill == "diplomacy" or skill == "administration"):
-            bonus += 0.1
-        
+        if "Direct" in self.traits and skill == "diplomacy":
+             bonus -= 0.1 # Direct is bad for diplomacy maybe? Or good? Let's say bad for nuances but good for action.
+             
         return bonus
     
     def get_effective_skill(self, skill: str) -> float:
@@ -497,29 +498,45 @@ class ContactProgram:
             self.message = f"Technology not yet available. Unlocks in Generation {tech.min_generation} (Year {min_year})."
             return False
             
-        if self.research_points < tech.cost:
-            self.message = f"Insufficient Research Points. Need {tech.cost}, have {int(self.research_points)}."
+        # Director Science Skill: Reduces research cost
+        science_skill = self.current_director.get_effective_skill("science")
+        cost_modifier = 1.1 - (0.4 * science_skill)
+        effective_cost = int(tech.cost * cost_modifier)
+        
+        if self.research_points < effective_cost:
+            self.message = f"Not enough Research Points! Need {effective_cost} (Base: {tech.cost}, Director Efficiency: {int((1-cost_modifier)*100)}%)"
             return False
             
         # Check prerequisites
-        for prereq in tech.prerequisites:
-            if prereq not in self.technologies or not self.technologies[prereq].researched:
-                self.message = f"Missing prerequisite technology."
+        for prereq_id in tech.prerequisites:
+            if prereq_id not in self.technologies or not self.technologies[prereq_id].researched:
+                prereq_name = self.technologies[prereq_id].name if prereq_id in self.technologies else prereq_id
+                self.message = f"Prerequisite not met: {prereq_name}"
                 return False
         
-        # Apply swan song tech discount if available
-        discount = self.swan_song_manager.get_tech_discount()
-        final_cost = int(tech.cost * (1.0 - discount))
+        # Handle Swan Song discount
+        final_cost = effective_cost
         discount_msg = ""
+        swan_discount = 0.0
         
-        if discount > 0:
-            discount_msg = f" (25% discount from Swan Song! Original: {tech.cost})"
-            logging.info(f"Swan Song tech discount applied: {int(discount*100)}% off")
+        if hasattr(self, 'swan_song_manager'):
+             swan_discount = self.swan_song_manager.next_tech_discount
+             if swan_discount > 0:
+                 final_cost = int(final_cost * (1 - swan_discount))
+                 discount_msg = f" (Discounted by {int(swan_discount*100)}%)"
+
+        if self.research_points < final_cost:
+            self.message = f"Not enough Research Points! Need {final_cost} (Base: {tech.cost}, Dir: {int(effective_cost)}, Discount: {int(swan_discount*100)}%)"
+            return False
             
+        # Consume discount if used
+        if swan_discount > 0:
+            self.swan_song_manager.get_tech_discount()
+
         # Research complete
         self.research_points -= final_cost
         tech.researched = True
-        self.message = f"Researched {tech.name}!{discount_msg}"
+        self.message = f"Researched {tech.name}!{discount_msg}\\nDirector Efficiency Saved {tech.cost - effective_cost} RP."
         logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
         
         # Apply special effects
@@ -532,281 +549,165 @@ class ContactProgram:
             
         return False
 
-    def choose_doctrine(self, tech_id: str, option_index: int):
-        """Apply effects of a doctrine choice"""
-        tech = self.technologies[tech_id]
-        choice = tech.doctrine_choice["options"][option_index]
-        tech.chosen_doctrine = choice["name"]
-        
-        effects = choice.get("effects", {})
-        if "security" in effects:
-            # Implement security logic
-            pass
-        if "public_support" in effects:
-            self.public_support += effects["public_support"]
-        if "self_destruct_risk" in effects:
-            self.self_destruct_risk += effects["self_destruct_risk"]
-        if "accident_risk" in effects:
-            self.accident_risk += effects["accident_risk"]
-        
-        # === PHASE 3A.1: Handle integration effects from doctrine choices ===
-        if "integration" in effects:
-            self.integration.add_integration(effects["integration"], f"{tech.name} - {choice['name']}")
-            self.message = f"Doctrine adopted: {choice['name']}\n{tech.name}: +{int(effects['integration']*100)}% integration"
-            self.message += self.integration.get_display_message()
-        else:
-            self.message = f"Doctrine adopted: {choice['name']}"
-            
-        self.active_doctrines.append(choice["name"])
-        logging.info(f"Doctrine Adopted: {choice['name']} for {tech.name}")
-
-        return None
-    
     def _apply_tech_special_effect(self, tech):
         """Apply special effects from technology research"""
         if tech.special == "passive_defense_40":
-            # Orbital Defense Grid - apply to all future warnings
-            self.passive_defense_bonus = 0.6  # 40% reduction = 0.6 multiplier
-            logging.info(f"PASSIVE DEFENSE ACTIVATED: {tech.name} - 40% damage reduction on all attacks")
-            self.message += f"\n🛡️ Passive Defense Online: All future attacks reduced by 40%"
+            self.passive_defense_bonus = 0.6
+            logging.info(f"PASSIVE DEFENSE ACTIVATED: {tech.name} - 40% damage reduction")
+            self.message += f"\\n🛡️ Passive Defense Online: All future attacks reduced by 40%"
             
         elif tech.special == "warning_time_bonus_2":
-            # Early Warning Network - not implemented yet, would need StarSystem changes
             self.warning_time_bonus = 2
             logging.info(f"EARLY WARNING ACTIVATED: {tech.name} - +2 generations warning time")
-            self.message += f"\n⚠️ Early Warning Active: +2 generations to prepare for attacks"
+            self.message += f"\\n⚠️ Early Warning Active: +2 generations to prepare for attacks"
             
         elif tech.special == "prevents_annihilation":
-            # Distributed Colonies - survive devastating attacks
             self.has_backup_colonies = True
-            logging.info(f"BACKUP COLONIES ESTABLISHED: {tech.name} - civilization can survive Earth's destruction")
-            self.message += f"\n🌍 Backup Colonies Online: Humanity no longer depends on Earth alone"
+            logging.info(f"BACKUP COLONIES ESTABLISHED: {tech.name}")
+            self.message += f"\\n🌍 Backup Colonies Online: Humanity no longer depends on Earth alone"
             
         elif tech.special == "reduces_leakage":
-            # Civilization Cloaking - reduces passive detection (future feature)
             self.cloaking_active = True
-            logging.info(f"CLOAKING ACTIVATED: {tech.name} - reduced passive detection by hostile civilizations")
-            self.message += f"\n🔇 Cloaking Active: Earth's electromagnetic signature reduced"
+            logging.info(f"CLOAKING ACTIVATED: {tech.name}")
+            self.message += f"\\n🔇 Cloaking Active: Earth's electromagnetic signature reduced"
             
         elif tech.special == "unlocks_ai_advisor":
-            # AI Strategic Advisor - future feature
             self.ai_advisor_unlocked = True
             logging.info(f"AI ADVISOR UNLOCKED: {tech.name}")
-            self.message += f"\n🤖 AI Strategic Advisor unlocked! (Feature coming soon)"
+            self.message += f"\\n🤖 AI Strategic Advisor unlocked!"
             
         elif tech.special == "unlock_post_bio_contact":
-            # Post-Biological Transition - can contact stage 5 civilizations
             self.can_contact_post_biological = True
             logging.info(f"POST-BIOLOGICAL CONTACT: {tech.name}")
-            self.message += f"\n✨ Post-Biological Contact enabled!"
+            self.message += f"\\n✨ Post-Biological Contact enabled!"
             
         elif tech.special == "ultimate_survival":
-            # Emergency Evacuation - ultimate survival guarantee
             self.ultimate_survival = True
             logging.info(f"ULTIMATE SURVIVAL: {tech.name}")
-            self.message += f"\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
+            self.message += f"\\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
+            
+        elif tech.special == "reduces_ecological_risk":
+            self.ecological_risk = max(0.0, self.ecological_risk - 0.10)
+            logging.info(f"ECOLOGICAL REMEDIATION: {tech.name} - Risk reduced by 10%")
+            self.message += f"\\n🌱 Planetary Remediation: Ecological Risk reduced by 10%"
+        
+        elif tech.special == "passive_eco_scrubbing":
+            logging.info(f"ECO TECHNOLOGY: {tech.name} - Passive scrubbing enabled")
+            self.message += f"\\n🍃 Atmospheric Scrubbing: Passive ecological repair initiated"
+            
+        elif tech.special == "unlocks_nano_ecology":
+            logging.info(f"ECO TECHNOLOGY: {tech.name} - Nano-swarm ready")
+            self.message += f"\\n🌫️ Nano-Ecological Swarm: Active ecological purge capability unlocked"
         
         # === PASSIVE LEAKAGE MITIGATION TECHS ===
         elif tech.special == "reduces_leakage_30":
-            # Directional Transmission - 30% leakage reduction
             self.leakage_multiplier *= 0.7
-            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 30% reduction (multiplier now: {self.leakage_multiplier:.2f})")
-            self.message += f"\n📡 Directional Transmission: Broadcast leakage reduced by 30%"
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 30%")
+            self.message += f"\\n📡 Directional Transmission: Broadcast leakage reduced by 30%"
         
         elif tech.special == "reduces_leakage_50":
-            # Radio Silence Protocol - 50% leakage reduction
             self.leakage_multiplier *= 0.5
-            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 50% reduction (multiplier now: {self.leakage_multiplier:.2f})")
-            self.message += f"\n🔇 Radio Silence Protocol: Broadcast leakage reduced by 50%"
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 50%")
+            self.message += f"\\n🔇 Radio Silence Protocol: Broadcast leakage reduced by 50%"
         
         elif tech.special == "reduces_leakage_80":
-            # Civilization Cloaking (updated from old reduces_leakage) - 80% reduction
             self.leakage_multiplier *= 0.2
             self.cloaking_active = True
-            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 80% reduction (multiplier now: {self.leakage_multiplier:.2f})")
-            self.message += f"\n👻 Civilization Cloaking: Broadcast leakage reduced by 80%"
+            logging.info(f"LEAKAGE REDUCTION: {tech.name} - 80%")
+            self.message += f"\\n👻 Civilization Cloaking: Broadcast leakage reduced by 80%"
         
         elif tech.special == "dark_forest_protocol":
-            # Dark Forest Protocol - complete electromagnetic silence
             self.leakage_multiplier = 0.0
-            self.public_support -= 50  # Massive public opposition to going dark
-            logging.info(f"DARK FOREST PROTOCOL ACTIVATED: {tech.name} - Complete silence, -50% support")
-            self.message += f"\n🌑 Dark Forest Protocol: Complete electromagnetic silence (-50% public support)"
+            self.public_support -= 50
+            logging.info(f"DARK FOREST PROTOCOL ACTIVATED: {tech.name}")
+            self.message += f"\\n🌑 Dark Forest Protocol: Complete electromagnetic silence (-50% public support)"
         
         # === PROPULSION TECHNOLOGY UNLOCKS ===
         elif tech.special == "unlocks_solar_sails":
-            # Solar Sail Technology
             self.has_solar_sails = True
-            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Solar sail technology available")
-            self.message += f"\n☀️ Solar Sails: Foundation for advanced propulsion"
+            logging.info(f"PROPULSION UNLOCKED: {tech.name}")
+            self.message += f"\\n☀️ Solar Sails: Foundation for advanced propulsion"
         
         elif tech.special == "unlocks_laser_sails":
-            # Laser Sail Propulsion - dramatically faster message delivery
             self.has_laser_sails = True
-            self.message_delivery_speed = 0.175  # 17.5% light speed
-            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Message delivery at 0.175c (83% faster)")
-            self.message += f"\n🚀 Laser Sails: Message delivery time reduced by 83%"
+            self.message_delivery_speed = 0.175
+            logging.info(f"PROPULSION UNLOCKED: {tech.name} - 0.175c")
+            self.message += f"\\n🚀 Laser Sails: Message delivery time reduced by 83%"
         
         elif tech.special == "unlocks_von_neumann_defense":
-            # Von Neumann Probe Theory - better defense against probe attacks
-            self.von_neumann_defense_bonus = 0.7  # 30% damage reduction against probes
-            logging.info(f"DEFENSE UNLOCKED: {tech.name} - +30% defense vs probe attacks")
-            self.message += f"\n🛡️ Von Neumann Defense: +30% defense against probe attacks"
+            self.von_neumann_defense_bonus = 0.7
+            logging.info(f"DEFENSE UNLOCKED: {tech.name}")
+            self.message += f"\\n🛡️ Von Neumann Defense: +30% defense against probe attacks"
         
         elif tech.special == "unlocks_fusion_propulsion":
-            # Fusion Propulsion - heavy payload capability
             self.has_fusion_propulsion = True
             self.can_send_heavy_probes = True
-            logging.info(f"PROPULSION UNLOCKED: {tech.name} - Heavy payload capability")
-            self.message += f"\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
+            logging.info(f"PROPULSION UNLOCKED: {tech.name}")
+            self.message += f"\\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
         
-        # === PHASE 3A.1: INTEGRATION PROGRESS TECHNOLOGIES ===
+        # === INTEGRATION PROGRESS ===
         elif tech.special == "integration_30":
-            # Synthetic Biology +30% integration
             self.integration.add_integration(0.3, tech.name)
-            self.message += f"\n🧬 {tech.name}: +30% integration progress"
-            self.message += self.integration.get_display_message()
-            # Award Fermi evidence
+            self.message += f"\\n🧬 {tech.name}: +30% integration progress"
             self.fermi_evidence["great_filter_evidence"] += 2
-            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
         
         elif tech.special == "integration_40":
-            # Neural Interface +40% integration
             self.integration.add_integration(0.4, tech.name)
-            self.message += f"\n🧠 {tech.name}: +40% integration progress"
-            self.message += self.integration.get_display_message()
-            # Award Fermi evidence
+            self.message += f"\\n🧠 {tech.name}: +40% integration progress"
             self.fermi_evidence["great_filter_evidence"] += 2
-            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
         
         elif tech.special == "integration_60":
-            # Consciousness Upload +60% integration
             self.integration.add_integration(0.6, tech.name)
-            self.message += f"\n💾 {tech.name}: +60% integration progress"
-            self.message += self.integration.get_display_message()
-            # Award Fermi evidence
+            self.message += f"\\n💾 {tech.name}: +60% integration progress"
             self.fermi_evidence["great_filter_evidence"] += 2
-            logging.info(f"FERMI EVIDENCE: +2 great filter evidence (integration tech)")
-        
-        elif tech.special == "integration_variable":
-            # Genetic Pacification - amount depends on doctrine choice
-            # Will be handled in choose_doctrine() method
-            pass
-        
+            
         elif tech.special == "hybrid_civilization_complete":
-            # Hybrid Civilization - ultimate integration achievement
-            # This tech requires all 4 other transcendence techs, so integration should already be high
-            # Set self-destruct risk to minimum (0.1%)
-            self.self_destruct_risk = 0.001  # 0.1%
-            self.integration.add_integration(0.1, tech.name)  # Small bonus to ensure >0.7
-            logging.info(f"HYBRID CIVILIZATION ACHIEVED: Humanity transcends the Dual DNA crisis")
-            self.message += f"\n✨ HYBRID CIVILIZATION COMPLETE ✨"
-            self.message += f"\nHumanity has successfully integrated biological and technological systems!"
-            self.message += f"\nSelf-destruct risk reduced to minimum (0.1%)"
-            self.message += self.integration.get_display_message()
+            self.self_destruct_risk = 0.001
+            self.integration.add_integration(0.1, tech.name)
+            logging.info(f"HYBRID CIVILIZATION ACHIEVED")
+            self.message += f"\\n✨ HYBRID CIVILIZATION COMPLETE ✨\\nSelf-destruct risk minimized."
+            
+        if hasattr(self, 'integration'):
+            self.message += self.integration.get_display_message(self.generation)
 
-
-        
     def process_information_attack(self, system_name: str):
-        """
-        Process an information warfare attack from a hostile civilization
-        
-        Dark Forest Theory: Information is the cheapest and most effective attack
-        No travel time - arrives instantly via electromagnetic transmission
-        """
-        # Randomly choose attack type
-        attack_types = [
-            "corrupted_technology",
-            "societal_manipulation", 
-            "false_hope_signal",
-            "philosophical_weapon"
-        ]
+        """Process an information warfare attack"""
+        attack_types = ["corrupted_technology", "societal_manipulation", "false_hope_signal", "philosophical_weapon"]
         attack_type = random.choice(attack_types)
         
         if attack_type == "corrupted_technology":
-            # False technical data that sets back research
             rp_loss = random.randint(100, 300)
-            self.research_points -= rp_loss
-            self.research_points = max(0, self.research_points)
-            
-            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
-
-ATTACK TYPE: Corrupted Technology Data
-They transmitted seemingly helpful technical specifications that turned out
-to be deliberately flawed, wasting valuable research time.
-
-Impact: -{rp_loss} Research Points
-
-This is why the Dark Forest is dark - information itself can be weaponized.
-"""
-            logging.critical(f"Information Attack (Corrupted Tech) from {system_name}: -{rp_loss} RP")
+            self.research_points = max(0, self.research_points - rp_loss)
+            self.message = f"⚠️ INFO ATTACK ({system_name}): Corrupted Tech Data (-{rp_loss} RP)"
+            logging.critical(f"Info Attack {system_name}: -{rp_loss} RP")
             
         elif attack_type == "societal_manipulation":
-            # Memetic attack targeting public opinion
             support_loss = random.randint(15, 30)
             self.public_support -= support_loss
-            
-            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
-
-ATTACK TYPE: Societal Manipulation
-They broadcast carefully crafted messages designed to undermine public faith
-in the contact program. Social media erupts with fear and doubt.
-
-Impact: -{support_loss}% Public Support
-
-Ideas can be more dangerous than weapons.
-"""
-            logging.critical(f"Information Attack (Societal Manipulation) from {system_name}: -{support_loss}% support")
+            self.message = f"⚠️ INFO ATTACK ({system_name}): Societal Manipulation (-{support_loss}% Support)"
+            logging.critical(f"Info Attack {system_name}: -{support_loss} Support")
             
         elif attack_type == "false_hope_signal":
-            # Deceptive friendly message that wastes resources
             funding_loss = random.randint(10, 25)
             support_loss = random.randint(5, 15)
             self.funding -= funding_loss
             self.public_support -= support_loss
-            
-            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
-
-ATTACK TYPE: False Hope Signal
-They sent what appeared to be a friendly first contact message, complete with
-detailed cultural exchange proposals. We invested heavily in translation and
-response efforts before realizing it was all fabricated nonsense.
-
-Impact: -{funding_loss}% Funding, -{support_loss}% Public Support
-
-The cruelest weapon: manufactured hope.
-"""
-            logging.critical(f"Information Attack (False Hope) from {system_name}: -{funding_loss}% funding, -{support_loss}% support")
+            self.message = f"⚠️ INFO ATTACK ({system_name}): False Hope (-{funding_loss}% Funding, -{support_loss}% Support)"
+            logging.critical(f"Info Attack {system_name}: False Hope")
             
         elif attack_type == "philosophical_weapon":
-            # Existential arguments that increase self-destruct risk
-            risk_increase = 0.01  # +1% self-destruct risk
+            risk_increase = 0.01
             self.self_destruct_risk += risk_increase
-            support_loss = random.randint(10, 20)
-            self.public_support -= support_loss
-            
-            self.message = f"""⚠️ INFORMATION ATTACK from {system_name}! ⚠️
-
-ATTACK TYPE: Philosophical Weapon
-They transmitted a series of logically sound arguments demonstrating the
-futility of existence and the inevitability of cosmic heat death. Several
-prominent thinkers have entered existential crises. Nihilism spreads.
-
-Impact: -{support_loss}% Public Support, +{int(risk_increase*100)}% Self-Destruct Risk
-
-Some truths are too heavy to bear.
-"""
-            logging.critical(f"Information Attack (Philosophical Weapon) from {system_name}: +{risk_increase} self-destruct risk")
+            self.public_support -= random.randint(10, 20)
+            self.message = f"⚠️ INFO ATTACK ({system_name}): Philosophical Weapon (+1% Self-Destruct Risk)"
+            logging.critical(f"Info Attack {system_name}: Philo Weapon")
         
-        # === PHASE 3A.3: Award Fermi Paradox evidence ===
         self.fermi_evidence["dark_forest_evidence"] += 1
-        logging.info(f"FERMI EVIDENCE: +1 dark forest evidence (hostile attack)")
         
-        # Check if attack caused program termination
         if self.public_support < 10 or self.funding < 20:
             self.game_over = True
-            self.message += "\n\nThe contact program has been shut down. Information warfare succeeded."
-    
+            self.message += "\\nPROGRAM TERMINATED via Info War."
+
     def advance_generation(self):
         """Advance to the next generation"""
         self.generation += 1
@@ -815,53 +716,74 @@ Some truths are too heavy to bear.
         # Knowledge Decay
         self.knowledge_bank.degrade()
         
-        # Support Decay (Fatigue)
+        # Support Decay
         decay_amount = 0.5
         if "global_education" in self.technologies and self.technologies["global_education"].researched:
             decay_amount -= 0.2
-        self.public_support -= decay_amount
         
-        # === PHASE 3A.1: Apply Low-Integration Penalties ===
+        # Director Trait: Patient
+        if "Patient" in self.current_director.traits:
+            decay_amount -= 0.5
+            logging.info("Director Trait (Patient): Reduced support decay")
+            
+        self.public_support -= max(0, decay_amount)
+
+        # Integration Penalty
         integration_support_penalty = self.integration.get_support_penalty()
         if integration_support_penalty < 0:
-            self.public_support += integration_support_penalty  # Negative penalty = reduces support
-            logging.info(f"Low Integration Penalty: {integration_support_penalty}% support per generation")
+            self.public_support += integration_support_penalty
         
-        # Increasing Risks
-        self.self_destruct_risk += 0.001 # +0.1% per gen
-        self.ecological_risk += 0.005 # +0.5% per gen
+        # Risks
+        self.self_destruct_risk += 0.001
         
-        # === PHASE 3A.1: Apply Integration Modifier to Self-Destruct Risk ===
+        eco_growth = 0.005
+        if "planetary_remediation" in self.technologies and self.technologies["planetary_remediation"].researched:
+            eco_growth = 0.002
+        
+        # Tech: Atmospheric Scrubbing
+        if "atmospheric_scrubbing" in self.technologies and self.technologies["atmospheric_scrubbing"].researched:
+            self.ecological_risk = max(0.0, self.ecological_risk - 0.001)
+            
+        self.ecological_risk += eco_growth
+        
+        # Director Trait: Traditional
+        if "Traditional" in self.current_director.traits and self.public_support < 50:
+             self.public_support += 1.0
+        
+        # Director Trait: Intuitive
+        if "Intuitive" in self.current_director.traits and random.random() < 0.05:
+            self.research_points += 50
+            self.message = f"💡 Director Intuition: +50 RP!"
+
+        # Risk Checks
         filter_modifier = self.integration.get_filter_risk_modifier()
         adjusted_self_destruct = self.self_destruct_risk * filter_modifier
-        
-        integration_status = self.integration.get_integration_status()
-        logging.info(f"Integration Status: {integration_status['level']:.1%} ({integration_status['status']}) - Filter Risk Modifier: {filter_modifier}x")
-        
-        # Risk Checks (The Great Filter) - with integration modifier applied
-        # GRACE PERIOD: No self-destruct risk during first 30 generations
-        if self.generation <= 30:
-            logging.info(f"GRACE PERIOD ACTIVE (Gen {self.generation}/30) - Self-destruct risk suppressed")
-            adjusted_self_destruct = 0.0
+        if self.generation <= 30: adjusted_self_destruct = 0.0
         
         if random.random() < adjusted_self_destruct:
             self.game_over = True
-            self.message = f"""GAME OVER: Civilization collapsed due to internal conflict (Self-Destruction).
-
-Integration Level: {integration_status['level']:.1%} ({integration_status['status']})
-{'Low biological-technological integration contributed to social instability.' if integration_status['level'] < 0.3 else ''}"""
-            logging.info(f"GAME OVER: Self-Destruction triggered (Integration: {integration_status['level']:.1%}, Risk: {self.self_destruct_risk:.2%}, Adjusted: {adjusted_self_destruct:.2%})")
+            self.message = "GAME OVER: Self-Destruction."
             return
             
-        if random.random() < self.ecological_risk:
+        if self.generation > 30 and random.random() < self.ecological_risk:
             self.public_support -= 15
-            self.message = "ECOLOGICAL COLLAPSE: Environmental degradation has caused famine and unrest. Public support plummets."
-            logging.info("EVENT: Ecological Collapse triggered.")
-            
-        if random.random() < self.accident_risk:
-            self.public_support -= 20
-            self.message = "MAJOR ACCIDENT: A technological catastrophe has damaged public trust."
+            self.message = "EVENT: Ecological Collapse."
         
+        if self.generation > 30 and random.random() < self.accident_risk:
+            self.public_support -= 20
+            self.message = "EVENT: Major Accident."
+
+        # Passive RP
+        passive_rp = 0
+        if "signal_processing_basic" in self.technologies and self.technologies["signal_processing_basic"].researched: passive_rp += 3
+        if "seti_at_home" in self.technologies and self.technologies["seti_at_home"].researched: passive_rp += 15
+        if "ai_pattern_recognition" in self.technologies and self.technologies["ai_pattern_recognition"].researched: passive_rp += 20
+        # Director vision handled in knowledge gain usually, or here?
+        # Visionary trait added to knowledge gain logic in legacy_of_stars_v3.py (Step 647)
+        
+        if passive_rp > 0:
+            self.research_points += passive_rp
+            
         # Process pending messages
         for system in self.star_systems.values():
             responses_to_remove = []
@@ -869,34 +791,24 @@ Integration Level: {integration_status['level']:.1%} ({integration_status['statu
             for response in system.pending_responses:
                 message, arrival_generation = response
                 if arrival_generation <= self.generation:
-                    # Message has arrived
                     system.received_messages.append(message)
-                    logging.info(f"Message Received from {system.name}: {message[:50]}...")
                     
-                    # Knowledge increase from received message
-                    system.knowledge += 10 * self.tech_level
-                    system.knowledge = min(100, system.knowledge)
+                    # Knowledge gain
+                    k_gain = 10 * self.tech_level
                     
-                    # Overall knowledge base increase
-                    self.knowledge_base += 5
-                    self.knowledge_base = min(100, self.knowledge_base)
-                    
-                    # Public support boost from successful contact
-                    self.public_support += 5
-                    self.public_support = min(100, self.public_support)
-                    
+                    # Director Trait: Visionary
+                    if "Visionary" in self.current_director.traits:
+                        k_gain = int(k_gain * 1.1)
+                        
+                    system.knowledge = min(100, system.knowledge + k_gain)
+                    self.knowledge_base = min(100, self.knowledge_base + 5)
+                    self.public_support = min(100, self.public_support + 5)
                     responses_to_remove.append(response)
             
-            # Remove processed responses
             for response in responses_to_remove:
                 system.pending_responses.remove(response)
-            
-            # Update system knowledge
-            research_focus = self.research_points / 100
-            system.update_knowledge(research_focus)
         
-        
-        # === PASSIVE SIGNAL LEAKAGE: Check for Detection by Hostile Civilizations ===
+        # === PASSIVE SIGNAL LEAKAGE
         # Calculate Earth's current broadcast radius
         self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies)
         
@@ -1097,11 +1009,30 @@ The program survives, but at great cost.
 
         
         # Passive Research Gain
-        self.research_points += 10 + (self.funding / 10)
+        # Base gain
+        base_rp = 10 + (self.funding / 10)
+        
+        # Add passive RP from technologies
+        tech_rp = 0
+        for tech in self.technologies.values():
+            if tech.researched:
+                tech_rp += tech.passive_rp
+        
+        self.research_points += base_rp + tech_rp
+        
+        if tech_rp > 0:
+            logging.info(f"Passive RP Gain: Base {base_rp:.1f} + Tech {tech_rp} = {base_rp+tech_rp:.1f}")
         
         # Funding changes based on public support
         support_modifier = (self.public_support - 50) / 10
         self.funding += support_modifier
+        
+        # Director Administration Skill: Improves funding maintenance
+        admin_skill = self.current_director.get_effective_skill("administration")
+        # Bonus: +0 to +5 funding per turn based on skill
+        funding_bonus = 5 * admin_skill
+        self.funding += funding_bonus
+        
         self.funding = max(20, min(100, self.funding))
         
         # Message quality improves with tech and knowledge
@@ -1123,10 +1054,24 @@ The program survives, but at great cost.
             if system.has_civilization and len(system.received_messages) > 0:
                 contacted_count += 1
         
-        if contacted_count >= 3:
+        if contacted_count >= 3 and not self.victory:
             self.victory = True
-            self.game_over = True
-            self.message = "VICTORY! Earth has established contact with multiple civilizations."
+            # self.game_over = True # DO NOT END GAME
+            self.message = f"""
+============================================================
+       🎉 ACHIEVEMENT UNLOCKED: FIRST CONTACT NETWORK 🎉
+============================================================
+
+You have successfully established contact with 3 distinct civilizations!
+Humanity is no longer alone in the dark.
+
+The program continues. Your new goal is to foster these relationships,
+warn them of dangers, or perhaps seek the answers to the ultimate question.
+
+(Game continues...)
+============================================================
+"""
+            logging.info("ACHIEVEMENT UNLOCKED: Contact Victory (Game Continues)")
         
         # Game over check - funding cut or lost public support
         if self.funding < 20 or self.public_support < 10:
@@ -1153,7 +1098,15 @@ The program survives, but at great cost.
             
         system = self.star_systems[system_name]
         system.messages_sent.append((message_content, self.generation))
-        logging.info(f"Message Sent to {system_name}: {message_content}")
+        
+        # Director Diplomacy Skill: Improves message quality
+        diplomacy_skill = self.current_director.get_effective_skill("diplomacy")
+        # Multiplier: 0.5 (incompetent) to 1.5 (expert)
+        quality_multiplier = 0.5 + diplomacy_skill 
+        effective_quality = self.message_quality * quality_multiplier
+        
+        logging.info(f"Message Sent to {system_name} (Dir. Skill: {diplomacy_skill:.2f}, Quality Multiplier: {quality_multiplier:.2f})")
+        
         self.action_points -= 1
         
         # Extinct civilizations
@@ -1232,7 +1185,8 @@ Advanced tech might make you more cautious, primitive tech might make you dismis
         
         # LR Strategy
         elif system.true_strategy == "LR":
-            response_chance = 0.3 + (self.message_quality * 0.2) + (0.1 * system.civilization_stage.value)
+            # Use effective_quality instead of self.message_quality
+            response_chance = 0.3 + (effective_quality * 0.2) + (0.1 * system.civilization_stage.value)
             response_chance = min(0.85, response_chance)
             
             if random.random() < response_chance:
@@ -1260,7 +1214,8 @@ If they have advanced tech, show more respect. If primitive, be more dismissive.
         
         # LB Strategy
         elif system.true_strategy == "LB":
-            response_chance = 0.7 + (self.message_quality * 0.2)
+            # Use effective_quality instead of self.message_quality
+            response_chance = 0.7 + (effective_quality * 0.2)
             
             if random.random() < min(0.95, response_chance):
                 arrival_generation = self.generation + round_trip_time
@@ -1616,8 +1571,13 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         
         # Check if diplomacy might work (only for low-deception LBA)
         success_chance = 0.0
+        
+        # Director Diplomacy Skill Bonus
+        diplomacy_skill = self.current_director.get_effective_skill("diplomacy")
+        skill_bonus = diplomacy_skill * 0.2 # Up to +20% chance
+        
         if warning.source.true_strategy == "LBA" and warning.source.deception_level < 0.4:
-            success_chance = 0.3  # 30% chance to abort attack
+            success_chance = 0.3 + skill_bonus # Base 30% + skill
             
             if random.random() < success_chance:
                 # Diplomacy worked! Remove the warning
@@ -1625,6 +1585,7 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
                 self.message = f"""🕊️ DIPLOMATIC BREAKTHROUGH! 🕊️
 
 Our urgent diplomatic transmission reached {warning.source.name}.
+Director {self.current_director.name}'s diplomatic skill ({int(diplomacy_skill*100)}%) was crucial!
 After intense negotiations, they have agreed to abort their attack!
 
 This proves that even hostile civilizations can sometimes be reasoned with.
@@ -1664,14 +1625,16 @@ class GameInterface:
               f"Administration {int(self.program.current_director.get_effective_skill('administration')*100)}%")
         
         # Calculate passive income
-        passive_income = 10 + (self.program.funding / 10)
+        base_income = 10 + (self.program.funding / 10)
+        tech_income = sum(t.passive_rp for t in self.program.technologies.values() if t.researched)
+        total_passive = base_income + tech_income
         
         print(f"\nProgram Status:")
         print(f"  Action Points: {self.program.action_points}/{self.program.max_action_points}")
         print(f"  Funding: {int(self.program.funding)}%")
         print(f"  Public Support: {int(self.program.public_support)}%")
         print(f"  Knowledge Base: {int(self.program.knowledge_base)}%")
-        print(f"  Research Points: {int(self.program.research_points)} (+{int(passive_income)}/turn)")
+        print(f"  Research Points: {int(self.program.research_points)} (+{int(total_passive)}/turn)")
         print(f"  Self-Destruct Risk: {self.program.self_destruct_risk*100:.1f}%")
         print(f"  Ecological Risk: {self.program.ecological_risk*100:.1f}%")
         
