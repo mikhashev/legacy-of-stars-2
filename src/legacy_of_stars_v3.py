@@ -708,6 +708,65 @@ class ContactProgram:
             self.game_over = True
             self.message += "\\nPROGRAM TERMINATED via Info War."
 
+    def handle_philosophical_event_choice(self, choice_index: int) -> bool:
+        """
+        Handle player's choice for a philosophical event
+
+        Args:
+            choice_index: Index of the chosen option (0-based)
+
+        Returns:
+            True if choice was applied successfully, False otherwise
+        """
+        if not self.pending_philosophical_event:
+            return False
+
+        event = self.pending_philosophical_event
+        result_message = self.philosophical_events.apply_choice_effects(event, choice_index, self)
+
+        # Build response message
+        self.message = f"""============================================================
+         🤔 PHILOSOPHICAL EVENT: {event.name}
+============================================================
+
+CHOICE: {event.chosen_option}
+
+{result_message}
+
+============================================================
+"""
+        logging.info(f"PHILOSOPHICAL EVENT RESOLVED: {event.name} -> {event.chosen_option}")
+
+        # Clear pending event
+        self.pending_philosophical_event = None
+        return True
+
+    def get_philosophical_event_display(self) -> str:
+        """
+        Get formatted display text for pending philosophical event
+
+        Returns:
+            Formatted string for display, or empty string if no pending event
+        """
+        if not self.pending_philosophical_event:
+            return ""
+
+        event = self.pending_philosophical_event
+        choices_text = ""
+        for i, choice in enumerate(event.choices):
+            choices_text += f"{i + 1}. {choice['name']}\n   {choice['description']}\n\n"
+
+        return f"""============================================================
+         🤔 PHILOSOPHICAL EVENT: {event.name}
+============================================================
+
+{event.description}
+
+YOUR CHOICE:
+
+{choices_text}============================================================
+"""
+
     def advance_generation(self):
         """Advance to the next generation"""
         self.generation += 1
@@ -1080,7 +1139,50 @@ warn them of dangers, or perhaps seek the answers to the ultimate question.
         
         # === PHASE 3B: Genesis Project Update ===
         self.genesis.advance_generation(self)
-        
+
+        # === PHASE 3A: Philosophical Events Check ===
+        if not self.pending_philosophical_event and not self.victory:
+            event = self.philosophical_events.check_and_trigger(self)
+            if event:
+                self.pending_philosophical_event = event
+                # Event will be displayed in main loop and handled via choice
+
+        # === PHASE 3A: Philosophical Victory Check ===
+        if not self.philosophical_victory and not self.game_over:
+            total_evidence = sum(self.fermi_evidence.values())
+            if total_evidence >= 15:
+                self.philosophical_victory = True
+                # Determine most likely Fermi Paradox answer
+                primary_evidence = max(self.fermi_evidence.items(), key=lambda x: x[1])
+
+                explanations = {
+                    "extinction_evidence": "Most civilizations go extinct before reaching interstellar capability.",
+                    "dark_forest_evidence": "The galaxy is a dark forest where speaking means death.",
+                    "cooperation_evidence": "Peaceful civilizations exist but are extremely rare and cautious.",
+                    "great_filter_evidence": "The biological-technological integration crisis destroys most species."
+                }
+
+                self.message = f"""🌟 PHILOSOPHICAL VICTORY 🌟
+
+After {self.generation} generations, humanity has gathered sufficient evidence
+to answer the Fermi Paradox:
+
+{explanations[primary_evidence[0]]}
+
+Evidence collected:
+- Extinction cases: {self.fermi_evidence['extinction_evidence']}
+- Hostile encounters: {self.fermi_evidence['dark_forest_evidence']}
+- Peaceful contacts: {self.fermi_evidence['cooperation_evidence']}
+- Great Filter evidence: {self.fermi_evidence['great_filter_evidence']}
+
+Total Evidence: {total_evidence}/15
+
+You have answered one of humanity's greatest questions.
+
+(Game continues...)
+"""
+                logging.info(f"PHILOSOPHICAL VICTORY ACHIEVED: {explanations[primary_evidence[0]]}")
+
         # Process async message queue
         if self.message_queue:
             for msg in self.message_queue:
@@ -1649,7 +1751,11 @@ class GameInterface:
         if self.program.message:
             print(f"\n{self.program.message}")
             self.program.message = ""
-        
+
+        # Display Pending Philosophical Event
+        if self.program.pending_philosophical_event:
+            print(self.program.get_philosophical_event_display())
+
         # Display Active Threats (Attack Warnings)
         if self.program.pending_attack_warnings:
             print("\n⚠️⚠️⚠️ === ACTIVE THREATS === ⚠️⚠️⚠️")
@@ -1750,6 +1856,12 @@ class GameInterface:
             if self.program.genesis.unlocked:
                 next_num = menu_max + 1
                 print(f"{next_num}. 🌱 Genesis Project (Seed Life)")
+                menu_max = next_num
+
+            # Show Philosophical Event option if pending
+            if self.program.pending_philosophical_event:
+                next_num = menu_max + 1
+                print(f"{next_num}. 🤔 Respond to Philosophical Event")
                 menu_max = next_num
             
             choice = input(f"\nEnter your choice (1-{menu_max}): ")
@@ -2008,6 +2120,39 @@ class GameInterface:
                             self.program.message = "Invalid input."
                         continue
 
+                # Philosophical Event option
+                if self.program.pending_philosophical_event:
+                    # Calculate dynamic option number for Philosophical Event
+                    philo_option = 7
+                    if self.program.pending_attack_warnings: philo_option += 1
+                    if self.program.ai_advisor_unlocked: philo_option += 1
+                    if undiscovered_swan_songs: philo_option += 1
+                    if self.program.genesis.unlocked: philo_option += 1
+
+                    if choice_num == philo_option:
+                        event = self.program.pending_philosophical_event
+                        print(f"\n🤔 === PHILOSOPHICAL EVENT: {event.name} === 🤔")
+
+                        # Display choices
+                        for i, choice in enumerate(event.choices, 1):
+                            print(f"{i}. {choice['name']}")
+                            print(f"   {choice['description']}")
+                            print()
+
+                        # Get player choice
+                        philo_choice = input("Choose your response (1-3, or 0 to postpone): ")
+                        try:
+                            choice_idx = int(philo_choice) - 1
+                            if choice_idx >= 0 and choice_idx < len(event.choices):
+                                self.program.handle_philosophical_event_choice(choice_idx)
+                            elif choice_idx == -1:
+                                self.program.message = "Philosophical event postponed. You will be prompted again next generation."
+                            else:
+                                self.program.message = "Invalid choice."
+                        except ValueError:
+                            self.program.message = "Invalid input."
+                        continue
+
                 if self.program.ai_advisor_unlocked:
                     max_choice += 1
                 if undiscovered_swan_songs:
@@ -2015,6 +2160,10 @@ class GameInterface:
                 
                 # Genesis Project option
                 if self.program.genesis.unlocked:
+                    max_choice += 1
+
+                # Philosophical Event option
+                if self.program.pending_philosophical_event:
                     max_choice += 1
                     
                 self.program.message = f"Invalid choice. Please enter a number from 1 to {max_choice}."
