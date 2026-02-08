@@ -3,8 +3,19 @@ Test script for Attack Early Warning System
 This script verifies all defensive mechanics work correctly
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import logging
 import datetime
+
+# Fix UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
 from src.attack_warning import AttackWarning
 

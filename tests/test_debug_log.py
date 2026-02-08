@@ -1,6 +1,7 @@
 """Quick test to show the new debug logging"""
 import sys
-sys.path.insert(0, r"c:\Users\mike\Documents\Antigravity Test\legacy-of-stars")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.legacy_of_stars_v3 import ContactProgram
 import random

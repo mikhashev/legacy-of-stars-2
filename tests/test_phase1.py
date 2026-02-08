@@ -3,7 +3,14 @@ Test script to verify Phase 1 implementation of Legacy of Stars
 Tests: 75/25 age distribution, hidden strategies, extinct civilizations
 """
 import sys
-sys.path.insert(0, r"c:\Users\mike\Documents\Antigravity Test\legacy-of-stars")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Fix UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from legacy.legacy_of_stars_v2 import StarSystem
 import random

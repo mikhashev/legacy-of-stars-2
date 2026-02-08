@@ -1,6 +1,13 @@
 """Test v3 Dark Forest mechanics"""
 import sys
-sys.path.insert(0, r"c:\Users\mike\Documents\Antigravity Test\legacy-of-stars")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Fix UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
 import random

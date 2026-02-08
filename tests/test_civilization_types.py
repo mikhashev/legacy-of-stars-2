@@ -12,6 +12,12 @@ from pathlib import Path
 root_path = Path(__file__).parent.parent
 sys.path.insert(0, str(root_path))
 
+# Fix UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 import random
 random.seed(42)  # Reproducible tests
 
