@@ -1140,7 +1140,7 @@ Our message triggered a hostile reaction.
 Fleet ETA: Generation {self.generation + round_trip_time} (Year {self.start_year + (self.generation + round_trip_time - 1) * 25})
 Time to Prepare: {round_trip_time} generations
 
-DEFENSIVE OPTIONS AVAILABLE (TODO: Implement in next session)
+DEFENSIVE OPTIONS AVAILABLE (TODO)
 """
             
             logging.critical(f"HOSTILE FLEET DETECTED: {system_name}")

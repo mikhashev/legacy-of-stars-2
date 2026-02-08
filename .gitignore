@@ -1,7 +1,25 @@
+# Python
 __pycache__/
-*.log
-.vscode/
-.idea/
 *.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
 !game.log
 logs/
+
+# Environment files
+.env
+.env.local
+
+# Personal development files
+game_context.json
+NEXT_SESSION.md
+
+# IDE
+.vscode/
+.idea/
+
+# AI agent workflows
+.agent/
