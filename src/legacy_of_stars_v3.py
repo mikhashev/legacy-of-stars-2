@@ -1849,7 +1849,7 @@ class GameInterface:
             if undiscovered_swan_songs:
                 next_num = menu_max + 1
                 count = len(undiscovered_swan_songs)
-                print(f"{next_num}. 🕊️ Listen for Swan Song ({count} undiscovered) (1 AP)")
+                print(f"{next_num}. 🕊️  Listen for Swan Song ({count} undiscovered) (1 AP)")
                 menu_max = next_num
 
             # Show Genesis Project option if unlocked
