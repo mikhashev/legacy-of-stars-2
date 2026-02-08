@@ -1,0 +1,139 @@
+version: "1.0"
+namespace: game
+
+entries:
+  # HTTP Gateway for Python game communication
+  - name: gateway
+    kind: http.service
+    addr: :8080
+    lifecycle:
+      auto_start: true
+
+  # Router for AI endpoints
+  - name: api
+    kind: http.router
+    meta:
+      server: gateway
+      prefix: /api
+
+  # LLM Client Library
+  - name: llm_client
+    kind: library.lua
+    source: file://modules/llm_client.lua
+
+  # Wippy Docs Library
+  - name: wippy_docs
+    kind: library.lua
+    source: file://modules/wippy_docs.lua
+
+  # Registry State Library
+  - name: registry_state
+    kind: library.lua
+    source: file://registry/state.lua
+
+  # AI Advisor Library
+  - name: advisor_lib
+    kind: library.lua
+    source: file://processes/advisor.lua
+
+  # Advisor HTTP handler libraries (each returns a handler function)
+  - name: advisor_analyze_handler
+    kind: library.lua
+    source: file://functions/advisor_analyze.lua
+
+  - name: advisor_learn_handler
+    kind: library.lua
+    source: file://functions/advisor_learn.lua
+
+  - name: advisor_health_handler
+    kind: library.lua
+    source: file://functions/advisor_health.lua
+
+  # Advisor HTTP endpoints
+  - name: advisor.endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: POST
+      func: game:advisor_analyze_handler:handler
+      path: /advisor/analyze
+
+  - name: advisor.learn_endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: POST
+      func: game:advisor_learn_handler:handler
+      path: /advisor/learn
+
+  - name: advisor.health_endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: GET
+      func: game:advisor_health_handler:handler
+      path: /advisor/health
+
+  # Civ Response Library
+  - name: civ_response_lib
+    kind: library.lua
+    source: file://processes/civ_response.lua
+
+  # Civ Response HTTP handler library
+  - name: civ_response_handler
+    kind: library.lua
+    source: file://functions/civ_response.lua
+
+  # Civ Response HTTP endpoint
+  - name: civ_response.endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: POST
+      func: game:civ_response_handler:handler
+      path: /civ_response/generate
+
+  # Director Log Library
+  - name: director_log_lib
+    kind: library.lua
+    source: file://processes/director_log.lua
+
+  # Director Log HTTP handler library
+  - name: director_log_handler
+    kind: library.lua
+    source: file://functions/director_log.lua
+
+  # Director Log HTTP endpoint
+  - name: director_log.endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: POST
+      func: game:director_log_handler:handler
+      path: /director_log/narrate
+
+  # Registry HTTP handler libraries
+  - name: registry_update_handler
+    kind: library.lua
+    source: file://functions/registry_update.lua
+
+  - name: registry_get_handler
+    kind: library.lua
+    source: file://functions/registry_get.lua
+
+  # Registry HTTP endpoints
+  - name: registry.update_endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: POST
+      func: game:registry_update_handler:handler
+      path: /registry/update
+
+  - name: registry.get_endpoint
+    kind: http.endpoint
+    meta:
+      router: game:api
+      method: GET
+      func: game:registry_get_handler:handler
+      path: /registry/get
