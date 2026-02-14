@@ -1,5 +1,7 @@
 # Legacy of Stars
 
+![Legacy of Stars Banner](media/legacy_of_stars_v2_variant_1_1280x640_small.jpg)
+
 ## Overview
 Legacy of Stars is a turn-based strategy game about humanity's multi-generational effort to establish contact with alien civilizations. As the overseer of Earth's interstellar communication program, you'll make decisions that span centuries, with each turn representing approximately 25 years of human history.
 

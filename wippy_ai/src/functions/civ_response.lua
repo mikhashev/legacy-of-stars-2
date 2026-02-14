@@ -1,15 +1,21 @@
 -- HTTP Handler for Civilization Response generate endpoint
-local civ_response = require("civ_response_lib")
-local json = require("json")
+local http = require("http")
+local civ_response_lib = require("civ_response_lib")
 
-local function handler(req, res)
-  local body = json.decode(req:body())
-  local result = civ_response.generate(body)
-  res:set_status(200)
-  res:set_header("Content-Type", "application/json")
-  res:write(json.encode(result))
+local function handler()
+    local req = http.request()
+    local res = http.response()
+
+    local body, err = req:body_json()
+    if err then
+        res:set_status(400)
+        return res:write_json({ error = "Invalid JSON" })
+    end
+
+    local result = civ_response_lib.generate(body)
+
+    res:set_status(200)
+    res:write_json(result)
 end
 
-return {
-  handler = handler
-}
+return { handler = handler }
