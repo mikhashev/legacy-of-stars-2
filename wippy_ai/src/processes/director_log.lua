@@ -1,13 +1,10 @@
 -- Director Log Narrator Process for Legacy of Stars
 -- Generates narrative summaries of each generation as the Director's Log
 
-local http = require("http")
-local json = require("json")
 local llm = require("llm_client")
 
 local M = {}
 
-local process_id = nil
 local request_count = 0
 
 -- Generate a Director's Log entry for a generation
@@ -179,37 +176,6 @@ function M.fallback_log(generation, year, events, game_state)
   end
 
   return table.concat(parts, "\n")
-end
-
--- HTTP request handler
-function M.handle_request(req)
-  local path = req:path()
-  local method = req:method()
-
-  if path == "/director_log/narrate" and method == "POST" then
-    local body = json.decode(req:read_body())
-    local result = M.narrate(body)
-    return {status = 200, body = json.encode(result)}
-  end
-
-  return {status = 404, body = json.encode({error = "Not found"})}
-end
-
--- Spawn function for process entry
-function M.spawn()
-  process_id = "director_log-" .. os.time()
-
-  while true do
-    local msg = process.receive()
-
-    if msg.type == "http_request" then
-      local result = M.handle_request(msg.data)
-      process.send(msg.reply_to, {
-        type = "http_response",
-        data = result
-      })
-    end
-  end
 end
 
 return M

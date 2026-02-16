@@ -2,16 +2,13 @@
 -- Provides context-aware strategic recommendations using AI
 -- Self-modifying: adjusts strategy based on game outcomes
 
-local http = require("http")
-local json = require("json")
 local llm = require("llm_client")
 local docs = require("wippy_docs")
 local state = require("registry_state")
 
 local M = {}
 
--- Process ID for tracking
-local process_id = nil
+-- Request counter for tracking
 local request_count = 0
 
 -- Build game context from Python request
@@ -256,64 +253,10 @@ end
 function M.health()
   return {
     status = "healthy",
-    process_id = process_id,
     request_count = request_count,
     strategy = state.get_advisor_strategy(),
     learning_stats = state.get_learning_stats()
   }
-end
-
--- HTTP request handler
-function M.handle_request(req)
-  local path = req:path()
-  local method = req:method()
-
-  if path == "/advisor/analyze" and method == "POST" then
-    local body = json.decode(req:read_body())
-    local result = M.analyze(body)
-    return {status = 200, body = json.encode(result)}
-
-  elseif path == "/advisor/learn" and method == "POST" then
-    local body = json.decode(req:read_body())
-    local result = M.learn(body)
-    return {status = 200, body = json.encode(result)}
-
-  elseif path == "/advisor/health" and method == "GET" then
-    local result = M.health()
-    return {status = 200, body = json.encode(result)}
-  end
-
-  return {status = 404, body = json.encode({error = "Not found"})}
-end
-
--- Spawn function for process entry
-function M.spawn()
-  process_id = "advisor-" .. os.time()
-
-  -- Initialize state if not already done
-  state.init()
-
-  -- Main process loop
-  while true do
-    local msg = process.receive()
-
-    if msg.type == "http_request" then
-      local result = M.handle_request(msg.data)
-      process.send(msg.reply_to, {
-        type = "http_response",
-        data = result
-      })
-    elseif msg.type == "analyze_request" then
-      local result = M.analyze(msg.data)
-      process.send(msg.reply_to, {
-        type = "analyze_response",
-        data = result
-      })
-    elseif msg.type == "registry_update" then
-      -- Self-modify when registry changes
-      -- Prompts will be reloaded on next analyze call
-    end
-  end
 end
 
 return M

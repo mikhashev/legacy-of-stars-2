@@ -1,14 +1,17 @@
 -- HTTP Handler for AI Advisor health endpoint
 local http = require("http")
-local advisor_lib = require("advisor_lib")
 
 local function handler()
-    local res = http.response()
-
-    local result = advisor_lib.health()
-
-    res:set_status(200)
-    res:write_json(result)
+  local res = http.response()
+  -- Simple health check without library dependencies
+  res:set_status(200)
+  res:write_json({
+    status = "healthy",
+    service = "legacy-of-stars-ai",
+    version = "1.0.0"
+  })
 end
 
-return { handler = handler }
+return {
+  handler = handler
+}

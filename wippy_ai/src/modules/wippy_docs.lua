@@ -1,7 +1,7 @@
 -- Wippy Documentation API Client Module
 -- Fetches and searches Wippy documentation via llms.txt API
 
-local http = require("http")
+local http_client = require("http_client")
 local json = require("json")
 
 local M = {}
@@ -20,7 +20,7 @@ end
 function M.search(query)
   local url = base_url .. "/search?q=" .. urlencode(query)
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -49,7 +49,7 @@ function M.get_page(path, language)
   language = language or "en"
   local url = base_url .. "/path/" .. language .. "/" .. path
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -74,7 +74,7 @@ function M.get_summary(path, language)
   language = language or "en"
   local url = base_url .. "/summary/" .. language .. "/" .. path
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -98,7 +98,7 @@ end
 function M.get_chunk(chunk_id)
   local url = base_url .. "/chunk/" .. chunk_id
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -122,7 +122,7 @@ end
 function M.get_related(chunk_id)
   local url = base_url .. "/related/" .. chunk_id
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -147,7 +147,7 @@ function M.get_context(paths)
   local paths_str = table.concat(paths, ",")
   local url = base_url .. "/context?paths=" .. paths_str
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 
@@ -171,7 +171,7 @@ end
 function M.get_toc()
   local url = base_url .. "/toc"
 
-  local resp, err = http.get(url, {
+  local resp, err = http_client.get(url, {
     headers = {["Accept"] = "application/json"}
   })
 

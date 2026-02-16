@@ -1,14 +1,10 @@
 -- Civilization Response Generator Process for Legacy of Stars
 -- Generates authentic alien civilization responses based on their psychology and situation
 
-local http = require("http")
-local json = require("json")
 local llm = require("llm_client")
-local docs = require("wippy_docs")
 
 local M = {}
 
-local process_id = nil
 local request_count = 0
 
 -- Civilization type characteristics
@@ -192,37 +188,6 @@ We have so much to discuss...]], civ_name)
   }
 
   return fallbacks[civ_type]
-end
-
--- HTTP request handler
-function M.handle_request(req)
-  local path = req:path()
-  local method = req:method()
-
-  if path == "/civ_response/generate" and method == "POST" then
-    local body = json.decode(req:read_body())
-    local result = M.generate(body)
-    return {status = 200, body = json.encode(result)}
-  end
-
-  return {status = 404, body = json.encode({error = "Not found"})}
-end
-
--- Spawn function for process entry
-function M.spawn()
-  process_id = "civ_response-" .. os.time()
-
-  while true do
-    local msg = process.receive()
-
-    if msg.type == "http_request" then
-      local result = M.handle_request(msg.data)
-      process.send(msg.reply_to, {
-        type = "http_response",
-        data = result
-      })
-    end
-  end
 end
 
 return M
