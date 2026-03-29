@@ -276,27 +276,26 @@ class ContactProgram:
         self.star_systems = self.generate_star_systems(8)
         
         # === DEBUG: Log all civilization details at game start ===
-        logging.info("")
-        logging.info("="*60)
-        logging.info("GALAXY OVERVIEW - Hidden Civilization Details")
-        logging.info("="*60)
+        logging.debug("")
+        logging.debug("="*60)
+        logging.debug("GALAXY OVERVIEW - Hidden Civilization Details")
+        logging.debug("="*60)
         for name, system in self.star_systems.items():
             if system.has_civilization:
                 if system.is_extinct:
-                    logging.info(f"  {name} ({system.distance:.1f} LY) - EXTINCT")
-                    logging.info(f"    Age: {int(system.civilization_age)} years")
-                    logging.info(f"    Died: {system.extinct_years_ago} years ago")
-                    logging.info(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
-                    logging.info(f"    Type: {system.civilization_type}")
+                    logging.debug(f"  {name} ({system.distance:.1f} LY) - EXTINCT")
+                    logging.debug(f"    Age: {int(system.civilization_age)} years")
+                    logging.debug(f"    Died: {system.extinct_years_ago} years ago")
+                    logging.debug(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
+                    logging.debug(f"    Type: {system.civilization_type}")
                 else:
-                    logging.info(f"  {name} ({system.distance:.1f} LY) - ACTIVE")
-                    logging.info(f"    Age: {int(system.civilization_age)} years")
-                    logging.info(f"    Stage: {system.civilization_stage.name}")
-                    logging.info(f"    Strategy: {system.true_strategy}")
-                    logging.info(f"    Deception: {system.deception_level:.2f}")
-                    logging.info(f"    Type: {system.civilization_type}")
-                    
-                    # Explain what this means
+                    logging.debug(f"  {name} ({system.distance:.1f} LY) - ACTIVE")
+                    logging.debug(f"    Age: {int(system.civilization_age)} years")
+                    logging.debug(f"    Stage: {system.civilization_stage.name}")
+                    logging.debug(f"    Strategy: {system.true_strategy}")
+                    logging.debug(f"    Deception: {system.deception_level:.2f}")
+                    logging.debug(f"    Type: {system.civilization_type}")
+
                     strategy_desc = {
                         "L": "Listen Only - Will NEVER respond",
                         "LB": "Listen & Broadcast - Enthusiastic, friendly METI",
@@ -304,13 +303,13 @@ class ContactProgram:
                         "LA": "Listen & Annihilate - HOSTILE, attacks silently",
                         "LBA": "Listen, Broadcast & Annihilate - TRAP! Friendly bait then attack"
                     }
-                    logging.info(f"    >>> {strategy_desc[system.true_strategy]}")
+                    logging.debug(f"    >>> {strategy_desc[system.true_strategy]}")
             else:
-                logging.info(f"  {name} ({system.distance:.1f} LY) - No civilization")
-            logging.info("")
-        
-        logging.info("="*60)
-        logging.info("")
+                logging.debug(f"  {name} ({system.distance:.1f} LY) - No civilization")
+            logging.debug("")
+
+        logging.debug("="*60)
+        logging.debug("")
         self.directors = []
         self.current_director = self.generate_director()
         self.directors.append(self.current_director)
@@ -423,7 +422,7 @@ class ContactProgram:
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
-            path = Path("data/tech_tree.json")
+            path = Path(__file__).parent.parent / "data" / "tech_tree.json"
             if not path.exists():
                 return {}
             with open(path, "r") as f:

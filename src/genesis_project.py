@@ -33,6 +33,7 @@ class GenesisProject:
         self.unlocked = False
         self.seed_cost_rp = 500
         self.seed_cost_funding = 20
+        self.seeds_this_gen = 0  # Limit: 1 seeding action per generation
         logging.info("Genesis Project system initialized")
         
     def seed_world(self, game, system) -> Tuple[bool, str]:
@@ -48,13 +49,19 @@ class GenesisProject:
         """
         if not self.unlocked:
             return False, "Genesis Project technology not yet researched."
-            
+
+        if system.name not in game.star_systems:
+            return False, "System not found in this galaxy."
+
+        if self.seeds_this_gen >= 1:
+            return False, "Can only seed one world per generation."
+
         if system.has_civilization:
             return False, "Cannot seed a system that already has a civilization."
-            
+
         if system.name in self.seeded_worlds:
             return False, "System is already seeded."
-            
+
         if game.research_points < self.seed_cost_rp:
             return False, f"Insufficient Research Points ({self.seed_cost_rp} required)."
             
@@ -69,12 +76,14 @@ class GenesisProject:
         world = SeededWorld(system.name, game.generation)
         self.seeded_worlds[system.name] = world
         system.is_seeded = True  # Mark system for UI
-        
+        self.seeds_this_gen += 1
+
         logging.info(f"GENESIS: Seeded life on {system.name} (Gen {game.generation})")
         return True, f"Life seeded on {system.name}. Evolution will take many generations."
 
     def advance_generation(self, game):
         """Update seeded worlds"""
+        self.seeds_this_gen = 0  # Reset per-generation seeding limit
         for world in self.seeded_worlds.values():
             if world.is_destroyed:
                 continue

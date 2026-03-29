@@ -4,10 +4,11 @@ Adds narrative depth and strategic intelligence to the Dark Forest game
 """
 
 import random
+from enum import Enum
 from typing import Dict, Optional
 from .ai_manager import AIManager
 
-class SwanSongCategory:
+class SwanSongCategory(str, Enum):
     """Categories of swan song messages"""
     WARNING = "warning"
     ARCHIVE = "archive"

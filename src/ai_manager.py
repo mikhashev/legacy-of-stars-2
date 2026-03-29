@@ -38,25 +38,6 @@ class AIManager:
                 return provider
         return None
 
-    def generate_text(self, prompt: str, system_prompt: str = "You are a sci-fi game master.") -> str:
-        """Generate text using the current provider"""
-        if not self.current_provider:
-            return "AI Error: No provider configured."
-
-        provider_type = self.current_provider.get("type")
-        
-        try:
-            if provider_type == "ollama":
-                return self._call_ollama(prompt, system_prompt)
-            elif provider_type == "anthropic":
-                return self._call_anthropic(prompt, system_prompt)
-            elif provider_type == "openai" or provider_type == "openai_compatible":
-                return self._call_openai(prompt, system_prompt)
-            else:
-                return f"AI Error: Provider type '{provider_type}' not yet implemented."
-        except Exception as e:
-            return f"AI Error ({provider_type}): {str(e)}"
-
     def _call_ollama(self, prompt: str, system_prompt: str) -> str:
         """Call Ollama API"""
         host = self.current_provider.get("host", "http://127.0.0.1:11434")

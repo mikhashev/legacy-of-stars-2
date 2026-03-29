@@ -23,3 +23,6 @@ NEXT_SESSION.md
 
 # AI agent workflows
 .agent/
+
+# Private audit (not for version control)
+audit/

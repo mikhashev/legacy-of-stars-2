@@ -130,8 +130,11 @@ class WOWSignalEvent:
         logging.info("="*60)
         logging.info("WOW! SIGNAL: Reply sent to 1,800 LY distance")
         logging.info(f"WOW! MESSAGE: {custom_message}")
-        logging.info(f"WOW! SIGNAL: Secret source = {self.wow_source_system.name}")
-        logging.info(f"WOW! SIGNAL: Strategy = {self.wow_source_system.true_strategy}")
+        if self.wow_source_system:
+            logging.info(f"WOW! SIGNAL: Secret source = {self.wow_source_system.name}")
+            logging.info(f"WOW! SIGNAL: Strategy = {self.wow_source_system.true_strategy}")
+        else:
+            logging.warning("WOW! SIGNAL: No civilization found to assign as source — Gen 144 event will not trigger")
         logging.info("="*60)
         
         input("\nPress Enter to begin your mission...")
@@ -197,11 +200,11 @@ class WOWSignalEvent:
         
         wow_system = self.wow_source_system
         
-        logging.critical("="*70)
-        logging.critical("GENERATION 144 - WOW! SIGNAL RESPONSE")
-        logging.critical("="*70)
-        logging.critical(f"Source: {wow_system.name}")
-        logging.critical(f"Strategy: {wow_system.true_strategy}")
+        logging.info("="*70)
+        logging.info("GENERATION 144 - WOW! SIGNAL RESPONSE")
+        logging.info("="*70)
+        logging.info(f"Source: {wow_system.name}")
+        logging.info(f"Strategy: {wow_system.true_strategy}")
         
         # Branch based on strategy
         if wow_system.true_strategy == "L":
@@ -309,7 +312,7 @@ Achievement Unlocked: "The WOW! Reckoning"
 {'='*70}
         """
         
-        logging.critical(f"WOW! ATTACK from {wow_system.name}")
+        logging.warning(f"WOW! ATTACK from {wow_system.name}")
         logging.info("Achievement: The WOW! Reckoning")
         
         # Apply attack (use existing attack system)

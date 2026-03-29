@@ -33,6 +33,7 @@ class AttackWarning:
         self.defense_multiplier *= 0.7
         self.defensive_actions_taken.append("Evacuation")
         
-    def apply_diplomatic_attempt(self):
-        """Log diplomatic attempt"""
+    def apply_diplomatic_attempt(self) -> str:
+        """Record diplomatic contact attempt. Outcome unknown — no mechanical guarantee."""
         self.defensive_actions_taken.append("Diplomatic Contact")
+        return "Diplomatic signal transmitted. No guaranteed effect — the fleet may ignore it."
