@@ -491,9 +491,19 @@ export class Store {
     }
   }
 
-  /** The console's `s` shortcut: save under the label "quicksave" without opening the menu. */
+  /**
+   * The console's `s` shortcut: overwrite the fixed "quicksave" slot without opening the menu
+   * (matching `autosave()` below, not `manualSave` - a quicksave is one slot, not a new save
+   * every press).
+   */
   async quickSave(): Promise<void> {
-    await this.manualSave("quicksave");
+    try {
+      const text = await this.bridge.save();
+      saveToSlot("quicksave", withLabel(text, "Quicksave"));
+      this.showToast('Saved to "Quicksave".');
+    } catch (error) {
+      this.showToast(`Could not save: ${describe(error)}`);
+    }
   }
 
   async manualSave(label: string): Promise<void> {

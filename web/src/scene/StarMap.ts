@@ -52,7 +52,7 @@ import {
   positionForSystem,
   radiusFor,
 } from "./coords";
-import { type DebugFleet, type DebugSphere, SceneEffects } from "./effects";
+import { type DebugArk, type DebugFleet, type DebugSphere, SceneEffects } from "./effects";
 import { CONTACTED_COLOR, MOOD_COLOR, SEEDED_COLOR, moodFor, styleFor } from "./palette";
 import { type Nebula, type Starfield, createNebula, createStarfield } from "./starfield";
 import { easeInOut } from "./timeline";
@@ -96,6 +96,8 @@ export interface MapDebug {
   /** Message and reply spheres currently in the scene. */
   spheres(): DebugSphere[];
   fleets(): DebugFleet[];
+  /** Genesis arks in flight or landed (the colony glow is `stage >= 1`, i.e. `landed`). */
+  arks(): DebugArk[];
   /** The leakage front in light-years at the current scene time. */
   leakageLy(): number;
   /** Names of the flashes still playing. */
@@ -394,6 +396,7 @@ export class StarMap {
       samples: () => [...this.timeSamples],
       spheres: () => this.effects.debugSpheres(),
       fleets: () => this.effects.debugFleets(),
+      arks: () => this.effects.debugArks(),
       leakageLy: () => this.effects.debugLeakageLy(),
       flashes: () => this.effects.debugFlashes(),
       objectCount: () => this.effects.objectCount(),

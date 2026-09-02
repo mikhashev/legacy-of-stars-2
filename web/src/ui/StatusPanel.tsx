@@ -1,4 +1,5 @@
 import type { ViewState } from "../types";
+import { Collapsible } from "./Collapsible";
 
 function pct(value: number): string {
   return `${Math.round(value)}%`;
@@ -9,8 +10,7 @@ export function StatusPanel({ view }: { view: ViewState }) {
   const s = view.status;
   const evidence = view.fermi_evidence;
   return (
-    <section class="panel status-panel">
-      <h2>Program status</h2>
+    <Collapsible id="status" title="Program status" extraClass="status-panel">
       <dl class="status-grid">
         <dt>Action Points</dt>
         <dd>
@@ -53,6 +53,6 @@ export function StatusPanel({ view }: { view: ViewState }) {
         </p>
       )}
       {view.genesis.unlocked && <p class="status-genesis">{view.genesis.summary}</p>}
-    </section>
+    </Collapsible>
   );
 }

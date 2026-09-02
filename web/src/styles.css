@@ -209,6 +209,31 @@ input[type="text"], input[type="number"], textarea {
 
 .program-message pre { color: var(--text); }
 
+/* ---------------------------------------------------------------- collapsible panels (W5) */
+.collapsible-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0 0 0.4rem;
+  margin: 0 0 0.5em;
+  cursor: pointer;
+  text-align: left;
+}
+.collapsible-head:hover { border-color: var(--accent); }
+.collapsible-head h2 { border: none; margin: 0; padding: 0; }
+.collapsible-chevron { color: var(--text-dim); font-size: 1rem; font-weight: 700; padding: 0 0.3rem; flex: 0 0 auto; }
+.collapsible[data-open="false"] { padding-bottom: 0.6rem; }
+.collapsible[data-open="false"] .collapsible-head { border-bottom: none; margin-bottom: 0; }
+
+/* the journal keeps its own flex-column/scroll layout whether or not it is wrapped open */
+.main-column-right .event-log[data-open="true"] { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.event-log .collapsible-body { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+
 .system-list, .threat-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .system-row, .threat-row {
   background: var(--panel-alt);
@@ -289,8 +314,32 @@ input[type="text"], input[type="number"], textarea {
 .menu-save-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
 .menu-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
+.achievement-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.achievement-row {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+.achievement-row::before { content: "\1F3C6  "; }
+.stats-grid { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 0.75rem; margin: 0; font-size: 0.85rem; }
+.stats-grid dt { color: var(--text-dim); text-transform: capitalize; }
+.stats-grid dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
 .help-text { font-size: 0.85rem; }
 .help-ai { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.5rem; }
+.help-web { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+.help-web-list { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem; color: var(--text); }
+.help-web-list li { position: relative; padding-left: 1rem; }
+.help-web-list li::before { content: "-"; position: absolute; left: 0; color: var(--text-dim); }
+kbd {
+  font: inherit;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+}
 
 .summary-text { font-size: 0.82rem; }
 .score-table { width: 100%; border-collapse: collapse; margin-top: 0.8rem; }
@@ -322,7 +371,9 @@ input[type="text"], input[type="number"], textarea {
 }
 
 /* ---------------------------------------------------------------- responsive */
-/* 1024x700 still gets three columns; the side ones just give the map more room. */
+/* 1280x800 and 1024x700 both keep the three-column layout (web_version_plan.md W5: "at >=
+   1000px keep the current three-column layout"); below 1200px the side columns just give the
+   centre map more room. */
 @media (max-width: 1200px) {
   .main-layout {
     grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr) minmax(13rem, 15rem);
@@ -333,11 +384,19 @@ input[type="text"], input[type="number"], textarea {
   .panel { padding: 0.7rem 0.8rem; }
 }
 
-@media (max-width: 900px) {
-  .main-screen { height: auto; }
+/* Below 1000px the three columns stack: map first (a fixed ~4:3 block, at least 320px tall so
+   it stays usable even at 800px wide), then status/actions, then the journal - `order` reflows
+   them without touching the DOM (main-column-center/left/right stay in their original markup
+   order for screen readers and Playwright). */
+@media (max-width: 999px) {
+  .main-screen { height: auto; min-height: 100vh; }
   .main-layout { grid-template-columns: 1fr; }
   .main-column-left, .main-column-right, .main-column-center { overflow: visible; }
-  .star-map-viewport { height: 60vh; }
+  .main-column-center { order: 1; }
+  .main-column-left { order: 2; }
+  .main-column-right { order: 3; }
+  .star-map-viewport { height: auto; aspect-ratio: 4 / 3; min-height: 320px; }
+  .header { flex-direction: column; align-items: stretch; }
   .header-director { text-align: left; }
 }
 

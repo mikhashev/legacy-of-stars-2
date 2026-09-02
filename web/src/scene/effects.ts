@@ -134,6 +134,8 @@ interface ArkVisual {
   marker: Mesh<IcosahedronGeometry, ShaderMaterial>;
   glow: Mesh<IcosahedronGeometry, ShaderMaterial>;
   target: Vector3;
+  /** 0-1 across the trip, set each frame by `stepArk`; kept for the debug hook. */
+  progress: number;
 }
 
 interface Flash {
@@ -165,6 +167,18 @@ export interface DebugFleet {
   attackType: string;
   eta: number;
   progress: number;
+}
+
+export interface DebugArk {
+  system: string;
+  seedGen: number;
+  arrivalGen: number;
+  /** `GenesisWorld.evolution_stage`: 0 = in transit ... 4 = spacefaring. */
+  stage: number;
+  /** How far the trail has crossed, 0-1 (`arkProgress`); >= 1 once it has landed. */
+  progress: number;
+  /** The colony glow is visible once `stage >= 1` - the ark has landed. */
+  landed: boolean;
 }
 
 /* ---------------------------------------------------------------- the layer */
@@ -432,6 +446,7 @@ export class SceneEffects {
       marker,
       glow,
       target: new Vector3(),
+      progress: 0,
     };
   }
 
@@ -736,6 +751,7 @@ export class SceneEffects {
       this.layTrajectory(visual.line, this.scratch.set(0, 0, 0), star);
     }
     const progress = arkProgress(visual.seedGen, visual.arrivalGen, t);
+    visual.progress = progress;
     const landed = progress >= 1;
     visual.line.visible = !landed;
     visual.marker.visible = !landed;
@@ -826,6 +842,17 @@ export class SceneEffects {
       attackType: v.attackType,
       eta: v.eta,
       progress: v.progress,
+    }));
+  }
+
+  debugArks(): DebugArk[] {
+    return [...this.arks.values()].map((v) => ({
+      system: v.system,
+      seedGen: v.seedGen,
+      arrivalGen: v.arrivalGen,
+      stage: v.stage,
+      progress: v.progress,
+      landed: v.stage >= 1,
     }));
   }
 

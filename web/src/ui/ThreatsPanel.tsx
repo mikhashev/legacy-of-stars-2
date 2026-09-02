@@ -1,11 +1,11 @@
 import type { ViewState } from "../types";
+import { Collapsible } from "./Collapsible";
 
 /** Mirrors the console's "ACTIVE THREATS" block; only rendered when threats exist. */
 export function ThreatsPanel({ view }: { view: ViewState }) {
   if (view.threats.length === 0) return null;
   return (
-    <section class="panel threats-panel">
-      <h2>Active threats</h2>
+    <Collapsible id="threats" title="Active threats" extraClass="threats-panel">
       <ul class="threat-list">
         {view.threats.map((t) => (
           <li key={t.index} class="threat-row">
@@ -27,6 +27,6 @@ export function ThreatsPanel({ view }: { view: ViewState }) {
           </li>
         ))}
       </ul>
-    </section>
+    </Collapsible>
   );
 }

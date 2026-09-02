@@ -1,4 +1,4 @@
-# Legacy of Stars - web front-end (phases W2-W4)
+# Legacy of Stars - web front-end (phases W2-W5)
 
 A playable browser build of the console game, with a 3D star map (Three.js) as the main
 screen's centre column, animated by shaders off the engine's own event stream. The Python engine (`src/`) is unchanged and runs inside a
@@ -77,10 +77,21 @@ and the leakage front's lag. The two runners never see each other's files: Vites
   4.2 LY and fully faded, the leakage front grows, the "Reduce effects" toggle reaches the
   scene and clears the flashes, and six further generations of whatever seed 1 produces (a
   discovery among them) run without a console error and inside the object budget.
+- `tests/layout.spec.ts` - W5: 1280x800 and 1024x700 keep the three-column grid, 800x1000
+  stacks map-first (a fixed ~4:3 block, >= 320px tall), a panel's collapsed state persists in
+  `localStorage` across a fresh mount, and at every width
+  `document.documentElement.scrollWidth <= innerWidth` (no horizontal scrollbar).
+- `tests/showcase.spec.ts` - W5: loads the three fixtures `scripts/make_web_fixtures.py`
+  builds (`web/tests/fixtures/*.json`) through the real Load screen's "Import JSON file", and
+  checks the matching effect reached `window.__losMap`: a fleet marker (`threat.json`), a reply
+  sphere (`reply.json`), a landed ark's colony glow (`genesis.json` - `arks()[].landed`, added
+  to the debug hook alongside `spheres()`/`fleets()` for this test).
 
 Screenshots land in `test-results/` (`opening.png`, `main.png`, `dialog-system-picker.png`,
 `smoke.png`, `map.png`, `map-selected.png`, `map-true-scale.png`, `animation.png` mid-glide,
-`animation-end.png`, `animation-reduced.png`, `animation-generation-8.png`).
+`animation-end.png`, `animation-reduced.png`, `animation-generation-8.png`, `layout-1280.png`,
+`layout-1024.png`, `layout-800.png`, `showcase-threat.png`, `showcase-reply.png`,
+`showcase-genesis.png` and their `-generation.png` mid-animation counterparts).
 
 ## Layout
 
@@ -115,6 +126,8 @@ web/
 │       ├── Dialogs.tsx          system/text/tech/threat/defense/event/dossier pickers
 │       ├── DoctrineModal.tsx, EventModal.tsx, DossierModal.tsx, MenuModal.tsx,
 │       │   HelpModal.tsx, SummaryModal.tsx, Toast.tsx
+│       └── Collapsible.tsx      W5: a `.panel` that can collapse, remembered in localStorage
+├── public/404.html       W5: GitHub Pages has no client routing to fall back to; see "GitHub Pages" below
 ├── scripts/engine.mjs    npm -> python scripts/build_web_engine.py
 ├── vitest.config.ts      unit tests only (tests/unit/**/*.test.ts)
 └── tests/
@@ -122,6 +135,9 @@ web/
     ├── play.spec.ts       full playable slice (see above)
     ├── map.spec.ts        the 3D map (see above)
     ├── animation.spec.ts  W4 scene time and light spheres (see above)
+    ├── layout.spec.ts     W5 responsive layout and collapsible panels (see above)
+    ├── showcase.spec.ts   W5 fixture-driven animation showcase (see above)
+    ├── fixtures/          threat.json, reply.json, genesis.json - scripts/make_web_fixtures.py
     └── unit/              Vitest: coords.test.ts, palette.test.ts, timeline.test.ts
 ```
 
@@ -232,18 +248,86 @@ frame time stays above 33 ms for two seconds, with a toast saying so.
 Playwright runs against `vite preview`, i.e. a production build. It is read-only: nothing in
 the scene can be driven through it.
 
+## Polish and release (W5)
+
+**Responsive layout.** `styles.css`'s `.main-layout` is a three-column grid at >= 1000px (it
+just narrows its gutters below 1200px). Below 1000px it drops to one column and CSS `order`
+reflows the three `.main-column`s to map, then status/actions, then the journal - the DOM stays
+in its original order, so nothing changes for a screen reader. `.star-map-viewport` switches
+from a fixed `60vh` to `aspect-ratio: 4 / 3` with a `320px` floor, so it stays a sane block
+instead of a sliver at 800px wide.
+
+**Collapsible panels.** `ui/Collapsible.tsx` wraps `StatusPanel`, `ActionsPanel`,
+`ThreatsPanel` and `EventLog`: a header button toggles the body and remembers the choice per
+panel in `localStorage` (`los.panelOpen.<id>`), read back on the next mount. Most useful once
+the layout stacks, but it works at any width.
+
+**Keyboard.** Console parity end to end: 1-5 the core actions, 6 the menu, 7+ situational
+actions in the order `state.actions` lists them (`ui/ActionsPanel.tsx`'s `assignKeys`), `v` the
+dossier of the map's selected system or a picker if nothing is selected, `s` a quicksave to the
+fixed `"quicksave"` slot (overwritten each time, like the autosave - not a new save per press),
+`h` / `?` help, `Escape` closes whichever dialog/modal is on top (dialog, then a big-event
+modal, then the summary, then help) and only clears the map selection once nothing else is
+open; the doctrine choice is deliberately not on that list; it has no cancel path in the engine
+either. Every action button shows its hotkey. All of it is skipped while a text input or
+textarea has focus (`MainScreen.tsx`'s `isTyping()`).
+
+**Final report.** `web_api.py`'s `summary` action only puts the score and its breakdown in
+`data`; the rest (timeline, contacts, hostile encounters, swan songs, Genesis, the WOW!
+outcome, achievements) lives solely in `build_summary()`'s text. `SummaryModal` renders the
+breakdown as a table and keeps the full text below it in a `<pre>`, plus "Export save" and
+"New game" buttons. The in-game menu (`MenuModal`) adds an **Achievements** section
+(`state.achievements`) and a **Statistics** grid (`state.stats`), both already in
+`docs/web_contract.md`'s `ViewState` and unused by the UI until now.
+
+**Help.** `HelpModal` still shows the engine's own `HELP_TEXT`, with a short web-specific
+section appended below it: mouse controls (rotate/zoom/pan, click to select), the key list
+above, the "Effects" toggle, and a reminder that saves live in this browser and "Export save"
+is the way to keep them.
+
+**Offline cache.** A hand-written service worker (no plugin) - `vite.config.ts`'s
+`serviceWorker()` plugin runs in a `closeBundle` hook after `vite build` writes `dist/`, walks
+the finished output (the hashed JS/CSS, `engine.zip`, the Pyodide runtime, `index.html`),
+hashes that file list into a version, writes `dist/version.json`, and generates `dist/sw.js`:
+cache-first for exactly those precached files, cleans up any `los-cache-*` that is not the
+current version on activate, and never touches anything else - saves are in `localStorage`, not
+behind a fetchable URL, so there is nothing there for a service worker to catch. `main.tsx`
+registers it only when `import.meta.env.PROD` and `"serviceWorker" in navigator` are both true.
+
+**GitHub Pages.** `.github/workflows/web.yml` builds (`npm ci`, `npm run build`, `npm run
+unit`) and deploys `web/dist` on every push to `main` (and by hand, via `workflow_dispatch`).
+Pages serves a project site under `/legacy-of-stars/`, not the domain root, so the workflow sets
+`VITE_BASE=/legacy-of-stars/`; `vite.config.ts`'s `base` reads `VITE_BASE` with a `/` default
+for local dev/preview, and everything that fetches `engine.zip` or the Pyodide runtime already
+went through `import.meta.env.BASE_URL` since W1 (`bridge.ts`, `worker.ts`). `public/404.html`
+exists only because GitHub Pages serves it for any URL it does not recognise; the game has no
+client-side routing to fall back to, so it just bounces back to the app's own base path.
+
+**Showcase fixtures.** `scripts/make_web_fixtures.py` (repository root) uses the Python engine
+directly - `ContactProgram(seed=1, offline=True)`, then `send_message`/`genesis.seed_world`/
+`advance_generation` - to build three saves already in situations a seed-1 playthrough rarely
+reaches in a test-sized number of generations: `threat.json` (a hostile fleet inbound, ETA >= 3
+generations), `reply.json` (a reply already in flight), `genesis.json` (a landed Genesis
+colony). `tests/showcase.spec.ts` loads each one through the real Load screen ("Import JSON
+file") and checks the matching effect reached `window.__losMap` - `arks()` was added to the
+debug hook for this (`spheres()`/`fleets()` already existed from W4).
+
 ## What's covered vs. intentionally missing
 
 Covered: the full action set (`send_message`, `focus_research`, `public_outreach`,
 `research_tech` + doctrine follow-up, `advance_generation`, `defend`, `consult_advisor`,
 `listen_swan_song`, `genesis_seed`, `respond_event`), the 1977 WOW! opening (custom /
 director-drafted / standard reply), system dossiers, threats, the event journal with big-kind
-modals, save/load (manual, autosave, export/import JSON, console-compatible), Help and the
-final report/score.
+modals, save/load (manual, autosave, export/import JSON, console-compatible), Help (with a
+web-specific section) and the final report/score, achievements and statistics; a responsive,
+collapsible-panel layout; full keyboard parity with the console; an offline service-worker
+cache; and a GitHub Pages deployment workflow.
 
-Missing by design (not part of W2-W4): LLM text in
+Missing by design (not part of W2-W5): LLM text in
 the browser (`urllib` does not work in Pyodide - the engine falls back to its offline content
-bank, same as the console with `LOS_OFFLINE=1`).
+bank, same as the console with `LOS_OFFLINE=1`); mobile-specific input (touch works through
+OrbitControls' default gestures, but nothing was tuned beyond "doesn't break on a tablet", per
+the plan's scope).
 
 Three small contract gaps were found while building the UI and have since been fixed on the
 Python side: `help` now works with no game in progress (the Start screen's Help link calls it

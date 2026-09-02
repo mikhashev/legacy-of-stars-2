@@ -13,7 +13,33 @@ or a fleet.
 Inspired by the "Dark Forest" theory and by the real history of SETI, the game starts on
 August 15, 1977 - the night of the WOW! signal - and asks whether Earth should reply.
 
-## Playing
+## Play in the browser
+
+`https://mikhashev.github.io/legacy-of-stars/` - live once the `.github/workflows/web.yml`
+Pages workflow has run against `main`.
+
+The web version is the same game and the same Python engine (`src/`), run in the browser
+through [Pyodide](https://pyodide.org) (Python-in-WebAssembly, in a Web Worker) instead of a
+console; the HUD is Preact and the star map is a real 3D scene (Three.js) with the messages,
+fleets, Genesis arks and the leakage front animated off the engine's own event stream. Saves
+live in the browser (`localStorage`) with JSON export/import compatible with the console's
+`saves/*.json`. See [web/README.md](web/README.md) for the full architecture.
+
+Build and run it locally:
+
+```bash
+cd web
+npm ci
+npm run build      # scripts/build_web_engine.py packs src/ + data/ into public/engine.zip first
+npm run preview     # http://localhost:4173 - Pyodide needs a real server, file:// will not do
+```
+
+```bash
+npm run unit        # Vitest: the pure scene modules (map coordinates, animation timing)
+npm test            # Playwright: full playthroughs, the 3D map, animations, layout, GitHub Pages fixtures
+```
+
+## Playing (console)
 
 Requirements: Python 3.9 or newer. No packages to install; the game uses only the standard library.
 
@@ -97,20 +123,26 @@ legacy-of-stars/
 │   ├── philosophical_events.py  # mid-game crises with lasting choices
 │   ├── genesis_project.py       # seeding sterile worlds
 │   ├── console.py, ui_text.py   # terminal helpers, help text
+│   └── web_api.py               # GameSession: the JSON facade the browser build calls (docs/web_contract.md)
 ├── data/
 │   ├── tech_tree.json           # 44 technologies in 6 tiers, 1977 onward
 │   ├── star_catalog.json        # real nearby stars with distances and coordinates
 │   ├── templates/               # alien replies, swan songs, WOW! texts, special messages
 │   └── llm_providers.json       # optional LLM providers
-├── scripts/auto_playtest.py     # headless harness used by the tests
+├── scripts/
+│   ├── auto_playtest.py         # headless harness used by the tests
+│   ├── build_web_engine.py      # packs src/ + data/ into web/public/engine.zip
+│   └── make_web_fixtures.py     # builds web/tests/fixtures/*.json (fleet/reply/Genesis showcase saves)
 ├── tests/                       # unittest suites
+├── web/                         # browser front-end: Pyodide + Three.js + Preact (web/README.md)
 ├── docs/                        # design notes and development history
 └── legacy/                      # earlier engine versions (historical)
 ```
 
 The engine is deliberately free of console I/O: it exposes the list of currently available
 actions, a structured event stream and a player-visible state snapshot, so a graphical or web
-front-end can be built on it without touching the rules.
+front-end can be built on it without touching the rules - `src/web_api.py` and `web/` are exactly
+that, built on the same engine with no rule changes.
 
 ## Status
 

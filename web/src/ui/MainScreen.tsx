@@ -50,23 +50,38 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const s = store.state;
-      if (isTyping() || s.dialog || s.modalEvent || s.showHelp || s.summaryResult) return;
+      if (isTyping()) return;
       const key = e.key.toLowerCase();
       if (key === "escape") {
-        // W3: Escape clears the map selection (no dialog is open - the guard above returned).
-        store.selectSystem(null);
+        // Closes whatever is currently on top; only clears the map selection when nothing
+        // else is open. The doctrine choice cannot be escaped - it has no cancel path in the
+        // engine either - so it is deliberately not in this list.
+        if (s.dialog) {
+          store.closeDialog();
+        } else if (s.modalEvent) {
+          store.dismissModal();
+        } else if (s.summaryResult) {
+          store.closeSummary();
+        } else if (s.showHelp) {
+          store.toggleHelp(false);
+        } else {
+          store.selectSystem(null);
+        }
         return;
       }
-      if (s.pendingDoctrine || s.busy) return;
+      // Everything else needs a clear screen: no dialog/modal on top, and not mid-doctrine.
+      if (s.dialog || s.modalEvent || s.showHelp || s.summaryResult || s.pendingDoctrine || s.busy) return;
       if (key === "v") {
-        store.openDossierPicker();
+        // The dossier of whatever is selected on the map, or the picker if nothing is.
+        if (s.selectedSystem) store.openDossier(s.selectedSystem);
+        else store.openDossierPicker();
         return;
       }
       if (key === "s") {
         void store.quickSave();
         return;
       }
-      if (key === "h") {
+      if (key === "h" || key === "?") {
         store.toggleHelp(true);
         return;
       }

@@ -1,0 +1,366 @@
+{
+  "format_version": 1,
+  "saved_at": "2026-09-03T04:59:00",
+  "label": "",
+  "generation": 1,
+  "year": 1977,
+  "director": "Dr. Noah Lewis",
+  "game_over": false,
+  "program": {
+    "seed": 1,
+    "state": {
+      "generation": 1,
+      "start_year": 1977,
+      "funding": 50,
+      "research_points": 100,
+      "message_quality": 1.0,
+      "public_support": 65,
+      "knowledge_base": 10,
+      "game_over": false,
+      "game_over_reason": "",
+      "victory": false,
+      "philosophical_victory": false,
+      "self_destruct_risk": 0.0,
+      "ecological_risk": 0.0,
+      "action_points": 2,
+      "max_action_points": 3,
+      "ap_modifier": 0,
+      "advisor_consulted_this_gen": false,
+      "broadcast_radius": 0.0,
+      "leakage_multiplier": 1.0
+    },
+    "flags": {
+      "passive_defense_bonus": 1.0,
+      "warning_time_bonus": 0,
+      "has_backup_colonies": false,
+      "cloaking_active": false,
+      "ai_advisor_unlocked": false,
+      "can_contact_post_biological": false,
+      "ultimate_survival": false,
+      "has_solar_sails": false,
+      "has_laser_sails": false,
+      "message_delivery_speed": 1.0,
+      "von_neumann_defense_bonus": 1.0,
+      "has_fusion_propulsion": false,
+      "can_send_heavy_probes": false
+    },
+    "undiscovered": [
+      "Alpha Centauri",
+      "Wolf 359",
+      "Luyten 726-8",
+      "Ross 248",
+      "Epsilon Eridani",
+      "Lacaille 9352",
+      "Ross 128",
+      "EZ Aquarii",
+      "61 Cygni",
+      "Procyon",
+      "Struve 2398",
+      "Groombridge 34",
+      "DX Cancri",
+      "Epsilon Indi",
+      "Tau Ceti",
+      "GJ 1061",
+      "YZ Ceti",
+      "Luyten's Star",
+      "Teegarden's Star",
+      "Kapteyn's Star",
+      "Lacaille 8760",
+      "Kruger 60",
+      "Wolf 1061",
+      "Van Maanen's Star",
+      "Gliese 1",
+      "Wolf 424",
+      "TZ Arietis",
+      "Gliese 687",
+      "Gliese 674",
+      "Gliese 876",
+      "GJ 1002",
+      "Gliese 832",
+      "Altair",
+      "Sigma Draconis",
+      "Gliese 570",
+      "Eta Cassiopeiae",
+      "82 G. Eridani",
+      "Delta Pavonis",
+      "Gliese 581",
+      "Gliese 667 C",
+      "Vega",
+      "Fomalhaut",
+      "Chara",
+      "Pollux",
+      "Arcturus",
+      "TRAPPIST-1",
+      "Capella",
+      "Castor"
+    ],
+    "star_systems": [
+      {
+        "name": "Proxima Centauri",
+        "distance": 4.24,
+        "spectral_type": "M5.5V",
+        "ra": 217.43,
+        "dec": -62.68,
+        "has_civilization": true,
+        "civilization_age": 100.0,
+        "is_extinct": false,
+        "has_swan_song": false,
+        "true_strategy": "LB",
+        "deception_level": 0.1,
+        "civilization_type": "biological_pure",
+        "civilization_attitude": 0.5,
+        "knowledge": 30,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": false,
+        "civilization_stage": "DIGITAL",
+        "extinct_years_ago": null,
+        "messages_sent": [
+          [
+            "hello",
+            1
+          ]
+        ],
+        "pending_responses": [
+          [
+            "Earth! We have kept a fire burning for strangers for eleven hundred generations, and no one ever came to sit by it. Then your message. We are a biological people; we age, we grieve, we plant orchards we will never taste. That is why your patience across 4.2 light-years moves us. Tell us what you eat, what you fear, what you name your storms. We will tell you everything.",
+            2
+          ]
+        ],
+        "received_messages": []
+      },
+      {
+        "name": "Barnard's Star",
+        "distance": 5.96,
+        "spectral_type": "M4V",
+        "ra": 269.45,
+        "dec": 4.69,
+        "has_civilization": false,
+        "civilization_age": 0,
+        "is_extinct": false,
+        "has_swan_song": false,
+        "true_strategy": null,
+        "deception_level": 0,
+        "civilization_type": null,
+        "civilization_attitude": 0,
+        "knowledge": 0,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": false,
+        "civilization_stage": null,
+        "extinct_years_ago": null,
+        "messages_sent": [],
+        "pending_responses": [],
+        "received_messages": []
+      },
+      {
+        "name": "Lalande 21185",
+        "distance": 8.31,
+        "spectral_type": "M2V",
+        "ra": 165.83,
+        "dec": 35.97,
+        "has_civilization": false,
+        "civilization_age": 0,
+        "is_extinct": false,
+        "has_swan_song": false,
+        "true_strategy": null,
+        "deception_level": 0,
+        "civilization_type": null,
+        "civilization_attitude": 0,
+        "knowledge": 0,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": false,
+        "civilization_stage": null,
+        "extinct_years_ago": null,
+        "messages_sent": [],
+        "pending_responses": [],
+        "received_messages": []
+      },
+      {
+        "name": "Sirius",
+        "distance": 8.6,
+        "spectral_type": "A1V",
+        "ra": 101.29,
+        "dec": -16.72,
+        "has_civilization": false,
+        "civilization_age": 0,
+        "is_extinct": false,
+        "has_swan_song": false,
+        "true_strategy": null,
+        "deception_level": 0,
+        "civilization_type": null,
+        "civilization_attitude": 0,
+        "knowledge": 0,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": false,
+        "civilization_stage": null,
+        "extinct_years_ago": null,
+        "messages_sent": [],
+        "pending_responses": [],
+        "received_messages": []
+      },
+      {
+        "name": "Ross 154",
+        "distance": 9.69,
+        "spectral_type": "M3.5V",
+        "ra": 282.45,
+        "dec": -23.84,
+        "has_civilization": true,
+        "civilization_age": 4203.460754011368,
+        "is_extinct": false,
+        "has_swan_song": null,
+        "true_strategy": "L",
+        "deception_level": 0.611771035838361,
+        "civilization_type": "digital_ascended",
+        "civilization_attitude": 0.33725733276227166,
+        "knowledge": 0,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": false,
+        "civilization_stage": "INTERPLANETARY",
+        "extinct_years_ago": null,
+        "messages_sent": [],
+        "pending_responses": [],
+        "received_messages": []
+      },
+      {
+        "name": "Wow! source (Chi Sagittarii)",
+        "distance": 1800.0,
+        "spectral_type": "G2V? (candidate 2MASS 19281982-2640123)",
+        "ra": 293.7,
+        "dec": -27.0,
+        "has_civilization": false,
+        "civilization_age": 0,
+        "is_extinct": false,
+        "has_swan_song": false,
+        "true_strategy": null,
+        "deception_level": 0,
+        "civilization_type": null,
+        "civilization_attitude": 0,
+        "knowledge": 0,
+        "is_seeded": false,
+        "has_detected_earth": false,
+        "is_wow_source": true,
+        "civilization_stage": null,
+        "extinct_years_ago": null,
+        "messages_sent": [],
+        "pending_responses": [],
+        "received_messages": []
+      }
+    ],
+    "directors": [
+      {
+        "name": "Dr. Noah Lewis",
+        "skills": {
+          "diplomacy": 0.5152949915167768,
+          "science": 0.5127229304967305,
+          "administration": 0.7707062363967483
+        },
+        "traits": [
+          "Intuitive",
+          "Patient"
+        ],
+        "generation": 1
+      }
+    ],
+    "technologies": {
+      "arecibo_telescope": {
+        "researched": true,
+        "is_legacy": true,
+        "chosen_doctrine": null
+      },
+      "drake_equation": {
+        "researched": true,
+        "is_legacy": true,
+        "chosen_doctrine": null
+      },
+      "signal_processing_basic": {
+        "researched": true,
+        "is_legacy": true,
+        "chosen_doctrine": null
+      },
+      "project_ozma": {
+        "researched": true,
+        "is_legacy": true,
+        "chosen_doctrine": null
+      },
+      "voyager_golden_record": {
+        "researched": true,
+        "is_legacy": true,
+        "chosen_doctrine": null
+      }
+    },
+    "active_doctrines": [],
+    "pending_attack_warnings": [],
+    "pending_info_attacks": [],
+    "wow_signal": {
+      "decided": true,
+      "wow_replied": true,
+      "wow_reply_message": "Greetings from Earth. We are humanity, a civilization of 4 billion individuals on the third planet of a yellow star. We seek knowledge and friendship among the stars. This message was sent in response to your signal of August 15, 1977. We await your reply with hope.",
+      "attack_damage_reduction": 0.0,
+      "outcome": null,
+      "wow_source_name": "Wow! source (Chi Sagittarii)"
+    },
+    "swan_songs": {
+      "next_tech_discount": 0.0,
+      "swan_songs": []
+    },
+    "integration": {
+      "integration_level": 0.0,
+      "integration_events": []
+    },
+    "philosophical_events": {
+      "events": {
+        "biology_tech_gap": {
+          "has_triggered": false,
+          "chosen_option": null
+        },
+        "expansion_instinct": {
+          "has_triggered": false,
+          "chosen_option": null
+        },
+        "ai_consciousness": {
+          "has_triggered": false,
+          "chosen_option": null
+        },
+        "cosmic_purpose": {
+          "has_triggered": false,
+          "chosen_option": null
+        },
+        "mirror_civilization": {
+          "has_triggered": false,
+          "chosen_option": null
+        }
+      }
+    },
+    "pending_philosophical_event": null,
+    "fermi_evidence": {
+      "extinction_evidence": 0,
+      "dark_forest_evidence": 0,
+      "cooperation_evidence": 0,
+      "great_filter_evidence": 0
+    },
+    "genesis": {
+      "unlocked": false,
+      "seeds_this_gen": 0,
+      "worlds": []
+    },
+    "stats": {
+      "messages_sent": 1,
+      "responses_received": 0,
+      "attacks_scheduled": 0,
+      "attacks_survived": 0,
+      "attacks_landed": 0,
+      "info_attacks": 0,
+      "swan_songs_found": 0,
+      "systems_discovered": 0,
+      "events_resolved": 0,
+      "techs_researched": 0,
+      "worlds_seeded": 0,
+      "passive_detections": 0
+    },
+    "achievements": []
+  }
+}

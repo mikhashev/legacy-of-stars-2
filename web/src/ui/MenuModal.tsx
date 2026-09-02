@@ -1,3 +1,4 @@
+import { Fragment } from "preact";
 import { useRef, useState } from "preact/hooks";
 import type { Store } from "../store";
 import { exportSave, importSaveFile, listSaves, loadSaveText, type SaveMeta } from "../saves";
@@ -99,6 +100,33 @@ export function MenuModal({ view, store }: { view: ViewState; store: Store }) {
               if (file) void doImport(file);
             }}
           />
+        </section>
+
+        <section class="menu-section">
+          <h3>Achievements ({view.achievements.length})</h3>
+          {view.achievements.length === 0 ? (
+            <p class="empty">None unlocked yet.</p>
+          ) : (
+            <ul class="achievement-list">
+              {view.achievements.map((name) => (
+                <li key={name} class="achievement-row">
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section class="menu-section">
+          <h3>Statistics</h3>
+          <dl class="stats-grid">
+            {Object.entries(view.stats).map(([label, value]) => (
+              <Fragment key={label}>
+                <dt>{label.replace(/_/g, " ")}</dt>
+                <dd>{value}</dd>
+              </Fragment>
+            ))}
+          </dl>
         </section>
 
         <section class="menu-section menu-links">

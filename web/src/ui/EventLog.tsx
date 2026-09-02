@@ -1,4 +1,5 @@
 import type { GameEvent, GameEventKind } from "../types";
+import { Collapsible } from "./Collapsible";
 
 const KIND_ICON: Record<GameEventKind, string> = {
   generation_start: "\u{1F4C5}", // calendar
@@ -22,8 +23,7 @@ const KIND_ICON: Record<GameEventKind, string> = {
 export function EventLog({ events }: { events: GameEvent[] }) {
   const ordered = [...events].reverse();
   return (
-    <section class="panel event-log">
-      <h2>Event log</h2>
+    <Collapsible id="journal" title="Event log" extraClass="event-log">
       {ordered.length === 0 ? (
         <p class="empty">Nothing has happened yet.</p>
       ) : (
@@ -38,6 +38,6 @@ export function EventLog({ events }: { events: GameEvent[] }) {
           ))}
         </ul>
       )}
-    </section>
+    </Collapsible>
   );
 }

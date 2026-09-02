@@ -1,5 +1,6 @@
 import type { Store } from "../store";
 import type { ActionId, ActionSpec, ViewState } from "../types";
+import { Collapsible } from "./Collapsible";
 
 /** Core actions keep the console's fixed hotkeys 1-5 (game_interface.py CORE_ACTION_KEYS). */
 const CORE_ORDER: ActionId[] = [
@@ -40,8 +41,7 @@ export function ActionsPanel({ view, store }: { view: ViewState; store: Store })
   const keyed = assignKeys(view.actions);
   const disabled = store.state.busy || store.state.pendingDoctrine !== null;
   return (
-    <section class="panel actions-panel">
-      <h2>Actions</h2>
+    <Collapsible id="actions" title="Actions" extraClass="actions-panel">
       <div class="action-buttons">
         {keyed.map(({ spec, key }) => (
           <button
@@ -67,6 +67,6 @@ export function ActionsPanel({ view, store }: { view: ViewState; store: Store })
           A philosophical crisis is pending - respond to it before advancing the generation.
         </p>
       )}
-    </section>
+    </Collapsible>
   );
 }

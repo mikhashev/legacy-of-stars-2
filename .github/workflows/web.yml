@@ -1,0 +1,65 @@
+name: Deploy web build to GitHub Pages
+
+# web_version_plan.md W5: build engine.zip + the Vite bundle and publish to Pages. The Python
+# engine itself is untouched by this job - it only needs Python to run scripts/build_web_engine.py
+# (invoked by `npm run build`, via web/scripts/engine.mjs) and to run the unit tests below.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # The repository is served at https://mikhashev.github.io/legacy-of-stars/ (a GitHub Pages
+      # *project* site, not a user/org site), so every built asset URL needs the repo name as
+      # its base path. Local dev/preview keep vite.config.ts's default of "/".
+      VITE_BASE: /legacy-of-stars/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (engine.zip + typecheck + Vite bundle)
+        run: npm run build
+
+      - name: Unit tests (Vitest)
+        run: npm run unit
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
