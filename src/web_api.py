@@ -197,6 +197,9 @@ class GameSession:
           `respond_event` action instead of a numeric menu key.
         """
         if self.program is None:
+            if action_id == "help":
+                # The only action that needs no game: the start screen shows the rules.
+                return _dumps({"ok": True, "message": HELP_TEXT, "events": [], "state": None, "needs": None})
             return _dumps({"ok": False, "message": "no game in progress: call new_game() or load() first",
                            "events": [], "state": None, "needs": None})
         program = self.program

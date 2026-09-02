@@ -1698,7 +1698,8 @@ You have answered one of humanity's greatest questions.
                 "actions_taken": list(w.defensive_actions_taken),
             })
         available = [{"id": t.id, "name": t.name, "tier": t.tier, "cost": t.cost, "description": t.description,
-                      "locked": self.tech_lock_reason(t)} for t in self.available_technologies()]
+                      "year_context": t.year_context, "locked": self.tech_lock_reason(t)}
+                     for t in self.available_technologies()]
         integration = self.integration.get_integration_status(self.generation)
         passive_rp = self.passive_research_income() * self.integration.get_research_efficiency(self.generation)
         event = self.pending_philosophical_event
@@ -1742,7 +1743,8 @@ You have answered one of humanity's greatest questions.
             "victory": self.victory,
             "philosophical_victory": self.philosophical_victory,
             "genesis": {"unlocked": self.genesis.unlocked, "summary": self.genesis.get_summary(),
-                        "worlds": self.genesis.to_dict()["worlds"]},
+                        "worlds": self.genesis.to_dict()["worlds"],
+                        "targets": self.genesis_targets()},
             "pending_event": None if event is None else {
                 "id": event.id, "name": event.name, "description": event.description,
                 "choices": [{"name": c["name"], "description": c["description"]} for c in event.choices],
@@ -1755,6 +1757,12 @@ You have answered one of humanity's greatest questions.
             "game_over": self.game_over,
             "game_over_reason": self.game_over_reason,
         }
+
+    def genesis_targets(self) -> List[str]:
+        """Systems an ark may be launched at: sterile, habitable, not yet seeded, not the WOW! source."""
+        return [s.name for s in self.star_systems.values()
+                if not s.has_civilization and not s.is_seeded and not s.is_wow_source
+                and habitability_weight(s.spectral_type) > 0]
 
     # ------------------------------------------------------------------ discovery
     def discovery_chance(self) -> float:

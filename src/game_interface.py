@@ -15,7 +15,7 @@ from typing import Callable, Dict, List, Optional
 from . import save_manager
 from .console import QuitGame, read_input
 from .genesis_project import ark_arrival_generation
-from .legacy_of_stars_v3 import ContactProgram, habitability_weight
+from .legacy_of_stars_v3 import ContactProgram
 from .summary import build_summary
 from .ui_text import HELP_TEXT
 
@@ -529,9 +529,7 @@ class GameInterface:
         p = self.program
         print("\n🌱 === GENESIS PROJECT === 🌱")
         print(f"Cost to seed a world: {p.genesis.seed_cost_rp} RP, {p.genesis.seed_cost_funding}% Funding")
-        sterile = [s for s in p.star_systems.values()
-                   if not s.has_civilization and not s.is_seeded and not s.is_wow_source
-                   and habitability_weight(s.spectral_type) > 0]
+        sterile = [p.star_systems[name] for name in p.genesis_targets()]
         if not sterile:
             p.message = "No habitable sterile worlds available for an ark."
             return

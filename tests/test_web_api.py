@@ -601,3 +601,23 @@ class HeadlessGameTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StartScreenAndViewStateTest(unittest.TestCase):
+    def test_help_works_without_a_game(self):
+        import json as _json
+        payload = _json.loads(GameSession().perform("help", "{}"))
+        self.assertTrue(payload["ok"])
+        self.assertIn("HOW TO PLAY", payload["message"])
+        self.assertIsNone(payload["state"])
+
+    def test_view_state_exposes_year_context_and_genesis_targets(self):
+        import json as _json
+        session = GameSession()
+        state = _json.loads(session.new_game(3))
+        self.assertTrue(all("year_context" in t for t in state["technologies"]["available"]))
+        targets = state["genesis"]["targets"]
+        self.assertIsInstance(targets, list)
+        names = {s["name"] for s in state["systems"]}
+        self.assertTrue(set(targets) <= names)
+

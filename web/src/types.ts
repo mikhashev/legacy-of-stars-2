@@ -229,6 +229,8 @@ export interface Technology {
   tier: number;
   cost: number;
   description: string;
+  /** e.g. "Unlocks Gen 4+ (Year 2052). Launched 2015." */
+  year_context: string;
   /** null when researchable now, otherwise the reason it is locked. */
   locked: string | null;
 }
@@ -266,6 +268,9 @@ export interface GenesisInfo {
   /** Multi-line status text. */
   summary: string;
   worlds: GenesisWorld[];
+  /** System names an ark may be launched at (sterile, habitable, unseeded, not the WOW!
+   *  source); the Genesis picker must list exactly these, in this order. */
+  targets: string[];
 }
 
 export interface PendingEventChoice {

@@ -6,8 +6,9 @@
   "description": "Browser front-end for Legacy of Stars: the Python engine runs in a Pyodide worker.",
   "scripts": {
     "engine": "node scripts/engine.mjs",
+    "typecheck": "tsc --noEmit -p .",
     "dev": "npm run engine && vite",
-    "build": "npm run engine && vite build",
+    "build": "npm run engine && npm run typecheck && vite build",
     "preview": "vite preview",
     "test": "playwright test"
   },

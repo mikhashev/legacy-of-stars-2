@@ -3,41 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Legacy of Stars - engine smoke test (W1)</title>
-    <style>
-      html { color-scheme: dark; }
-      body {
-        margin: 0;
-        padding: 1rem;
-        background: #0b0d12;
-        color: #d6dde8;
-        font: 13px/1.45 ui-monospace, SFMono-Regular, Consolas, "DejaVu Sans Mono", monospace;
-      }
-      h1 { font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem; }
-      button { font: inherit; margin: 0 0.4rem 0.4rem 0; padding: 0.3rem 0.7rem; }
-      button:disabled { opacity: 0.45; }
-      pre { white-space: pre-wrap; margin: 0.75rem 0 0; }
-      #boot { margin-bottom: 0.75rem; }
-      progress { width: 22rem; vertical-align: middle; }
-      .meta { color: #8b97a8; }
-      .error { color: #ff8a80; }
-    </style>
+    <title>Legacy of Stars</title>
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main id="app" data-ready="false">
-      <h1>Legacy of Stars - Pyodide smoke test (W1)</h1>
-      <div id="boot">
-        <progress id="bar" max="100" value="0"></progress>
-        <span id="stage">starting</span>
-      </div>
-      <div id="controls" hidden>
-        <button id="new-game">New game (seed 1)</button>
-        <button id="advance">Advance x10</button>
-        <button id="save">Save to console</button>
-      </div>
-      <div id="meta" class="meta"></div>
-      <pre id="out">no game yet</pre>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app" data-ready="false"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

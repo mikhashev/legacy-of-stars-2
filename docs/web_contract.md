@@ -239,7 +239,7 @@ strategies, deception levels) ever appears here.
 | `threats[].defense_pct` | int | damage reduction accumulated |
 | `threats[].actions_taken` | list[str] | `"Emergency Defense Protocol"`, `"Evacuation"`, `"Diplomatic Contact"` |
 | `technologies.researched` | list[str] | technology ids (includes the five pre-1977 legacy ones) |
-| `technologies.available[]` | `{id, name, tier, cost, description, locked}` | researchable now; `locked` is null or the reason string |
+| `technologies.available[]` | `{id, name, tier, cost, description, year_context, locked}` | researchable now; `locked` is null or the reason string |
 | `fermi_evidence` | `{extinction_evidence, dark_forest_evidence, cooperation_evidence, great_filter_evidence, total, goal}` | ints; `goal` is 15 |
 | `contacts` | int | living civilizations that answered |
 | `contacts_goal` | int | 3 |
@@ -247,6 +247,7 @@ strategies, deception levels) ever appears here.
 | `philosophical_victory` | bool | Fermi answer reached |
 | `genesis.unlocked` | bool | the ark programme is available |
 | `genesis.summary` | str | multi-line status text |
+| `genesis.targets[]` | str[] | system names an ark may be launched at (sterile, habitable, unseeded, not the WOW! source) — the Genesis picker lists exactly these |
 | `genesis.worlds[]` | `{system_name, seed_gen, arrival_gen, evolution_stage, is_hostile, is_destroyed, resolved, outcome}` | seeded worlds (`evolution_stage` 0 = in transit … 4 = spacefaring) |
 | `pending_event` | null \| `{id, name, description, choices: [{name, description}]}` | the philosophical crisis blocking `advance_generation` |
 | `wow` | `{decided: bool, replied: bool, outcome: null \| "silence" \| "friendly" \| "hostile"}` | the 1977 decision and its Generation 144 result |
