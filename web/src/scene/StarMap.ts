@@ -1,23 +1,29 @@
 /**
- * The W3 star map: Earth at the origin, the known systems around it, orientation rings and a
- * static backdrop. This class owns the WebGL renderer, the scene, the camera, OrbitControls
- * and the CSS2D label layer; `ui/MapPanel.tsx` is the only thing that constructs it.
+ * The star map: Earth at the origin, the known systems around it, orientation rings, the
+ * shader backdrop and (since W4) the animated layer in `effects.ts`. This class owns the
+ * WebGL renderer, the scene, the camera, OrbitControls and the CSS2D label layer;
+ * `ui/MapPanel.tsx` is the only thing that constructs it.
  *
- * Design notes for W4 (shaders and event animations):
+ * How the animation works (W4):
  *
- * - Every system is a `Group` (`StarEntry.group`) parked at the star's position, and Earth is
- *   its own `Group` at the origin. Per-star and per-Earth effects attach as children of those
- *   groups, so nothing has to recompute coordinates.
- * - `update()` diffs by system name and only rebuilds what actually changed, so animation
- *   objects that W4 adds under a group survive a state update.
- * - Nothing renders unless something changed (`requestRender`), so an idle page costs no GPU;
- *   a W4 animation keeps itself alive by calling `requestRender()` from its own step.
- * - `starfield.ts` returns a plain `Points`; W4 swaps its material for the nebula shader.
+ * - **Scene time.** `t` is a continuous generation number. A state update does not jump the
+ *   map to the new generation: `t` glides there over `SCENE_TIME_MS` with an ease-in-out, and
+ *   every radius and position in `effects.ts` is a function of `t` (see `timeline.ts`).
+ * - **Render on demand.** Nothing renders unless something changed (`requestRender`), so an
+ *   idle page costs no GPU. While the glide, a flash, a pulsing fleet or a camera flight is in
+ *   flight the loop renders every frame and the shared `Clock` advances; once they finish the
+ *   map goes back to sleep, which is also why the background twinkle holds still when idle.
+ * - **Groups.** Every system is a `Group` at the star's position and Earth is `earthGroup`, so
+ *   effects only ever need a name to find a point in space (`positionOf`).
+ * - **Budget.** Star sprites and decorations plus the animated layer stay under ~150 objects;
+ *   `devicePixelRatio` is capped at 2, and if frame time stays above `SLOW_FRAME_MS` for
+ *   `SLOW_FRAME_WINDOW_MS` the map asks the store to switch "Reduce effects" on.
  */
 import {
   AdditiveBlending,
   BufferGeometry,
   CanvasTexture,
+  Clock,
   Color,
   Float32BufferAttribute,
   Group,
@@ -36,23 +42,35 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import type { StarSystem } from "../types";
+import type { GameEvent, GenesisWorld, StarSystem, Threat } from "../types";
 import {
   EDGE_RADIUS,
   RING_DISTANCES_LY,
   type ScaleMode,
   formatDistance,
+  isBeyondRim,
   positionForSystem,
   radiusFor,
 } from "./coords";
+import { type DebugFleet, type DebugSphere, SceneEffects } from "./effects";
 import { CONTACTED_COLOR, MOOD_COLOR, SEEDED_COLOR, moodFor, styleFor } from "./palette";
-import { type Starfield, createStarfield } from "./starfield";
+import { type Nebula, type Starfield, createNebula, createStarfield } from "./starfield";
+import { easeInOut } from "./timeline";
 
-/** What the map needs out of the store; a subset of `ViewState` plus the two view toggles. */
+/** What the map needs out of the store; a subset of `ViewState` plus the view toggles. */
 export interface MapViewState {
+  /** `ViewState.generation`: the generation scene time glides to. */
+  generation: number;
   systems: StarSystem[];
+  threats: Threat[];
+  /** `ViewState.status.broadcast_radius`, in light-years. */
+  broadcastRadius: number;
+  /** `ViewState.genesis.worlds`. */
+  genesisWorlds: GenesisWorld[];
   selected: string | null;
   scale: ScaleMode;
+  /** The MapPanel toolbar's "Reduce effects": no nebula, no flashes. */
+  reduced: boolean;
 }
 
 export interface StarMapOptions {
@@ -60,18 +78,66 @@ export interface StarMapOptions {
   onSelect(name: string | null): void;
   /** The pointer moved onto or off a star. */
   onHover?(name: string | null): void;
+  /** Frame time stayed over budget: the map is asking for "Reduce effects" to be switched on. */
+  onAutoReduce?(): void;
+}
+
+/** The read-only view of the scene `window.__losMap` exposes in dev and `?debug=1` builds. */
+export interface MapDebug {
+  map: StarMap;
+  /** Continuous generation the scene is drawn at. */
+  sceneTime(): number;
+  /** The generation it is gliding towards. */
+  targetGeneration(): number;
+  /** True while the glide is still running. */
+  animating(): boolean;
+  /** Distinct scene-time values sampled since the glide began, oldest first. */
+  samples(): number[];
+  /** Message and reply spheres currently in the scene. */
+  spheres(): DebugSphere[];
+  fleets(): DebugFleet[];
+  /** The leakage front in light-years at the current scene time. */
+  leakageLy(): number;
+  /** Names of the flashes still playing. */
+  flashes(): string[];
+  /** Objects in the animated layer, for the performance budget. */
+  objectCount(): number;
+  /** Rolling mean frame time in milliseconds while the map was rendering. */
+  frameMs(): number;
+  reduced(): boolean;
+}
+
+declare global {
+  interface Window {
+    /** Set by `StarMap` in non-production builds and whenever the URL carries `?debug=1`. */
+    __losMap?: MapDebug;
+  }
 }
 
 /** Hard ceiling on drawn systems (the catalogue is 53 stars plus the WOW! source). */
 const MAX_SYSTEMS = 60;
 
-/** World-unit diameter of an average main-sequence star sprite. */
-const BASE_STAR_SIZE = 5;
+/** World-unit diameter of an average main-sequence star sprite (W4: 1.6x the W3 value of 5). */
+const BASE_STAR_SIZE = 8;
 
 const CAMERA_FOV = 50;
 /** How much of the rim the default framing leaves as margin. */
 const HOME_MARGIN = 1.1;
+/** Default elevation above the plane of the rings, in degrees (W4 raised it from ~10). */
+const HOME_ELEVATION_DEG = 35;
 const FLIGHT_MS = 700;
+
+/** How long the map takes to glide from one generation to the next. */
+const SCENE_TIME_MS = 1500;
+/** A star coming out of the fog fades in over this long. */
+const DISCOVERY_FADE_MS = 1000;
+
+/** Frame time (ms) above which the map is considered to be struggling. */
+const SLOW_FRAME_MS = 33;
+/** How long it must stay there before effects are reduced automatically. */
+const SLOW_FRAME_WINDOW_MS = 2000;
+/** How many scene-time samples the debug hook keeps per glide. */
+const MAX_TIME_SAMPLES = 240;
 /** Click slop: a pointer that moved further than this was a drag, not a click. */
 const CLICK_SLOP_PX = 4;
 /** Pick radius around the pointer, in CSS pixels. */
@@ -88,6 +154,10 @@ interface StarEntry {
   signature: string;
   /** Halo / ring / tick sprites, rebuilt as a set when `signature` changes. */
   decorations: Sprite[];
+  /** The opacity this star has at rest; the discovery fade scales it. */
+  baseOpacity: number;
+  /** `performance.now()` when the `system_discovered` fade-in started, or null. */
+  fadeStart: number | null;
 }
 
 interface Flight {
@@ -152,6 +222,20 @@ function squareTexture(): CanvasTexture {
   return new CanvasTexture(canvas);
 }
 
+/**
+ * Whether to publish `window.__losMap`. The URL flag is what `tests/animation.spec.ts` uses,
+ * because Playwright runs against `vite preview` - a production build, where `import.meta.env`
+ * would otherwise switch the hook off.
+ */
+function debugEnabled(): boolean {
+  if (import.meta.env.MODE !== "production") return true;
+  try {
+    return new URLSearchParams(window.location.search).get("debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
 /* ---------------------------------------------------------------- the map */
 
 export class StarMap {
@@ -170,6 +254,9 @@ export class StarMap {
   private readonly starsGroup = new Group();
   private readonly ringsGroup = new Group();
   private readonly starfield: Starfield;
+  private readonly nebula: Nebula;
+  /** The animated layer: light spheres, fleets, the leakage front, arks, flashes. */
+  private readonly effects: SceneEffects;
   private earthGlobe!: Mesh<SphereGeometry, MeshBasicMaterial>;
   private earthGlow!: Sprite;
   private earthLabel!: CSS2DObject;
@@ -197,6 +284,26 @@ export class StarMap {
   private started = false;
   private flight: Flight | null = null;
   private disposed = false;
+
+  /* -------------------------------------------------------------- scene time */
+
+  private readonly clock = new Clock();
+  /** Continuous generation the scene is drawn at. */
+  private sceneTime = 1;
+  private timeFrom = 1;
+  private timeTo = 1;
+  private timeStart = 0;
+  private timeAnimating = false;
+  /** False until the first `update()`, which seats scene time without animating. */
+  private hasState = false;
+  private timeSamples: number[] = [];
+
+  private reduced = false;
+  /** Rolling mean frame time, in milliseconds, over rendered frames. */
+  private frameMs = 16;
+  private lastFrameAt = 0;
+  private slowSince = 0;
+  private autoReduced = false;
 
   private readonly resizeObserver: ResizeObserver;
   private pointerDown: { x: number; y: number } | null = null;
@@ -239,8 +346,23 @@ export class StarMap {
     this.tickTexture = squareTexture();
     this.textures.push(this.starTexture, this.glowTexture, this.haloTexture, this.ringMarkTexture, this.tickTexture);
 
-    this.starfield = createStarfield();
-    this.scene.add(this.starfield, this.ringsGroup, this.earthGroup, this.starsGroup);
+    this.starfield = createStarfield(this.renderer.getPixelRatio());
+    this.nebula = createNebula();
+    this.effects = new SceneEffects({
+      positionOf: (name) => this.positionOf(name),
+      radiusOf: (ly) => radiusFor(ly, this.scale),
+      beyondRim: (ly) => isBeyondRim(ly, this.scale),
+      rimRadius: () => EDGE_RADIUS,
+      requestRender: this.requestRender,
+    });
+    this.scene.add(
+      this.nebula,
+      this.starfield,
+      this.ringsGroup,
+      this.earthGroup,
+      this.starsGroup,
+      this.effects.root,
+    );
 
     this.buildEarth();
     this.buildRings();
@@ -257,7 +379,27 @@ export class StarMap {
     this.renderer.domElement.addEventListener("pointermove", this.onPointerMove);
     this.renderer.domElement.addEventListener("pointerleave", this.onPointerLeave);
 
+    if (debugEnabled()) window.__losMap = this.debug();
+
     this.raf = requestAnimationFrame(this.tick);
+  }
+
+  /** The `window.__losMap` view; built once and handed out in dev/`?debug=1` builds only. */
+  private debug(): MapDebug {
+    return {
+      map: this,
+      sceneTime: () => this.sceneTime,
+      targetGeneration: () => this.timeTo,
+      animating: () => this.timeAnimating,
+      samples: () => [...this.timeSamples],
+      spheres: () => this.effects.debugSpheres(),
+      fleets: () => this.effects.debugFleets(),
+      leakageLy: () => this.effects.debugLeakageLy(),
+      flashes: () => this.effects.debugFlashes(),
+      objectCount: () => this.effects.objectCount(),
+      frameMs: () => this.frameMs,
+      reduced: () => this.reduced,
+    };
   }
 
   /* ------------------------------------------------------------ construction */
@@ -362,8 +504,71 @@ export class StarMap {
       this.entries.delete(name);
     }
 
+    this.setReduced(view.reduced);
+    this.setGeneration(view.generation);
+    // The star groups are in place, so the animated layer can resolve every position it needs.
+    this.effects.applyState({
+      generation: view.generation,
+      systems,
+      threats: view.threats,
+      broadcastRadius: view.broadcastRadius,
+      genesisWorlds: view.genesisWorlds,
+    });
+
     this.select(view.selected);
     this.requestRender();
+  }
+
+  /**
+   * The events of one `perform()` call, in order. Every one of them is decoration: the map
+   * would still be correct without them, which is why "Reduce effects" can drop them whole.
+   */
+  playEvents(events: readonly GameEvent[]): void {
+    if (this.disposed || events.length === 0) return;
+    if (!this.reduced) {
+      for (const event of events) {
+        if (event.kind !== "system_discovered") continue;
+        const entry = this.entries.get(event.data.system);
+        if (entry) entry.fadeStart = performance.now();
+      }
+    }
+    this.effects.playEvents(events);
+    this.requestRender();
+  }
+
+  /** "Reduce effects": drops the nebula and every flash, keeps all state-driven visuals. */
+  setReduced(reduced: boolean): void {
+    if (this.reduced === reduced) return;
+    this.reduced = reduced;
+    this.nebula.visible = !reduced;
+    this.effects.setReduced(reduced);
+    this.requestRender();
+  }
+
+  /**
+   * Starts the glide of scene time towards `generation`. The first state to arrive seats the
+   * clock outright - there is nothing to animate from when the map has just opened.
+   */
+  private setGeneration(generation: number): void {
+    if (!this.hasState) {
+      this.hasState = true;
+      this.sceneTime = generation;
+      this.timeFrom = generation;
+      this.timeTo = generation;
+      return;
+    }
+    if (generation === this.timeTo) return;
+    this.timeFrom = this.sceneTime;
+    this.timeTo = generation;
+    this.timeStart = performance.now();
+    this.timeAnimating = true;
+    this.timeSamples = [];
+    this.requestRender();
+  }
+
+  /** Scene position of a system the map is drawing; `effects.ts` asks by name. */
+  private positionOf(name: string): Vector3 | null {
+    return this.entries.get(name)?.group.position ?? null;
   }
 
   /** Marks one system (or nothing) as selected; the caller owns the actual selection state. */
@@ -388,7 +593,11 @@ export class StarMap {
   /** Resets the camera to the framing that fits the whole scene. */
   home(): void {
     const target = new Vector3(0, 0, 0);
-    const position = new Vector3(0, EDGE_RADIUS * 0.42, this.fitDistance());
+    // Looking down on the plane of the rings rather than along it: at 35 degrees the ring
+    // circles read as circles and the stars stop piling up on one line.
+    const elevation = (HOME_ELEVATION_DEG * Math.PI) / 180;
+    const distance = this.fitDistance();
+    const position = new Vector3(0, Math.sin(elevation) * distance, Math.cos(elevation) * distance);
     if (!this.started) {
       // Called from the constructor: place the camera outright, no animation.
       this.camera.position.copy(position);
@@ -435,9 +644,13 @@ export class StarMap {
     this.earthLabel.element.remove();
     this.earthGroup.clear();
 
+    this.effects.dispose();
     this.starfield.geometry.dispose();
     this.starfield.material.dispose();
+    this.nebula.geometry.dispose();
+    this.nebula.material.dispose();
     for (const texture of this.textures) texture.dispose();
+    if (window.__losMap?.map === this) delete window.__losMap;
 
     this.scene.clear();
     this.renderer.dispose();
@@ -514,6 +727,8 @@ export class StarMap {
       distance: system.distance,
       signature: "",
       decorations: [],
+      baseOpacity: 1,
+      fadeStart: null,
     };
     this.applyEntry(entry, system);
     return entry;
@@ -544,7 +759,7 @@ export class StarMap {
 
     entry.core.material.color.set(style.color);
     // knowledge 0 -> dim; anything the telescopes have actually studied -> normal.
-    entry.core.material.opacity = mood === "unknown" ? 0.6 : 1;
+    entry.baseOpacity = mood === "unknown" ? 0.6 : 1;
     entry.core.scale.setScalar(size);
 
     // A halo for what the description says about the inhabitants.
@@ -572,6 +787,7 @@ export class StarMap {
     if (distEl) distEl.textContent = formatDistance(system.distance);
     this.labelSizesStale = true;
     this.applyLabelStates();
+    this.applyEntryFade(entry, performance.now());
   }
 
   private addSprite(entry: StarEntry, map: Texture, color: number, size: number, opacity: number): Sprite {
@@ -586,8 +802,29 @@ export class StarMap {
       }),
     );
     sprite.scale.setScalar(size);
+    // Remembered so the discovery fade can scale it without losing the styled value.
+    sprite.userData["baseOpacity"] = opacity;
     entry.group.add(sprite);
     return sprite;
+  }
+
+  /**
+   * `system_discovered`: the star comes up out of the fog over `DISCOVERY_FADE_MS` instead of
+   * appearing at full brightness. Returns true while the fade still has frames to run.
+   */
+  private applyEntryFade(entry: StarEntry, now: number): boolean {
+    const k = entry.fadeStart === null ? 1 : Math.min(1, (now - entry.fadeStart) / DISCOVERY_FADE_MS);
+    entry.core.material.opacity = entry.baseOpacity * k;
+    for (const sprite of entry.decorations) {
+      const base = typeof sprite.userData["baseOpacity"] === "number" ? sprite.userData["baseOpacity"] : 1;
+      sprite.material.opacity = base * k;
+    }
+    entry.labelEl.style.opacity = k >= 1 ? "" : String(k);
+    if (k >= 1) {
+      entry.fadeStart = null;
+      return false;
+    }
+    return true;
   }
 
   private destroyEntry(entry: StarEntry): void {
@@ -778,14 +1015,77 @@ export class StarMap {
     }
   }
 
+  /**
+   * Moves scene time towards the generation the state asked for. Returns true while the glide
+   * is still running (and for the one frame that lands on the target).
+   */
+  private stepSceneTime(now: number): boolean {
+    if (!this.timeAnimating) return false;
+    const p = Math.min(1, (now - this.timeStart) / SCENE_TIME_MS);
+    this.sceneTime = this.timeFrom + (this.timeTo - this.timeFrom) * easeInOut(p);
+    if (this.timeSamples.length < MAX_TIME_SAMPLES) this.timeSamples.push(this.sceneTime);
+    if (p >= 1) {
+      this.sceneTime = this.timeTo;
+      this.timeAnimating = false;
+    }
+    return true;
+  }
+
+  /**
+   * Frame-time watchdog over consecutively rendered frames only (two frames a minute apart
+   * are not a 60-second frame). Two seconds above `SLOW_FRAME_MS` and the map asks the store
+   * to turn "Reduce effects" on - once, so a player who turns it back off is left alone.
+   */
+  private measureFrame(now: number): void {
+    if (this.lastFrameAt > 0) {
+      const dt = now - this.lastFrameAt;
+      if (dt > 0 && dt < 250) this.frameMs = this.frameMs * 0.8 + dt * 0.2;
+    }
+    this.lastFrameAt = now;
+
+    if (this.frameMs <= SLOW_FRAME_MS || this.reduced) {
+      this.slowSince = 0;
+      return;
+    }
+    if (this.slowSince === 0) {
+      this.slowSince = now;
+      return;
+    }
+    if (now - this.slowSince >= SLOW_FRAME_WINDOW_MS && !this.autoReduced) {
+      this.autoReduced = true;
+      this.slowSince = 0;
+      this.options.onAutoReduce?.();
+    }
+  }
+
   private readonly tick = (now: number): void => {
     this.raf = requestAnimationFrame(this.tick);
     if (this.flight) this.stepFlight(now);
-    if (!this.dirty) return;
+
+    // "Busy" means something will look different next frame, so the loop must keep going;
+    // everything else only redraws when `dirty` says the state or the camera moved.
+    let busy = this.stepSceneTime(now);
+    for (const entry of this.entries.values()) {
+      if (entry.fadeStart !== null && this.applyEntryFade(entry, now)) busy = true;
+    }
+    if (busy || this.dirty) {
+      const seconds = this.clock.getElapsedTime();
+      if (this.effects.step(this.sceneTime, seconds)) busy = true;
+      // The backdrop only twinkles while the map is awake anyway; freezing it when the page
+      // is idle is what keeps an untouched map at zero draw calls.
+      this.starfield.material.uniforms["uTime"]!.value = seconds;
+    }
+    if (busy) this.dirty = true;
+
+    if (!this.dirty) {
+      this.lastFrameAt = 0;
+      return;
+    }
     this.dirty = false;
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
     this.declutterLabels();
+    this.measureFrame(now);
     // What the canvas actually shows right now, as opposed to what the store has asked
     // for: tests/map.spec.ts waits on this before screenshotting a scale change.
     this.renderer.domElement.dataset["scale"] = this.scale;

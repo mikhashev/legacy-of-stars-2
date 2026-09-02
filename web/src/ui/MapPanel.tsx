@@ -82,7 +82,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
   const mapRef = useRef<StarMap | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedSystem, mapScale, showSystemList } = store.state;
+  const { selectedSystem, mapScale, showSystemList, reduceEffects, lastEvents } = store.state;
 
   // One StarMap for the lifetime of the main screen; it owns the WebGL context.
   useEffect(() => {
@@ -91,6 +91,10 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
     try {
       mapRef.current = new StarMap(host, {
         onSelect: (name) => store.selectSystem(name),
+        onAutoReduce: () => {
+          store.toggleReduceEffects(true);
+          store.showToast("The map was running slowly, so effects were reduced. Turn them back on in the toolbar.");
+        },
       });
     } catch (cause: unknown) {
       // No WebGL (a locked-down browser, a headless run without a GPU): the list overlay is
@@ -104,10 +108,27 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
     };
   }, [store]);
 
-  // Every state change the map cares about, in one diffing call.
+  // Every state change the map cares about, in one diffing call. `view.generation` is what
+  // starts the 1.5 s glide of scene time; everything animated is a function of it.
   useEffect(() => {
-    mapRef.current?.update({ systems: view.systems, selected: selectedSystem, scale: mapScale });
-  }, [view.systems, selectedSystem, mapScale]);
+    mapRef.current?.update({
+      generation: view.generation,
+      systems: view.systems,
+      threats: view.threats,
+      broadcastRadius: view.status.broadcast_radius,
+      genesisWorlds: view.genesis.worlds,
+      selected: selectedSystem,
+      scale: mapScale,
+      reduced: reduceEffects,
+    });
+  }, [view, selectedSystem, mapScale, reduceEffects]);
+
+  // The flashes for the last action's events, after the state above is in place so every
+  // star the events name already has a position. `lastEvents` is a fresh array per
+  // `perform()`, so this fires once per action and never replays an old batch.
+  useEffect(() => {
+    if (lastEvents.length > 0) mapRef.current?.playEvents(lastEvents);
+  }, [lastEvents]);
 
   const selected = selectedSystem ? view.systems.find((s) => s.name === selectedSystem) : undefined;
 
@@ -136,6 +157,16 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
           >
             Scale: {mapScale === "compressed" ? "compressed" : "true"}
           </button>
+          <button
+            onClick={() => store.toggleReduceEffects()}
+            title={
+              reduceEffects
+                ? "Nebula and event flashes are off; light spheres, fleets and the leakage front still animate"
+                : "Turn off the nebula and the event flashes"
+            }
+          >
+            Effects: {reduceEffects ? "reduced" : "full"}
+          </button>
           <button class={showSystemList ? "primary" : undefined} onClick={() => store.toggleSystemList()}>
             List
           </button>
@@ -151,7 +182,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
         )}
         <p class="star-map-legend">
           {view.catalog.known} of {view.catalog.total} catalogued &middot; rings at 5 / 10 / 20 / 50 LY &middot;
-          colour = spectral class
+          cyan = our signal, warm = a reply, red = a fleet
         </p>
         {selected && <SelectedCard system={selected} view={view} store={store} />}
         {showSystemList && (

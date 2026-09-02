@@ -65,6 +65,26 @@ export interface UIState {
   mapScale: ScaleMode;
   /** The systems list, which W3 moved off the main column into an overlay. */
   showSystemList: boolean;
+  /**
+   * The events of the most recent `perform()` only - the map plays these as one-off flashes
+   * (`StarMap.playEvents`). A fresh array per call, so a Preact effect keyed on it fires
+   * exactly once per action; `events` above stays the full journal.
+   */
+  lastEvents: GameEvent[];
+  /** W4 "Reduce effects": no nebula, no flashes. Persisted in localStorage. */
+  reduceEffects: boolean;
+}
+
+/** Where the effects toggle is remembered between sessions. */
+const REDUCE_EFFECTS_KEY = "los.reduceEffects";
+
+function loadReduceEffects(): boolean {
+  try {
+    return window.localStorage.getItem(REDUCE_EFFECTS_KEY) === "1";
+  } catch {
+    // Private mode, or storage disabled: the toggle still works, it just does not persist.
+    return false;
+  }
 }
 
 function describe(error: unknown): string {
@@ -92,6 +112,8 @@ const initialState: UIState = {
   selectedSystem: null,
   mapScale: "compressed",
   showSystemList: false,
+  lastEvents: [],
+  reduceEffects: loadReduceEffects(),
 };
 
 export class Store {
@@ -167,11 +189,13 @@ export class Store {
       summaryResult: null,
       selectedSystem: null,
       showSystemList: false,
+      lastEvents: [],
     });
   }
 
   backToStart(): void {
-    this.patch({ ...initialState, phase: "start" });
+    // The effects toggle is a display preference, not part of a game, so it survives.
+    this.patch({ ...initialState, phase: "start", reduceEffects: this.state.reduceEffects });
   }
 
   /** Runs a bridge.perform() promise, applying its result and surfacing refusals as a toast. */
@@ -224,6 +248,7 @@ export class Store {
       modalQueue,
       pendingDoctrine: result.needs && result.needs.kind === "doctrine" ? result.needs : null,
       selectedSystem,
+      lastEvents: result.events,
     });
     this.popModal();
   }
@@ -376,6 +401,21 @@ export class Store {
 
   toggleSystemList(open?: boolean): void {
     this.patch({ showSystemList: open ?? !this.state.showSystemList });
+  }
+
+  /**
+   * The map's "Reduce effects" toggle. `StarMap` calls this with `true` on its own when frame
+   * time stays over budget for two seconds; the player can turn it straight back off.
+   */
+  toggleReduceEffects(on?: boolean): void {
+    const reduceEffects = on ?? !this.state.reduceEffects;
+    if (reduceEffects === this.state.reduceEffects) return;
+    this.patch({ reduceEffects });
+    try {
+      window.localStorage.setItem(REDUCE_EFFECTS_KEY, reduceEffects ? "1" : "0");
+    } catch {
+      // Not persisting is not worth telling the player about.
+    }
   }
 
   /**

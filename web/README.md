@@ -1,7 +1,7 @@
-# Legacy of Stars - web front-end (phases W2-W3)
+# Legacy of Stars - web front-end (phases W2-W4)
 
 A playable browser build of the console game, with a 3D star map (Three.js) as the main
-screen's centre column. The Python engine (`src/`) is unchanged and runs inside a
+screen's centre column, animated by shaders off the engine's own event stream. The Python engine (`src/`) is unchanged and runs inside a
 [Pyodide](https://pyodide.org) worker; the main thread only ever talks JSON to it
 (`src/bridge.ts` / `src/worker.ts`, per `docs/web_contract.md`). The UI is Preact, plain CSS,
 no framework.
@@ -47,13 +47,15 @@ npm test              # Playwright: builds, previews, runs tests/*.spec.ts
 npm run test:all      # unit, then Playwright
 ```
 
-`npm run unit` (Vitest, `vitest.config.ts`) covers `src/scene/coords.ts` and
-`src/scene/palette.ts`: the sky directions of Sirius, Vega and Proxima against their real
+`npm run unit` (Vitest, `vitest.config.ts`) covers the pure scene modules `src/scene/coords.ts`,
+`src/scene/palette.ts` and `src/scene/timeline.ts`: the sky directions of Sirius, Vega and Proxima against their real
 J2000 positions, the radial compression (monotonic, and the 1,800 LY WOW! source pinned to
 the rim in both scales), the name-hash fallback for a system with no `ra`/`dec`,
 spectral-type parsing (including `DZ8` and the WOW! source's annotated
-`G2V? (candidate ...)`) and the description-to-mood rules. The two runners never see each
-other's files: Vitest takes `tests/unit/**/*.test.ts`, Playwright takes `tests/*.spec.ts`.
+`G2V? (candidate ...)`) and the description-to-mood rules, plus every W4 timing function -
+sphere radius over scene time, the reply's launch generation, each attack type's fraction of c
+and the leakage front's lag. The two runners never see each other's files: Vitest takes
+`tests/unit/**/*.test.ts`, Playwright takes `tests/*.spec.ts`.
 
 `npm test` starts its own server (`npm run build && npm run preview` on port 4173) and runs:
 
@@ -68,9 +70,17 @@ other's files: Vitest takes `tests/unit/**/*.test.ts`, Playwright takes `tests/*
   "1,800 LY", clicking Proxima Centauri's label selects it and opens the card, the selection
   becomes the default in the next system picker, Escape clears it, the scale toggle flips
   `data-scale`, and the List overlay selects the same way the map does.
+- `tests/animation.spec.ts` - W4, through the `window.__losMap` debug hook: scene time is
+  seated on Generation 1 without animating, a message to Proxima Centauri becomes an outgoing
+  sphere with `launchGen` 1 and radius 0, advancing one generation glides scene time through a
+  strictly increasing run of values inside (1, 2] and leaves that sphere pinned to the star's
+  4.2 LY and fully faded, the leakage front grows, the "Reduce effects" toggle reaches the
+  scene and clears the flashes, and six further generations of whatever seed 1 produces (a
+  discovery among them) run without a console error and inside the object budget.
 
 Screenshots land in `test-results/` (`opening.png`, `main.png`, `dialog-system-picker.png`,
-`smoke.png`, `map.png`, `map-selected.png`, `map-true-scale.png`).
+`smoke.png`, `map.png`, `map-selected.png`, `map-true-scale.png`, `animation.png` mid-glide,
+`animation-end.png`, `animation-reduced.png`, `animation-generation-8.png`).
 
 ## Layout
 
@@ -86,10 +96,13 @@ web/
 │   ├── app.tsx              routes start / opening / main off store.state.phase
 │   ├── main.tsx             creates the Store, mounts <App>, maintains #app test hooks
 │   ├── styles.css           the one stylesheet (dark theme)
-│   ├── scene/               the 3D star map (W3)
+│   ├── scene/               the 3D star map (W3) and its animated layer (W4)
 │   │   ├── coords.ts          ra/dec/distance -> scene position; radial compression (pure)
 │   │   ├── palette.ts         spectral class -> colour/size; description -> mood (pure)
-│   │   ├── starfield.ts       the static background shell of points
+│   │   ├── timeline.ts        scene time -> radii, fleet fractions, leakage front (pure)
+│   │   ├── shaders.ts         the five ShaderMaterials: sphere, marker, beam, starfield, nebula
+│   │   ├── effects.ts         SceneEffects: light spheres, fleets, arks, leakage, flashes
+│   │   ├── starfield.ts       the twinkling background points and the nebula shell
 │   │   └── StarMap.ts         the class: renderer, scene, camera, OrbitControls, CSS2D labels
 │   └── ui/
 │       ├── LoadingScreen.tsx    Pyodide boot progress (kept from W1)
@@ -108,7 +121,8 @@ web/
     ├── smoke.spec.ts      engine boots, start screen renders
     ├── play.spec.ts       full playable slice (see above)
     ├── map.spec.ts        the 3D map (see above)
-    └── unit/              Vitest: coords.test.ts, palette.test.ts
+    ├── animation.spec.ts  W4 scene time and light spheres (see above)
+    └── unit/              Vitest: coords.test.ts, palette.test.ts, timeline.test.ts
 ```
 
 ## The star map (W3)
@@ -148,10 +162,75 @@ something changed (a state update, a controls `change` event, or a camera flight
 page issues no draw calls; `devicePixelRatio` is capped at 2 and `dispose()` frees every
 geometry, material, texture and DOM label.
 
-Everything about the scene is arranged for W4: each system is a `Group` at the star's
-position, Earth is `StarMap.earthGroup`, `update()` diffs by name so objects hung off those
-groups survive a state change, and `requestRender()` is the hook an animation drives itself
-with.
+Each system is a `Group` at the star's position and Earth is `StarMap.earthGroup`, so the
+animated layer only ever needs a name to find a point in space; `update()` diffs by name, so
+objects hung off those groups survive a state change. The default camera sits 35 degrees above
+the plane of the rings (W3 looked at it almost edge-on) and star sprites are 1.6x the W3 size.
+
+## Animation and shaders (W4)
+
+Everything that moves is a function of two things and nothing else: the `ViewState` the engine
+produced, and the events of the last `perform()`. There is no game logic in the front-end - the
+launch generation of a fleet, for instance, is worked back from the engine's own `arrival_gen`,
+`source_distance` and `attack_type`, and every constant used to do that is the game's own
+(25 years per generation, 0.1c / 0.175c / 0.12c fleets, 0.12c arks, light speed for signals).
+
+**Scene time.** `src/scene/timeline.ts` is pure arithmetic over one variable: `t`, a continuous
+generation number. A state update does not snap the map to the new generation - `t` glides from
+the old one to the new one over 1.5 s with a cubic ease-in-out, and every radius and position
+below is read off `t`. While it glides (or a flash plays, or a fleet at `eta <= 2` pulses, or
+the camera flies) the loop renders every frame; the rest of the time the map is asleep and
+issues no draw calls, which is also why the background twinkle holds still on an idle page.
+
+**Light spheres.** Each of the last three `messages_sent` per system is a translucent shell
+centred on Earth with radius `min(distance, 25 * (t - generation))` LY, mapped through the same
+logarithmic compression the stars are, so it touches its star exactly when its light gets
+there; it dims as it grows and is gone 0.35 generations after arrival. A reply
+(`next_response_gen`) is the same shell centred on the star, launched `distance / 25`
+generations before it lands - the engine only ever states the arrival, so the launch is derived.
+Outgoing is cyan, incoming warm white; both are the same shader with a different colour.
+
+**Fleets.** Every `threats[]` entry draws a dashed straight line from its source star to Earth
+plus a marker at `clamp((t - launch) / (arrival - launch), 0, 1)` along it, labelled with
+`type_label` and its ETA. Red, and pulsing off the shader clock once `eta <= 2`.
+
+**Leakage front.** One near-invisible shell on Earth at `status.broadcast_radius`, lagging
+25 LY per generation behind it mid-glide. Its shader lights only the limb, so it reads as a
+front rather than a ball. Once the front outgrows the scene - around Generation 4, when the
+radius passes the catalogue's 51 LY - the sphere gives way to a faint ring pinned to the rim:
+everybody in the frame can hear us.
+
+**Event flashes.** `system_discovered` fades the new star up out of the fog over a second with
+a bloom; `response_received` pulses the star and then flashes Earth; `attack_resolved` and
+`info_attack` flash Earth red; `attack_warning` draws the new fleet's line in from the source;
+`genesis` blooms green on the target, and `genesis.worlds[]` keeps an ark trail and, from
+`evolution_stage >= 1`, a colony glow; `wow` fires a three-second beam towards Sagittarius;
+`victory` is a slow golden pulse on Earth. All of them are fire-and-forget and dispose
+themselves.
+
+**Background.** A shader starfield (sparse points, per-point size and twinkle phase) over a
+two-octave value-noise nebula on a back-facing shell, dark enough that its brightest patch is
+an order of magnitude under a star's core. The "dark forest" is the absence of anything else:
+the engine only lists systems it has resolved, so an unexplored direction is simply black. A
+fog sprite lifting around discovered systems was tried and dropped - it washed out exactly the
+dim `knowledge = 0` stars the player needs to be able to pick out.
+
+**Budget.** Every sphere in the scene shares one shader program (three.js caches them by
+source), as does every marker; geometries are shared too. At most 3 message spheres per system
+and 36 in total, 12 fleets, 8 arks, 20 flashes - the animated layer stays well under 150
+objects. `devicePixelRatio` is capped at 2 and all time comes from one `THREE.Clock`.
+
+**"Effects: full / reduced".** The toolbar button drops the nebula and every flash (the
+state-driven spheres, fleets and leakage front stay: they are information, not decoration). It
+is remembered in `localStorage` under `los.reduceEffects`, and the map turns it on by itself if
+frame time stays above 33 ms for two seconds, with a toast saying so.
+
+**The debug hook.** In a dev build, and in any build opened with `?debug=1` in the URL,
+`StarMap` publishes `window.__losMap`: `sceneTime()`, `targetGeneration()`, `animating()`,
+`samples()` (the scene times of the current glide), `spheres()`, `fleets()`, `leakageLy()`,
+`flashes()`, `objectCount()`, `frameMs()` and `reduced()`. The URL flag exists because
+Playwright runs against `vite preview`, i.e. a production build. It is read-only: nothing in
+the scene can be driven through it.
 
 ## What's covered vs. intentionally missing
 
@@ -162,7 +241,7 @@ director-drafted / standard reply), system dossiers, threats, the event journal 
 modals, save/load (manual, autosave, export/import JSON, console-compatible), Help and the
 final report/score.
 
-Missing by design (not part of W2/W3): event animations and shaders (W4), LLM text in
+Missing by design (not part of W2-W4): LLM text in
 the browser (`urllib` does not work in Pyodide - the engine falls back to its offline content
 bank, same as the console with `LOS_OFFLINE=1`).
 
@@ -178,7 +257,7 @@ sterile/habitable/unseeded/non-WOW!-source system list the Genesis picker shows,
 |---|---|
 | `engine.zip` | ~99 KiB (25 files) |
 | Pyodide runtime | ~13 MiB raw / ~6 MiB gzipped |
-| `dist/` (W2 build) | ~14 MiB, `index-*.js` ~50 KiB / ~16 KiB gzipped |
+| `dist/` (W4 build) | ~14 MiB, `index-*.js` ~645 KiB / ~167 KiB gzipped (three.js dominates) |
 | Time to `ready` | ~1 s (worker start -> engine imported, uncached local server) |
 
 Well inside the plan's 4-second budget.

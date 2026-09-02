@@ -435,6 +435,19 @@ input[type="text"], input[type="number"], textarea {
   user-select: none;
 }
 
+/* W4: the label riding along with an inbound fleet marker (type_label + ETA). */
+.fleet-label {
+  position: absolute;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: #ffb0a4;
+  white-space: nowrap;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  user-select: none;
+}
+.fleet-label[data-urgent="true"] { color: #ff6a58; font-weight: 600; }
+
 /* the selected-system card */
 .map-card {
   position: absolute;
