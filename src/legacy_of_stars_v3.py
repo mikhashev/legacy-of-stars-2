@@ -388,11 +388,21 @@ class ContactProgram:
         "voyager_golden_record",    # Launched 1977
     )
 
-    def __init__(self, seed: Optional[int] = None, offline: bool = False, generate: bool = True):
+    def __init__(self, seed: Optional[int] = None, offline: bool = False, generate: bool = True,
+                 data_dir: Optional[Path] = None):
         if seed is not None:
             random.seed(seed)
         self.seed = seed
         self.offline = bool(offline) or os.getenv("LOS_OFFLINE") == "1"
+
+        # --- where star_catalog.json, tech_tree.json and templates/ are read from.
+        # Defaults to the repository's data/; an explicit directory (web build, tests) must exist.
+        if data_dir is None:
+            self.data_dir = DATA_DIR
+        else:
+            self.data_dir = Path(data_dir)
+            if not self.data_dir.is_dir():
+                raise FileNotFoundError(f"data directory not found: {self.data_dir}")
 
         # --- core program state
         self.generation = 1
@@ -409,7 +419,7 @@ class ContactProgram:
         self.message = ""
 
         # --- galaxy
-        self.catalog = load_star_catalog()
+        self.catalog = load_star_catalog(self.data_dir / "star_catalog.json")
         self.undiscovered: List[str] = []  # catalogued stars we have not resolved yet, nearest first
         self.star_systems: Dict[str, StarSystem] = {}
 
@@ -428,7 +438,7 @@ class ContactProgram:
 
         # --- optional AI and the written content bank
         self.ai = AIManager(offline=self.offline)
-        self.content = ContentBank()
+        self.content = ContentBank(self.data_dir / "templates")
         self.ai_advisor = AIStrategicAdvisor(self.ai)
         self.advisor_consulted_this_gen = False
 
@@ -546,9 +556,11 @@ class ContactProgram:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], offline: Optional[bool] = None) -> "ContactProgram":
+    def from_dict(cls, data: Dict[str, Any], offline: Optional[bool] = None,
+                  data_dir: Optional[Path] = None) -> "ContactProgram":
         """Rebuild a program from to_dict() output. Unknown keys are ignored, missing ones get defaults."""
-        program = cls(seed=None, offline=bool(offline) if offline is not None else False, generate=False)
+        program = cls(seed=None, offline=bool(offline) if offline is not None else False, generate=False,
+                      data_dir=data_dir)
         program.seed = data.get("seed")
 
         for name, value in data.get("state", {}).items():
@@ -605,7 +617,7 @@ class ContactProgram:
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
         try:
-            path = Path(__file__).parent.parent / "data" / "tech_tree.json"
+            path = Path(getattr(self, "data_dir", DATA_DIR)) / "tech_tree.json"
             if not path.exists():
                 return {}
             with open(path, "r") as f:

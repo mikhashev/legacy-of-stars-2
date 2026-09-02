@@ -51,7 +51,7 @@ def serialize(program: ContactProgram, label: Optional[str] = None) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
-def deserialize(text: str, offline: Optional[bool] = None) -> ContactProgram:
+def deserialize(text: str, offline: Optional[bool] = None, data_dir: Optional[Path] = None) -> ContactProgram:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -62,7 +62,7 @@ def deserialize(text: str, offline: Optional[bool] = None) -> ContactProgram:
     if version != FORMAT_VERSION:
         raise SaveError(f"save format {version} is not supported by this version (expected {FORMAT_VERSION})")
     try:
-        return ContactProgram.from_dict(payload["program"], offline=offline)
+        return ContactProgram.from_dict(payload["program"], offline=offline, data_dir=data_dir)
     except (KeyError, TypeError, ValueError) as exc:
         raise SaveError(f"save file is damaged: {exc!r}") from exc
 
