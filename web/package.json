@@ -1,0 +1,26 @@
+{
+  "name": "legacy-of-stars-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser front-end for Legacy of Stars: the Python engine runs in a Pyodide worker.",
+  "scripts": {
+    "engine": "node scripts/engine.mjs",
+    "dev": "npm run engine && vite",
+    "build": "npm run engine && vite build",
+    "preview": "vite preview",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "preact": "10.29.8",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.4.1",
+    "@types/three": "0.185.4",
+    "pyodide": "314.0.6",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

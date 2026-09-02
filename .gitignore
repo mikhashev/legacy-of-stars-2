@@ -29,3 +29,11 @@ NEXT_SESSION.md
 
 # Private audit (not for version control)
 audit/
+
+# Web front-end (web/)
+web/node_modules/
+web/dist/
+web/public/engine.zip
+web/public/pyodide/
+web/test-results/
+web/playwright-report/
