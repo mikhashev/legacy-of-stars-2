@@ -248,7 +248,9 @@ def generate_civilization_age():
     return age
 
 def age_to_kardashev_scale(age):
-    """Map age to approximate Kardashev level"""
+    """Map age to approximate Kardashev level.
+    Illustrative, not implemented: Type II (10^26 W) in 10,000 years is far beyond any
+    real extrapolation; kept here only as a narrative sketch, not an engine formula."""
     if age < 50: return 0.5      # Pre-planetary
     elif age < 200: return 0.7   # Early Type I
     elif age < 1000: return 1.2  # Type I
@@ -459,6 +461,9 @@ class EarthSignalProfile:
 **Trigger**: Player reaches Kardashev Type I
 **Event**: Ultra-advanced civilization makes one-time contact
 
+> Any form of FTL is forbidden by `design_notes.md` §8 - the gift below must not grant
+> instant communication. It grants knowledge instead.
+
 ```
 ═══════════════════════════════════════════════════════════
 INCOMING TRANSMISSION - ORIGIN: UNKNOWN
@@ -472,8 +477,8 @@ your world. You have reached beyond your cradle.
 
 You have earned this gift."
 
-[TECHNOLOGY UNLOCKED: Quantum Entanglement Communication]
-[Enables instant communication - no light-speed delay]
+[GIFT RECEIVED: Deep Archive]
+[Reveals the true strategy of every known civilization. +500 RP.]
 
 "We will observe no further. The cosmos is yours to explore."
 

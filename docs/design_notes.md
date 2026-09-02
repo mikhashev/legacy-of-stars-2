@@ -63,6 +63,9 @@
 *   **Astronomy**: Use real star classes (O, B, A, F, G, K, M) and realistic habitable zones. Distances measured in Light Years.
 *   **Biology**: Evolution follows natural selection principles. Alien life might be non-carbon based but must be chemically plausible.
 *   **Sociology**: Civilizations follow game-theory principles (e.g., Prisoner's Dilemma in diplomacy, The Dark Forest).
+*   **In practice**: every distance effect uses light-time; fleets travel at 0.1c, probes at
+    0.175c, fusion craft at 0.12c; the passive-leakage front expands 1 light-year per year;
+    habitability depends on spectral class.
 
 ## 9. AI-Enhanced Gameplay
 **Concept**: Use Generative AI to create unique, non-repetitive content, elevating the text-based experience.

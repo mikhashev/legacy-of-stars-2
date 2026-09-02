@@ -1,5 +1,10 @@
 # Passive Signal Leakage System - Implementation Summary
 
+> **Historical document** — describes the pre-v1.0 model (fleets at light speed, message
+> probes). Current rules: README and `src/legacy_of_stars_v3.py`. The tech-tier broadcast
+> radius described below was replaced in v1.1 by a time-based leakage front (one light-year
+> per year since 1935), inverse-square detection and light-delayed information attacks.
+
 ## Status: COMPLETE ✅
 
 **Last Updated**: December 6, 2025
@@ -350,9 +355,9 @@ if self.program.leakage_multiplier < 1.0:
 ## Scientific Accuracy
 
 **Based on Real Research**:
-- Breakthrough Starshot (NASA/ESA): 15-20% c using laser sails
+- Breakthrough Starshot (Breakthrough Initiatives, 2016): 15-20% c using laser sails
 - Project Daedalus (British Interplanetary Society): 12% c using fusion
-- Solar sails (NASA, JAXA): Tested in space (IKAROS 2010, LightSail-2 2019)
+- Solar sails: Tested in space (IKAROS 2010, JAXA; LightSail-2 2019, Planetary Society)
 - Von Neumann probes: Theoretical but scientifically sound
 
 **Dark Forest Theory** (Liu Cixin):

@@ -31,6 +31,28 @@ the game:
 - **Tests.** `python -m unittest discover -s tests -t .` runs unit, end-to-end and headless
   whole-game tests; `LOS_SLOW=1` adds statistical balance checks.
 
+## v1.1 - Scientific accuracy pass (2026-09-03)
+
+The game was audited against its own realism standard (`docs/design_notes.md` §8); the audit and
+the seven-phase plan live in `docs/science_accuracy_audit.md` and `docs/science_accuracy_plan.md`.
+All phases are implemented: no FTL anywhere, technology unlock years derived from the 1977 start,
+the WOW! source is a real star 1,800 LY away whose hostile answer is a signal rather than a
+light-speed fleet, civilization odds depend on spectral class, extinct systems respect light-time,
+the leakage front grows one light-year per year, and the Genesis Project sends embryo arks at 0.12c.
+
+### Deferred from the code review (not in the plan, worth doing next)
+
+- **Information attacks as `AttackWarning`s.** `pending_info_attacks` is a bare
+  `[system, arrival]` list with its own delivery loop; it does not appear in `view_state()["threats"]`,
+  the advisor's threat list or the final report. Add an `"information"` attack type to
+  `ATTACK_TYPE_LABELS`, schedule through `_schedule_attack`, resolve in `_resolve_attack`, and let
+  the WOW! hostile outcome use the same path.
+- **One year formula.** `start_year + (generation - 1) * 25` appears in about a dozen places
+  (`legacy_of_stars_v3.py`, `ai_strategic_advisor.py`, `summary.py`, `save_manager.py`,
+  `genesis_project.py`, `game_interface.py`, plus `START_YEAR` for `Technology.year_context`).
+  Add `YEARS_PER_GENERATION` and a `ContactProgram.year_of(generation)` helper and route every
+  caller through it.
+
 The sections below are the historical development notes of Phases 1-3. Some figures in them
 (27 technologies, 8 star systems, Gemini AI) describe earlier builds.
 
@@ -41,7 +63,7 @@ The sections below are the historical development notes of Phases 1-3. Some figu
 ### What We Built
 **Statistical Realism:**
 - ✅ 75/25 age distribution (75% civs older than humanity)
-- ✅ Extinct civilizations (15% chance)
+- ✅ 15% of stars host a civilization, 25% of those extinct
 - ✅ Swan song data archive flags (80% of extinct civs)
 - ✅ Age-based tech stage progression
 - ✅ Deception capability (scales with civilization age)
@@ -72,7 +94,7 @@ The sections below are the historical development notes of Phases 1-3. Some figu
 **User Decision**: Literal gameplay scenario, not just narrative
 
 **The Design:**
-Opening scenario (Gen 1, August 15, 1977) - Player makes REAL choice with consequence 144 generations later (Year 3577). This teaches the game's core theme: decisions have multi-generational impact.
+Opening scenario (Gen 1, August 15, 1977) - Player makes REAL choice with consequence 144 generations later (Year 5552). This teaches the game's core theme: decisions have multi-generational impact.
 
 **Implementation:**
 
@@ -89,7 +111,7 @@ Opening scenario (Gen 1, August 15, 1977) - Player makes REAL choice with conseq
    
    → YES - Send Reply
       • Message travels 72 generations (1,800 LY)
-      • Response/attack arrives Generation 144 (Year 3577)
+      • Response/attack arrives Generation 144 (Year 5552)
       • Immediate: +100 RP, +10% Support (bold decision)
       • Long-term: Unknown until Gen 144
    
@@ -148,7 +170,8 @@ Opening scenario (Gen 1, August 15, 1977) - Player makes REAL choice with conseq
 4. **Historical Accuracy Notes**
    - Use real 1,800 LY estimate (disputed but commonly cited)
    - Acknowledge uncertainty in tutorial text
-   - Star 2MASS 19281982-2640123 ruled out, true source unknown
+   - Star 2MASS 19281982-2640123 remains an unconfirmed candidate; a 2024 analysis (Arecibo
+     Wow! project) proposes a natural origin - a hydrogen cloud brightened by a magnetar flare
    - Game treats it as gameplay scenario, not historical claim
 
 **Why This Design is Perfect:**
@@ -711,7 +734,7 @@ All planned features from Phases 1-3 have been implemented and integrated:
 - ✅ Dark Forest mechanics with 5 civilization strategies
 - ✅ WOW! Signal ultra-long-term legacy system (Gen 1 → Gen 144)
 - ✅ Attack Warning System with defensive actions
-- ✅ 41 technologies across 5 tiers (historically accurate SETI progression)
+- ✅ 44 technologies across 6 tiers (historically accurate SETI progression)
 - ✅ AI Strategic Advisor for player guidance
 - ✅ Swan Song Messages from extinct civilizations
 - ✅ Passive Signal Leakage (realistic broadcast detection)

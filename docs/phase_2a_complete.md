@@ -1,5 +1,8 @@
 # Phase 2A Implementation - COMPLETE ✅
 
+> **Historical document** — describes the pre-v1.0 model (fleets at light speed, message
+> probes). Current rules: README and `src/legacy_of_stars_v3.py`.
+
 **Date**: 2025-12-04  
 **Status**: ALL PRIORITIES COMPLETE  
 **Timeline**: Completed in single session
@@ -23,7 +26,7 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
 **What It Does**:
 - Opening scenario (Gen 1, August 15, 1977)
 - Player decides: Reply to WOW! Signal or Stay Silent
-- Consequence arrives Gen 144 (Year 3577) - 144 generations later!
+- Consequence arrives Gen 144 (Year 5552) - 144 generations later!
 - Achievement system for ultra-rare outcomes
 
 **Key Features**:
@@ -231,7 +234,7 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
 - Multiple simultaneous contacts
 - Victory within reach
 
-### Gen 144 (Year 3577)
+### Gen 144 (Year 5552)
 **WOW! Signal Consequences**:
 - Ultra-rare achievement unlock
 - Response/attack from 1,800 LY source
@@ -268,7 +271,7 @@ Gen 8+ (2175+):
 ├─ Stellar Engineering (become visible)
 └─ Victory likely if survived this far
 
-Gen 144 (3577):
+Gen 144 (5552):
 └─ WOW! Signal outcome [If player replied in Gen 1]
 ```
 

@@ -1,5 +1,8 @@
 # Tech Tree Redesign - Implementation Complete ✅
 
+> **Historical document** — describes the pre-v1.0 model (fleets at light speed, message
+> probes). Current rules: README and `src/legacy_of_stars_v3.py`.
+
 **Date**: 2025-12-04  
 **Status**: COMPLETE AND TESTED  
 **Priority**: 3 from Phase 2A Roadmap

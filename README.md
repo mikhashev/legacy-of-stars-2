@@ -56,7 +56,7 @@ director). Research Points accumulate from funding and from the instruments you 
   (bio-engineering, neural interfaces, consciousness upload) decide whether the self-destruct risk
   grows or recedes after the first thirty generations.
 - **Legacy.** Reply to the WOW! signal in 1977 and the answer - if any - arrives in Generation 144.
-- **Genesis.** Seed sterile worlds with engineered life and, forty generations later, meet what grew.
+- **Genesis.** Send arks to sterile worlds and, forty generations after landing, meet what grew.
 
 **Winning:** replies from three living civilizations (contact victory) and/or 15 pieces of Fermi
 Paradox evidence (philosophical victory). Both let the game continue.
@@ -135,4 +135,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   - [@SETIInstitute](@SETIInstitute) research
   - [WOW! Signal](https://en.wikipedia.org/wiki/Wow!_signal)
   - Liu Cixin's "Dark Forest" theory
+  - David Brin, "The Great Silence" (1983)
 - Implementation created using [Personal Context Technology](https://github.com/mikhashev/personal-context-manager/blob/main/use-cases/game-development/README.md)
