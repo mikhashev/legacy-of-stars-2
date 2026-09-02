@@ -262,6 +262,21 @@ This is the ultimate test of Dark Forest paranoia versus cooperative optimism.""
         
         return events
     
+    def to_dict(self) -> Dict:
+        return {"events": {event_id: {"has_triggered": event.has_triggered, "chosen_option": event.chosen_option}
+                           for event_id, event in self.events.items()}}
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "PhilosophicalEvents":
+        events = cls()
+        for event_id, state in data.get("events", {}).items():
+            event = events.events.get(event_id)
+            if event is None:
+                continue
+            event.has_triggered = bool(state.get("has_triggered", False))
+            event.chosen_option = state.get("chosen_option")
+        return events
+
     def check_and_trigger(self, game) -> Optional[PhilosophicalEvent]:
         """
         Check if any event should trigger this generation
@@ -340,16 +355,15 @@ This is the ultimate test of Dark Forest paranoia versus cooperative optimism.""
             game.integration.add_integration(effects["integration"], f"{event.name} - {choice['name']}")
         
         if "action_points" in effects:
-            game.max_action_points += effects["action_points"]
-        
+            game.ap_modifier = getattr(game, "ap_modifier", 0) + effects["action_points"]
+            game.max_action_points = max(1, game.max_action_points + effects["action_points"])
+            game.action_points = max(0, min(game.action_points, game.max_action_points))
+
+        message = effects.get("message") or choice.get("message") or "Choice applied."
+
         # Special effects
-        if "special" in effects and effects["special"] == "mirror_contact_attempt":
-            # Find a system at similar tech level for mirror encounter
-            # This will be handled in the game logic
-            pass
-        
-        # Log the choice
+        if effects.get("special") == "mirror_contact_attempt" and hasattr(game, "resolve_mirror_contact"):
+            message += "\n\n" + game.resolve_mirror_contact()
+
         logging.info(f"PHILOSOPHICAL CHOICE: {event.name} -> {choice['name']}")
-        
-        # Return the message
-        return choice.get("message", "Choice applied.")
+        return message

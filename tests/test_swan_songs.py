@@ -1,210 +1,129 @@
 """
-Test script for Swan Song Messages feature
-Tests discovery mechanics, rewards, and AI generation
+Swan Song Messages: creation, discovery thresholds, rewards, and the in-game action.
 """
-
-import sys
 import os
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+os.environ.setdefault("LOS_OFFLINE", "1")
 
-# Fix UTF-8 encoding for Windows console
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
+from src.swan_song_messages import SwanSong, SwanSongCategory, SwanSongManager  # noqa: E402
 
-from src.swan_song_messages import SwanSongManager, SwanSongCategory
-from src.ai_manager import AIManager
+SONG_RANDOM = "src.swan_song_messages.random.random"
 
-def test_swan_song_creation():
-    """Test creating swan songs for extinct civilizations"""
-    print("=" * 60)
-    print("TEST 1: Swan Song Creation")
-    print("=" * 60)
-    
-    ai = AIManager()
-    manager = SwanSongManager(ai)
-    
-    # Create swan songs for different civilizations
-    manager.create_swan_song("Alpha Centauri", 1500, 50000)
-    manager.create_swan_song("Barnard's Star", 3000, 200000)
-    manager.create_swan_song("Wolf 359", 500, 10000)
-    
-    assert len(manager.swan_songs) == 3
-    print("✓ Created 3 swan songs")
-    
-    assert manager.has_swan_song("Alpha Centauri")
-    assert manager.has_swan_song("Barnard's Star")
-    assert manager.has_swan_song("Wolf 359")
-    print("✓ All systems have swan songs")
-    
-    assert not manager.is_discovered("Alpha Centauri")
-    print("✓ Swan songs start as undiscovered")
-    
-    print("\nSwan Song Categories:")
-    for name, song in manager.swan_songs.items():
-        print(f"  {name}: {song.category}")
-    
-    print("\n✅ TEST 1 PASSED\n")
 
-def test_swan_song_discovery():
-    """Test discovery mechanics with different knowledge levels"""
-    print("=" * 60)
-    print("TEST 2: Swan Song Discovery Mechanics")
-    print("=" * 60)
-    
-    ai = AIManager()
-    manager = SwanSongManager(ai)
-    
-    manager.create_swan_song("Proxima Centauri", 2000, 100000)
-    
-    # Test insufficient knowledge
-    result = manager.discover_swan_song("Proxima Centauri", 20)
-    assert "error" in result
-    assert "Insufficient knowledge" in result["error"]
-    print("✓ Cannot discover with <30% knowledge")
-    
-    # Test discovery at 50% knowledge
-    result = manager.discover_swan_song("Proxima Centauri", 50)
-    # May succeed or fail probabilistically at 50%
-    if "error" not in result:
-        print("✓ Discovered swan song at 50% knowledge")
-        assert result["system"] == "Proxima Centauri"
-        assert "message" in result
-        assert "rewards" in result
-        print(f"  Category: {result['category']}")
-        print(f"  Rewards: {result['rewards']}")
-    else:
-        print("✓ Discovery failed at 50% (probabilistic - expected sometimes)")
-    
-    # Test already discovered
-    if "error" not in result:
-        result2 = manager.discover_swan_song("Proxima Centauri", 80)
-        assert "error" in result2
-        assert "already discovered" in result2["error"].lower()
-        print("✓ Cannot discover same swan song twice")
-    
-    print("\n✅ TEST 2 PASSED\n")
+class SwanSongManagerTest(unittest.TestCase):
+    def test_creation_and_status(self):
+        manager = SwanSongManager()
+        manager.create_swan_song("Alpha Centauri", 1500, 50000)
+        manager.create_swan_song("Wolf 359", 500, 10000, "failed_transition")
+        self.assertTrue(manager.has_swan_song("Alpha Centauri"))
+        self.assertFalse(manager.has_swan_song("Sirius"))
+        self.assertFalse(manager.is_discovered("Alpha Centauri"))
+        self.assertEqual(manager.get_all_swan_songs_status(), {"Alpha Centauri": False, "Wolf 359": False})
+        for song in manager.swan_songs.values():
+            self.assertIn(song.category, [c.value for c in SwanSongCategory])
+            self.assertIsNone(song.message)  # generated lazily
 
-def test_swan_song_rewards():
-    """Test different reward categories"""
-    print("=" * 60)
-    print("TEST 3: Swan Song Reward Categories")
-    print("=" * 60)
-    
-    ai = AIManager()
-    manager = SwanSongManager(ai)
-    
-    # Create enough swan songs to likely get all categories
-    for i in range(10):
-        manager.create_swan_song(f"System_{i}", 1000, 50000)
-    
-    categories_found = set()
-    
-    for name in manager.swan_songs.keys():
-        result = manager.discover_swan_song(name, 100)  # 100% success at high knowledge
-        if "error" not in result:
-            categories_found.add(result['category'])
-            print(f"✓ {result['category']}: {list(result['rewards'].keys())}")
-    
-    print(f"\nTotal categories found: {len(categories_found)}")
-    print(f"Categories: {categories_found}")
-    
-    print("\n✅ TEST 3 PASSED\n")
+    def test_discovery_thresholds(self):
+        manager = SwanSongManager()
+        manager.create_swan_song("Proxima Centauri", 2000, 100000)
+        self.assertIn("Insufficient knowledge", manager.discover_swan_song("Proxima Centauri", 20)["error"])
+        with mock.patch(SONG_RANDOM, return_value=0.9):  # roll fails at 50% knowledge (66% chance)
+            self.assertIn("Deep scan in progress", manager.discover_swan_song("Proxima Centauri", 50)["error"])
+        result = manager.discover_swan_song("Proxima Centauri", 100)  # 100% chance
+        self.assertNotIn("error", result)
+        self.assertEqual(result["system"], "Proxima Centauri")
+        self.assertGreater(len(result["message"]), 100)
+        self.assertIn("already discovered", manager.discover_swan_song("Proxima Centauri", 100)["error"].lower())
+        self.assertIn("No swan song", manager.discover_swan_song("Nowhere", 100)["error"])
 
-def test_tech_discount():
-    """Test tech discount accumulation"""
-    print("=" * 60)
-    print("TEST 4: Tech Discount System")
-    print("=" * 60)
-    
-    ai = AIManager()
-    manager = SwanSongManager(ai)
-    
-    # Create a technical swan song (25% chance)
-    created_technical = False
-    for i in range(20):  # Try multiple times
-        manager.create_swan_song(f"Tech_System_{i}", 1000, 50000)
-        
-    # Discover all and find technical ones
-    for name in manager.swan_songs.keys():
-        result = manager.discover_swan_song(name, 100)
-        if "error" not in result and result['category'] == SwanSongCategory.TECHNICAL:
-            created_technical = True
-            assert "tech_discount" in result["rewards"]
-            print(f"✓ Technical swan song gives tech discount: {result['rewards']['tech_discount']*100}%")
-            break
-    
-    if created_technical:
-        # Test discount retrieval
-        discount = manager.get_tech_discount()
-        assert discount > 0
-        print(f"✓ Retrieved tech discount: {discount*100}%")
-        
-        # Test discount consumed
-        discount2 = manager.get_tech_discount()
-        assert discount2 == 0
-        print("✓ Tech discount consumed after use")
-    else:
-        print("⚠️ No technical swan song generated (probabilistic)")
-    
-    print("\n✅ TEST 4 PASSED\n")
+    def test_rewards_by_category(self):
+        expectations = {
+            "warning": {"knowledge", "research_points", "public_support"},
+            "archive": {"knowledge", "research_points", "tech_hint"},
+            "technical": {"research_points", "tech_discount"},
+            "plea": {"knowledge", "research_points", "public_support"},
+            "philosophy": {"knowledge", "public_support", "research_points"},
+        }
+        for category, keys in expectations.items():
+            song = SwanSong("X", category, 1000, 5000.0)
+            self.assertTrue(keys <= set(song.rewards), category)
+        ancient = SwanSong("Y", "archive", 1000, 200000.0)
+        self.assertEqual(ancient.rewards["research_points"], 250)
+        self.assertIn("Ancient", ancient.rewards["message"])
 
-def test_message_generation():
-    """Test AI message generation (basic structure check)"""
-    print("=" * 60)
-    print("TEST 5: Message Generation")
-    print("=" * 60)
-    
-    ai = AIManager()
-    manager = SwanSongManager(ai)
-    
-    manager.create_swan_song("Test System", 1000, 75000)
-    
-    result = manager.discover_swan_song("Test System", 100)
-    
-    if "error" not in result:
-        message = result["message"]
-        print(f"✓ Generated message ({len(message)} characters)")
-        print("\nMessage preview:")
-        print("-" * 60)
-        print(message[:300] + "..." if len(message) > 300 else message)
-        print("-" * 60)
-        
-        # Basic validation
-        assert len(message) > 50  # Should be substantial
-        assert isinstance(message, str)
-        print("✓ Message structure valid")
-    
-    print("\n✅ TEST 5 PASSED\n")
+    def test_tech_discount_accumulates_and_is_consumed(self):
+        manager = SwanSongManager()
+        manager.swan_songs["T1"] = SwanSong("T1", "technical", 1000, 5000.0)
+        manager.swan_songs["T2"] = SwanSong("T2", "technical", 1000, 5000.0)
+        manager.discover_swan_song("T1", 100)
+        manager.discover_swan_song("T2", 100)
+        self.assertAlmostEqual(manager.next_tech_discount, 0.5)
+        self.assertAlmostEqual(manager.get_tech_discount(), 0.5)
+        self.assertEqual(manager.get_tech_discount(), 0.0)
 
-def run_all_tests():
-    """Run all swan song tests"""
-    print("\n" + "=" * 60)
-    print("SWAN SONG MESSAGES - TEST SUITE")
-    print("=" * 60 + "\n")
-    
-    try:
-        test_swan_song_creation()
-        test_swan_song_discovery()
-        test_swan_song_rewards()
-        test_tech_discount()
-        test_message_generation()
-        
-        print("=" * 60)
-        print("🎉 ALL TESTS PASSED! 🎉")
-        print("=" * 60)
-        print("\nSwan Song Messages system is working correctly!")
-        print("Ready for integration with main game.")
-        
-    except AssertionError as e:
-        print(f"\n❌ TEST FAILED: {e}")
-        raise
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        raise
+
+class SwanSongActionTest(unittest.TestCase):
+    def _extinct_program(self):
+        p = ContactProgram(seed=51, offline=True)
+        system = next(iter(p.star_systems.values()))
+        system.has_civilization = True
+        system.is_extinct = True
+        system.extinct_years_ago = 1200
+        system.civilization_age = 8000
+        system.has_swan_song = True
+        system.civilization_type = "failed_transition"
+        system.true_strategy = None
+        system.civilization_stage = None
+        p.swan_song_manager.swan_songs.pop(system.name, None)
+        p._register_swan_song(system)
+        return p, system
+
+    def test_listening_applies_rewards_evidence_and_achievement(self):
+        p, system = self._extinct_program()
+        self.assertIn(system.name, p.undiscovered_swan_songs())
+        self.assertIn("listen_swan_song", [a.id for a in p.available_actions()])
+        system.knowledge = 100
+        p.action_points = 2
+        rp, knowledge = p.research_points, p.knowledge_base
+        with mock.patch(SONG_RANDOM, return_value=0.0):
+            p.listen_for_swan_song(system.name)
+        self.assertEqual(p.action_points, 1)
+        self.assertIn("SWAN SONG DISCOVERED", p.message)
+        self.assertGreater(p.research_points, rp)
+        self.assertGreaterEqual(p.knowledge_base, knowledge)
+        self.assertEqual(p.fermi_evidence["extinction_evidence"], 2)
+        self.assertEqual(p.stats["swan_songs_found"], 1)
+        self.assertIn("Archivist", p.achievements)
+        self.assertNotIn(system.name, p.undiscovered_swan_songs())
+        p.listen_for_swan_song(system.name)
+        self.assertIn("already discovered", p.message.lower())
+
+    def test_listening_needs_knowledge_and_action_points(self):
+        p, system = self._extinct_program()
+        system.knowledge = 10
+        p.action_points = 1
+        p.listen_for_swan_song(system.name)
+        self.assertIn("Insufficient knowledge", p.message)
+        self.assertEqual(p.action_points, 0)
+        p.listen_for_swan_song(system.name)
+        self.assertIn("Not enough Action Points", p.message)
+
+    def test_non_extinct_system_has_nothing_to_hear(self):
+        p, _ = self._extinct_program()
+        other = list(p.star_systems.values())[1]
+        other.has_civilization = False
+        p.action_points = 1
+        p.listen_for_swan_song(other.name)
+        self.assertIn("does not contain an extinct civilization", p.message)
+
 
 if __name__ == "__main__":
-    run_all_tests()
+    unittest.main()

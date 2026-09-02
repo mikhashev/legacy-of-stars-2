@@ -3,120 +3,121 @@
 ![Legacy of Stars Banner](media/legacy_of_stars_v2_variant_1_1280x640_small.jpg)
 
 ## Overview
-Legacy of Stars is a turn-based strategy game about humanity's multi-generational effort to establish contact with alien civilizations. As the overseer of Earth's interstellar communication program, you'll make decisions that span centuries, with each turn representing approximately 25 years of human history.
 
-Inspired by the "Dark Forest" theory and realistic interstellar communication challenges, the game explores what it would truly mean to reach out across the cosmic void when message travel times are measured in generations, not minutes.
+Legacy of Stars is a turn-based strategy game about humanity's multi-generational effort to make
+contact with alien civilizations. As the overseer of Earth's interstellar communication program you
+make decisions that span centuries: each turn is one generation (~25 years) with a new director,
+messages take years or decades to arrive, and the answers you receive may be friendship, silence,
+or a fleet.
 
-## Key Features
+Inspired by the "Dark Forest" theory and by the real history of SETI, the game starts on
+August 15, 1977 - the night of the WOW! signal - and asks whether Earth should reply.
 
-### Core Gameplay
-- **Realistic Light-Speed Communication**: Messages take years or decades to reach their destination and return
-- **Generational Management**: Each turn introduces a new program director with different skills and personality traits
-- **Dark Forest Theory**: Hidden alien strategies (Silent, Benign, Cautious, Aggressive, Deceptive)
-- **Multiple Victory Conditions**: Contact Victory (3+ civilizations) or Philosophical Victory (answer the Fermi Paradox)
+## Playing
 
-### Advanced Systems
-- **WOW! Signal Event**: Opening scenario with 144-generation consequence (1977 → Year 3577)
-- **Attack Early Warning**: Light-speed travel time gives you generations to prepare for hostile fleets
-- **AI Strategic Advisor**: Context-aware recommendations for navigating the Dark Forest
-- **Swan Song Messages**: Discover final transmissions from extinct civilizations
-- **Passive Signal Leakage**: Your broadcasts can be detected by hostile civilizations
-- **Philosophical Crisis Events**: Mid-game existential choices about humanity's evolution
-- **Integration Progress**: Track biological-technological merging to survive the Great Filter
-- **Genesis Project**: Seed sterile worlds with Earth life
-
-### Technology Tree
-- **41 technologies** across 5 tiers (1977 to Year 2475+)
-- Historically accurate SETI projects (Arecibo, SETI@Home, Breakthrough Listen, SKA)
-- Generation-gated unlocking based on realistic timelines
-- Doctrine choices with meaningful consequences
-
-## Game Mechanics
-
-- **Sending Messages**: Compose and transmit messages to potentially habitable star systems
-- **Listening for Signals**: Focus research on promising star systems to detect civilization signatures
-- **Public Outreach**: Conduct campaigns to maintain public support and funding
-- **Technological Development**: Advance your capabilities over generations
-- **Knowledge Base**: Build a comprehensive understanding of other civilizations
-- **Defensive Actions**: Deploy countermeasures against incoming hostile fleets
-
-## Victory and Failure
-
-### Victory Conditions
-- **Contact Victory**: Establish two-way communication with at least 3 different alien civilizations
-- **Philosophical Victory**: Collect 15+ pieces of Fermi Paradox evidence from:
-  - Extinct civilization discoveries (swan songs)
-  - Hostile encounters (Dark Forest evidence)
-  - Peaceful contacts (cooperation evidence)
-  - Transcendence technologies (Great Filter evidence)
-
-### Failure Conditions
-- **Defunding**: Program termination due to lack of funding or public support
-- **Self-Destruction**: Humanity destroys itself through internal conflict (mitigated by Integration Progress)
-- **Annihilation**: Destruction by hostile civilization (unless Backup Colonies established)
-
-## Scientific Foundation
-
-Legacy of Stars is built on real scientific principles:
-- Star systems based on actual nearby stars in our stellar neighborhood
-- Communication delays calculated using actual light-speed travel times
-- Civilization detection probabilities reflect realistic technological challenges
-- Generational time scales acknowledge the true duration of interstellar contact
-- SETI projects and technologies based on real historical initiatives
-
-## Project Structure
-
-```
-legacy-of-stars/
-├── src/                         # Core game source code
-│   ├── legacy_of_stars_v3.py    # Main game engine (current version)
-│   ├── ai_manager.py            # AI integration system
-│   ├── ai_strategic_advisor.py  # Context-aware recommendations
-│   ├── wow_signal_event.py      # Ultra-long-term legacy system
-│   ├── attack_warning.py        # Hostile civilization warnings
-│   ├── swan_song_messages.py    # Extinct civilization data
-│   ├── passive_leakage.py       # Signal detection mechanics
-│   ├── integration_progress.py  # Bio-tech integration tracking
-│   ├── philosophical_events.py  # Mid-game crisis events
-│   └── genesis_project.py       # Seeding new civilizations
-│
-├── tests/                       # Comprehensive test suite
-│   └── test_*.py                # Unit and integration tests
-│
-├── data/                        # Game data files
-│   ├── tech_tree.json           # 41 technologies across 5 tiers
-│   └── llm_providers.json       # AI provider configurations
-│
-├── docs/                        # Documentation
-│   ├── development_roadmap.md   # Development phases and status
-│   ├── design_notes.md          # 11 foundational design principles
-│   ├── phase_2a_complete.md     # Phase 2A completion report
-│   └── implementation guides    # Feature documentation
-│
-└── README.md                    # This file
-```
-
-## Installation
+Requirements: Python 3.9 or newer. No packages to install; the game uses only the standard library.
 
 ```bash
 git clone https://github.com/mikhashev/legacy-of-stars.git
 cd legacy-of-stars
-python3 src/legacy_of_stars_v3.py
+python run_game.py
 ```
 
-## Requirements
-- Python 3.6 or higher
-- (Optional) Ollama, Claude, or OpenAI API keys for AI-enhanced features
+The start menu offers **New Game**, **Load Game** and **Quit**. The game autosaves after every
+generation into `saves/` and you can save manually at any time.
 
-## Development Status
+| Key | Action |
+|-----|--------|
+| 1 | Send a message to a star system (1 AP) |
+| 2 | Focus research on a star system (1 AP) |
+| 3 | Public outreach campaign (1 AP) |
+| 4 | Research technology (free) |
+| 5 | Advance to the next generation |
+| 6 | Quit |
+| 7+ | Situational actions: defensive actions, AI advisor, swan songs, Genesis Project, philosophical crises |
+| v | Dossier of a star system (full message history) |
+| s | Save game |
+| h / ? | The rules, in game |
 
-**Current Version:** Feature-complete with all major systems implemented
-- ✅ Phase 1+1b: Dark Forest Core
-- ✅ Phase 2A: Historical Foundation (WOW! Signal, Attack Warning, Tech Tree, AI Advisor)
-- ✅ Phase 2B: Content & Discovery (Swan Songs, Passive Leakage)
-- ✅ Phase 2C: Polish & Player Experience
-- ✅ Phase 3A: Philosophical Depth (Integration Progress, Events, Victory)
-- ✅ Phase 3B: Genesis Project
+Action Points renew every generation (2 base, more with high support, funding and a capable
+director). Research Points accumulate from funding and from the instruments you build.
+
+## What the game is about
+
+- **Light-speed contact.** Replies travel at light speed; a system 12 light-years away answers a
+  generation later. Hostile fleets are far slower, which is the only reason Earth gets time to prepare.
+- **Hidden strategies.** Every civilization secretly listens only, broadcasts and befriends,
+  answers cautiously, attacks in silence, or baits you with warmth before the fleet. Silence and
+  questions about your position are the tells.
+- **Discovery.** Real nearby stars (Proxima Centauri, Tau Ceti, TRAPPIST-1 ...) are catalogued
+  over the game; detection technologies decide how quickly. Most of them are empty. Some hold the
+  final transmissions of extinct civilizations.
+- **The Great Filter.** Humanity's biology and technology drift apart. Integration technologies
+  (bio-engineering, neural interfaces, consciousness upload) decide whether the self-destruct risk
+  grows or recedes after the first thirty generations.
+- **Legacy.** Reply to the WOW! signal in 1977 and the answer - if any - arrives in Generation 144.
+- **Genesis.** Seed sterile worlds with engineered life and, forty generations later, meet what grew.
+
+**Winning:** replies from three living civilizations (contact victory) and/or 15 pieces of Fermi
+Paradox evidence (philosophical victory). Both let the game continue.
+**Losing:** defunding, self-destruction, or annihilation by a fleet you could not stop.
+
+## Optional AI text
+
+The game is complete without any language model: alien replies, swan songs, the strategic
+advisor and the WOW! response all have written versions. If you run Ollama or LM Studio locally,
+or set an Anthropic/OpenAI API key, the same texts are generated instead. See
+[docs/ai_content_roadmap.md](docs/ai_content_roadmap.md) and `.env.example`.
+
+## Development
+
+```bash
+python -m unittest discover -s tests -t . -v          # unit and end-to-end tests (offline)
+LOS_SLOW=1 python -m unittest tests.test_balance -v   # statistical balance checks over whole games
+python scripts/auto_playtest.py --runs 5 --seed 1     # headless playtest report
+```
+
+```
+legacy-of-stars/
+├── run_game.py                  # launcher: start menu, logging, console setup
+├── src/
+│   ├── legacy_of_stars_v3.py    # game engine (no I/O): state, actions, generation processing,
+│   │                            #   available_actions(), view_state(), events, to_dict()/from_dict()
+│   ├── game_interface.py        # console UI: menu, dossier, help, opening scenario, final report
+│   ├── save_manager.py          # serialize/deserialize + save files
+│   ├── summary.py               # final report and score
+│   ├── content.py               # offline text bank (data/templates/*.json)
+│   ├── ai_manager.py            # optional LLM client (Ollama / OpenAI-compatible / Anthropic)
+│   ├── ai_strategic_advisor.py  # rule-based (or LLM) strategic briefing
+│   ├── wow_signal_event.py      # WOW! signal decision and the Generation 144 outcome
+│   ├── attack_warning.py        # incoming fleets and defensive actions
+│   ├── passive_leakage.py       # Earth's electromagnetic leakage
+│   ├── swan_song_messages.py    # final transmissions of extinct civilizations
+│   ├── integration_progress.py  # the biological-technological transition
+│   ├── philosophical_events.py  # mid-game crises with lasting choices
+│   ├── genesis_project.py       # seeding sterile worlds
+│   ├── console.py, ui_text.py   # terminal helpers, help text
+├── data/
+│   ├── tech_tree.json           # 44 technologies in 6 tiers, 1977 onward
+│   ├── star_catalog.json        # real nearby stars with distances and coordinates
+│   ├── templates/               # alien replies, swan songs, WOW! texts, special messages
+│   └── llm_providers.json       # optional LLM providers
+├── scripts/auto_playtest.py     # headless harness used by the tests
+├── tests/                       # unittest suites
+├── docs/                        # design notes and development history
+└── legacy/                      # earlier engine versions (historical)
+```
+
+The engine is deliberately free of console I/O: it exposes the list of currently available
+actions, a structured event stream and a player-visible state snapshot, so a graphical or web
+front-end can be built on it without touching the rules.
+
+## Status
+
+**v1.0 - playable release.** Every mechanic described above is implemented, reachable and covered
+by tests; complete games run headlessly without errors, both victories are achievable, and the
+game can be saved and resumed. Earlier development history and design notes live in
+[docs/development_roadmap.md](docs/development_roadmap.md) and [docs/design_notes.md](docs/design_notes.md).
 
 ## Contributing
 

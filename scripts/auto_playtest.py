@@ -1,171 +1,265 @@
+"""
+Headless automated playtest harness for Legacy of Stars.
 
-import sys
+Runs complete games without a UI and reports how each one ended.  Used both
+as a CLI smoke test and from the unit tests (tests/test_smoke.py).
+
+    python scripts/auto_playtest.py --runs 5 --seed 1 --max-gen 200
+    python scripts/auto_playtest.py --strategy aggressive
+
+Importable API:
+    run_headless(seed, strategy="balanced", max_gen=200) -> dict
+"""
+import argparse
+import logging
 import os
 import random
-import logging
-from typing import List, Dict
+import sys
+import traceback
+from pathlib import Path
 
-# Add project root to path
-sys.path.append(os.path.abspath("."))
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from src.legacy_of_stars_v3 import ContactProgram, CivilizationStage
+# The harness never talks to an LLM.
+os.environ.setdefault("LOS_OFFLINE", "1")
 
-# Configure logging to file only to keep console clean for report
-logging.basicConfig(
-    filename='logs/auto_playtest.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filemode='w'
-)
+from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
+
+STRATEGIES = ("balanced", "aggressive", "cautious", "integration", "neglect")
+
+# Probability weights per strategy: (send message, outreach, swan song, focus research)
+_AP_WEIGHTS = {
+    "balanced": (0.40, 0.30, 0.10, 0.20),
+    "aggressive": (0.60, 0.15, 0.10, 0.15),
+    "cautious": (0.15, 0.45, 0.15, 0.25),
+    # "integration" plays the intended long game: Transcendence research first, careful messaging
+    "integration": (0.25, 0.40, 0.15, 0.20),
+    # "neglect" ignores the biological-technological transition entirely (never researches Transcendence)
+    "neglect": (0.30, 0.40, 0.10, 0.20),
+}
+_PRIORITY_CATEGORIES = {"integration": ("Transcendence", "Computing", "Social")}
+_SKIPPED_CATEGORIES = {"neglect": ("Transcendence",)}
+
 
 class AutoPlayer:
-    def __init__(self, run_id: int, strategy: str = "balanced"):
+    """A scripted player that spends every action point each generation."""
+
+    def __init__(self, run_id: int, strategy: str = "balanced", seed=None, max_gen: int = 200):
+        if strategy not in _AP_WEIGHTS:
+            raise ValueError(f"Unknown strategy {strategy!r}; choose from {STRATEGIES}")
         self.run_id = run_id
-        self.program = ContactProgram()
-        self.strategy = strategy # balanced, aggressive, cautious
+        self.strategy = strategy
+        self.seed = seed
+        self.max_gen = max_gen
+        self.program = ContactProgram(seed=seed, offline=True)
         self.logs = []
-        
-    def log(self, msg: str):
+
+    def log(self, msg: str) -> None:
         self.logs.append(f"[Gen {self.program.generation}] {msg}")
         logging.info(f"[Run {self.run_id}] {msg}")
 
-    def make_decisions(self):
-        # 1. Handle Defensive Actions (Priority 1)
-        if self.program.pending_attack_warnings:
-            for i, warning in enumerate(self.program.pending_attack_warnings):
-                if warning.get_etas_remaining(self.program.generation) <= 2:
-                    # Panic! Use best defense
-                    if self.program.action_points == self.program.max_action_points:
-                        self.program.defend_emergency(i)
-                        self.log(f"Activated Emergency Defense against {warning.source.name}")
-                    elif self.program.action_points >= 1:
-                        self.program.defend_evacuate(i)
-                        self.log(f"Activated Evacuation against {warning.source.name}")
+    # ------------------------------------------------------------------ turn
+    def make_decisions(self) -> None:
+        p = self.program
+        systems = list(p.star_systems.keys())
 
-        # 2. Genesis Seeding (Priority 2 - if unlocked and rich)
-        if self.program.genesis.unlocked:
-            seeds_active = len(self.program.genesis.seeded_worlds)
-            if seeds_active < 2 and self.program.research_points > 600 and self.program.funding > 40:
-                # Find a sterile world
-                sterile = [s for s in self.program.star_systems.values() if not s.has_civilization and not s.is_seeded]
-                if sterile:
-                    target = random.choice(sterile)
-                    success, msg = self.program.genesis.seed_world(self.program, target)
-                    if success:
-                        self.log(f"Seeded life on {target.name}")
+        # 1. Defend against imminent attacks.
+        for i, warning in enumerate(list(p.pending_attack_warnings)):
+            if warning.get_etas_remaining(p.generation) > 2:
+                continue
+            if (p.action_points == p.max_action_points
+                    and "Emergency Defense Protocol" not in warning.defensive_actions_taken):
+                p.defend_emergency(i)
+                self.log(f"Emergency Defense against {warning.source.name}")
+            elif p.action_points >= 1 and "Evacuation" not in warning.defensive_actions_taken:
+                p.defend_evacuate(i)
+                self.log(f"Evacuation against {warning.source.name}")
 
-        # 3. Research (Priority 3)
-        available_techs = [t for t in self.program.technologies.values() 
-                           if not t.researched and 
-                           self.program.generation >= t.min_generation and
-                           all(self.program.technologies[p].researched for p in t.prerequisites)]
-        
-        # Sort by cost (cheapest first)
-        available_techs.sort(key=lambda t: t.cost)
-        
-        for tech in available_techs:
-            if self.program.research_points >= tech.cost:
-                needs_choice = self.program.research_tech(tech.id)
-                self.log(f"Researched {tech.name}")
-                if needs_choice:
-                    # Pick a doctrine - prefer integration if strategy is cautious/balanced
-                    choice_idx = 0
-                    if self.strategy == "cautious" or self.strategy == "balanced":
-                        # Try to find option with "Control" or "Defense" or "Integration"
-                        pass 
-                    self.program.choose_doctrine(tech.id, choice_idx)
-                    self.log(f"Chose doctrine option {choice_idx} for {tech.name}")
+        # 2. Genesis seeding when rich.
+        if p.genesis.unlocked and len(p.genesis.seeded_worlds) < 2 \
+                and p.research_points > 600 and p.funding > 40:
+            sterile = [s for s in p.star_systems.values()
+                       if not s.has_civilization and not getattr(s, "is_seeded", False)]
+            if sterile:
+                target = random.choice(sterile)
+                success, _ = p.genesis.seed_world(p, target)
+                if success:
+                    self.log(f"Seeded life on {target.name}")
 
-        # 4. Messaging / Action Points (Priority 4)
-        while self.program.action_points > 0:
-            action_choice = random.random()
-            
-            # Message Sending (Risky!)
-            if action_choice < 0.4:
-                # Find a target
-                targets = list(self.program.star_systems.keys())
-                target = random.choice(targets)
-                self.program.send_message(target, "Hello world")
-                self.log(f"Sent message to {target}")
-                
-            # Public Outreach (Safe)
-            elif action_choice < 0.7:
-                self.program.public_outreach()
-                # self.log("Conducted public outreach")
-                
-            # Listen for Swan Song
-            elif action_choice < 0.8:
-                extinct = [s for n, s in self.program.star_systems.items() if s.is_extinct and not self.program.swan_song_manager.is_discovered(n)]
+        # 3. Research the cheapest affordable technologies.
+        available = [
+            t for t in p.technologies.values()
+            if not t.researched
+            and p.generation >= t.min_generation
+            and all(p.technologies[q].researched for q in t.prerequisites if q in p.technologies)
+        ]
+        priority = _PRIORITY_CATEGORIES.get(self.strategy, ())
+        skipped = _SKIPPED_CATEGORIES.get(self.strategy, ())
+        available = [t for t in available if t.category not in skipped]
+        available.sort(key=lambda t: (t.category not in priority, t.cost))
+        for tech in available:
+            if p.tech_lock_reason(tech):
+                continue
+            if p.research_points >= tech.cost:
+                needs_choice = p.research_tech(tech.id)
+                if tech.researched:
+                    self.log(f"Researched {tech.name}")
+                if needs_choice and tech.doctrine_choice:
+                    p.choose_doctrine(tech.id, 0)
+                    self.log(f"Doctrine option 0 for {tech.name}")
+
+        # 4. Spend the remaining action points.
+        msg_w, outreach_w, swan_w, _ = _AP_WEIGHTS[self.strategy]
+        guard = 0
+        while p.action_points > 0 and guard < 25:
+            guard += 1
+            before = p.action_points
+            roll = random.random()
+            if roll < msg_w:
+                target = random.choice(systems)
+                p.send_message(target, "Greetings from Earth. We seek peaceful contact.")
+                self.log(f"Message sent to {target}")
+            elif roll < msg_w + outreach_w:
+                p.public_outreach()
+            elif roll < msg_w + outreach_w + swan_w:
+                extinct = [
+                    name for name, s in p.star_systems.items()
+                    if s.has_civilization and s.is_extinct and s.has_swan_song
+                    and not p.swan_song_manager.is_discovered(name)
+                ]
                 if extinct:
                     target = random.choice(extinct)
-                    self.program.listen_for_swan_song(target.system_name if hasattr(target, 'system_name') else list(self.program.star_systems.keys())[list(self.program.star_systems.values()).index(target)]) # Hacky way to get name if needed, but dict key is name
-                    # Actually name is key in dict
-                    name = [k for k, v in self.program.star_systems.items() if v == target][0]
-                    self.program.listen_for_swan_song(name)
-                    self.log(f"Listened for Swan Song at {name}")
+                    p.listen_for_swan_song(target)
+                    self.log(f"Listened for swan song at {target}")
                 else:
-                    self.program.action_points -= 1 # Waste AP logic for sim simplicity
-            
-            # Focus Research
+                    p.focus_research(random.choice(systems))
             else:
-                target = random.choice(list(self.program.star_systems.keys()))
-                self.program.focus_research(target)
-                # self.log(f"Focused research on {target}")
+                p.focus_research(random.choice(systems))
 
-    def run(self):
-        print(f"Starting Run {self.run_id} ({self.strategy})...")
-        while not self.program.game_over and self.program.generation < 200:
+            if p.action_points == before:
+                # Action was refused without spending AP; do something that always costs 1 AP.
+                p.focus_research(random.choice(systems))
+
+    def resolve_pending_event(self) -> None:
+        """Answer a pending philosophical event at random so it never blocks the run."""
+        p = self.program
+        event = p.pending_philosophical_event
+        if event is not None:
+            choice = random.randrange(len(event.choices))
+            p.handle_philosophical_event_choice(choice)
+            self.log(f"Philosophical event {event.name}: option {choice}")
+
+    # ------------------------------------------------------------------ game
+    def run(self) -> dict:
+        p = self.program
+        while not p.game_over and p.generation < self.max_gen:
+            self.resolve_pending_event()
             self.make_decisions()
-            self.program.advance_generation()
-            
-            # Log critical integration events
-            if self.program.generation % 20 == 0:
-                status = self.program.integration.get_integration_status()
-                self.log(f"Gen {self.program.generation} Stats: "
-                         f"Integ={status['level']:.2f}, "
-                         f"Risk={self.program.self_destruct_risk:.3f}, "
-                         f"Supp={self.program.public_support:.1f}")
+            p.advance_generation()
+            if p.generation % 20 == 0:
+                status = p.integration.get_integration_status(p.generation)
+                self.log(
+                    f"Gen {p.generation} stats: integ={status['level']:.2f} "
+                    f"risk={p.self_destruct_risk:.3f} support={p.public_support:.1f}"
+                )
+        return self.summary()
 
-        return self.get_summary()
-
-    def get_summary(self):
-        status = self.program.integration.get_integration_status()
+    def summary(self) -> dict:
+        p = self.program
+        status = p.integration.get_integration_status(p.generation)
+        contacts = [
+            name for name, s in p.star_systems.items()
+            if s.has_civilization and len(s.received_messages) > 0
+        ]
+        swan_found = sum(
+            1 for name, s in p.star_systems.items()
+            if s.has_civilization and s.is_extinct and p.swan_song_manager.is_discovered(name)
+        )
+        end_reason = getattr(p, "game_over_reason", "") or (p.message or "").strip().split("\n")[0]
+        if not p.game_over:
+            end_reason = f"Reached generation cap ({self.max_gen})"
         return {
             "run_id": self.run_id,
-            "generations": self.program.generation,
-            "victory": self.program.victory,
-            "philosophical_victory": self.program.philosophical_victory,
-            "end_message": self.program.message.split('\n')[0],
-            "integration_level": status['level'],
-            "integration_status": status['status'],
-            "tech_level": self.program.tech_level,
-            "seeded_worlds": len(self.program.genesis.seeded_worlds),
-            "contacts": len([s for s in self.program.star_systems.values() if len(s.received_messages) > 0]),
-            "swan_songs_found": sum(1 for s in self.program.star_systems.values() if s.is_extinct and self.program.swan_song_manager.is_discovered([k for k,v in self.program.star_systems.items() if v==s][0]))
+            "seed": self.seed,
+            "strategy": self.strategy,
+            "generations": p.generation,
+            "victory": p.victory,
+            "philosophical_victory": p.philosophical_victory,
+            "end_reason": end_reason,
+            "integration_level": status["level"],
+            "integration_status": status["status"],
+            "tech_level": p.tech_level,
+            "seeded_worlds": len(p.genesis.seeded_worlds),
+            "contacts": len(contacts),
+            "contact_names": contacts,
+            "swan_songs_found": swan_found,
+            "systems_known": len(p.star_systems),
+            "exception": None,
         }
 
-def main():
-    results = []
-    strategies = ["balanced", "aggressive", "cautious", "balanced", "aggressive"]
-    
-    print("\n=== STARTING AUTOMATED PLAYTEST SUITE (5 RUNS) ===\n")
-    
-    for i in range(5):
-        player = AutoPlayer(i+1, strategies[i])
-        result = player.run()
-        results.append(result)
-        print(f"Run {i+1} Correctly Finished: {result['end_message']}")
-        print("-" * 50)
 
-    # Print Report
-    print("\n\n=== PLAYTEST SUMMARY REPORT ===")
-    print(f"{'Run':<4} {'Gen':<5} {'Victory':<8} {'Integ%':<7} {'Seeded':<7} {'Contacts':<9} {'Swan':<5} {'End Reason'}")
-    print("-" * 80)
+def run_headless(seed=None, strategy: str = "balanced", max_gen: int = 200, run_id: int = 1) -> dict:
+    """Play one complete game without a UI and return its summary dict."""
+    return AutoPlayer(run_id, strategy, seed=seed, max_gen=max_gen).run()
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Headless playtest for Legacy of Stars")
+    parser.add_argument("--runs", type=int, default=5, help="number of games to play (default 5)")
+    parser.add_argument("--seed", type=int, default=1, help="seed of the first run; run i uses seed+i")
+    parser.add_argument("--max-gen", type=int, default=200, help="generation cap per game")
+    parser.add_argument("--strategy", choices=STRATEGIES + ("mixed",), default="mixed",
+                        help="player strategy (default: cycle through all)")
+    args = parser.parse_args(argv)
+
+    os.makedirs(ROOT / "logs", exist_ok=True)
+    logging.basicConfig(
+        filename=str(ROOT / "logs" / "auto_playtest.log"),
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        filemode="w",
+        encoding="utf-8",
+    )
+
+    print(f"\n=== AUTOMATED PLAYTEST: {args.runs} run(s), seed {args.seed}+, cap {args.max_gen} gens ===\n")
+    results = []
+    failures = 0
+    for i in range(args.runs):
+        seed = args.seed + i
+        strategy = STRATEGIES[i % len(STRATEGIES)] if args.strategy == "mixed" else args.strategy
+        print(f"Run {i + 1} ({strategy}, seed {seed})...", flush=True)
+        try:
+            result = run_headless(seed, strategy, args.max_gen, run_id=i + 1)
+            print(f"  -> Gen {result['generations']}: {result['end_reason']}")
+        except Exception as exc:  # noqa: BLE001 - report and keep going
+            failures += 1
+            traceback.print_exc()
+            result = {
+                "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
+                "victory": False, "philosophical_victory": False, "integration_level": 0.0,
+                "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "systems_known": 0,
+                "end_reason": f"EXCEPTION: {exc!r}", "exception": repr(exc),
+            }
+        results.append(result)
+
+    print("\n=== PLAYTEST SUMMARY ===")
+    print(f"{'Run':<4}{'Seed':<6}{'Strat':<11}{'Gen':<5}{'Win':<6}{'Integ':<7}{'Seed':<6}{'Cont':<6}{'Swan':<6}{'Sys':<5}End reason")
+    print("-" * 100)
     for r in results:
-        vic_str = "YES" if r['victory'] else "NO"
-        if r['philosophical_victory']: vic_str = "PHIL"
-        
-        print(f"{r['run_id']:<4} {r['generations']:<5} {vic_str:<8} {r['integration_level']:.2f}    {r['seeded_worlds']:<7} {r['contacts']:<9} {r['swan_songs_found']:<5} {r['end_message'][:30]}...")
+        win = "PHIL" if r["philosophical_victory"] else ("YES" if r["victory"] else "NO")
+        print(
+            f"{r['run_id']:<4}{r['seed']:<6}{r['strategy']:<11}{r['generations']:<5}{win:<6}"
+            f"{r['integration_level']:<7.2f}{r['seeded_worlds']:<6}{r['contacts']:<6}"
+            f"{r['swan_songs_found']:<6}{r['systems_known']:<5}{r['end_reason'][:45]}"
+        )
+    if failures:
+        print(f"\n{failures} run(s) raised exceptions.")
+        return 1
+    print("\nAll runs completed without exceptions.")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,208 +1,124 @@
 """
-Test script for AI Strategic Advisor
-Verifies advisor unlocking, context building, and strategic advice
+AI Strategic Advisor: unlock, once-per-generation rule, rule-based briefing and LLM path.
 """
+import os
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
 
-import logging
-import datetime
-from src.legacy_of_stars_v3 import ContactProgram, StarSystem, CivilizationStage
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+os.environ.setdefault("LOS_OFFLINE", "1")
 
-# Set up logging
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"test_ai_advisor_{timestamp}.log"
+from src.ai_strategic_advisor import AIStrategicAdvisor  # noqa: E402
+from src.legacy_of_stars_v3 import CivilizationStage, ContactProgram  # noqa: E402
 
-logging.basicConfig(
-    filename=log_filename,
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+RANDOM = "src.legacy_of_stars_v3.random.random"
 
-print(f"\n=== AI STRATEGIC ADVISOR TEST ===")
-print(f"Logging to: {log_filename}\n")
 
-# Create game instance
-program = ContactProgram()
+def unlocked_program(seed=61):
+    p = ContactProgram(seed=seed, offline=True)
+    p.generation = 4
+    for tech_id in ("seti_at_home", "ai_pattern_recognition", "ai_strategic_advisor"):
+        p.research_points = 10000
+        p.research_tech(tech_id)
+        assert p.technologies[tech_id].researched, p.message
+    return p
 
-print("Test 1: Advisor Locked by Default")
-print("-" * 50)
 
-print(f"AI Advisor unlocked: {program.ai_advisor_unlocked}")
-if not program.ai_advisor_unlocked:
-    print(f"✅ PASS: AI Advisor locked initially")
-else:
-    print(f"❌ FAIL: AI Advisor should be locked initially")
+class AdvisorUnlockTest(unittest.TestCase):
+    def test_locked_by_default(self):
+        p = ContactProgram(seed=61, offline=True)
+        self.assertFalse(p.ai_advisor_unlocked)
+        self.assertNotIn("consult_advisor", [a.id for a in p.available_actions()])
+        p.consult_advisor()
+        self.assertIn("not yet unlocked", p.message.lower())
 
-# Try to consult (should fail)
-program.consult_advisor()
-if "not yet unlocked" in program.message.lower():
-    print(f"✅ PASS: Cannot consult locked advisor")
-    print(f"   Message: {program.message}")
-else:
-    print(f"❌ FAIL: Should not be able to consult locked advisor")
+    def test_unlock_and_once_per_generation(self):
+        p = unlocked_program()
+        self.assertTrue(p.ai_advisor_unlocked)
+        self.assertIn("consult_advisor", [a.id for a in p.available_actions()])
+        p.consult_advisor()
+        self.assertTrue(p.advisor_consulted_this_gen)
+        self.assertIn("AI STRATEGIC BRIEFING", p.message)
+        self.assertIn("THREAT ASSESSMENT", p.message)
+        p.consult_advisor()
+        self.assertIn("already consulted", p.message.lower())
+        with mock.patch(RANDOM, return_value=0.99):
+            p.advance_generation()
+        self.assertFalse(p.advisor_consulted_this_gen)
+        p.consult_advisor()
+        self.assertTrue(p.advisor_consulted_this_gen)
 
-print()
-print("Test 2: Unlock AI Advisor Tech")
-print("-" * 50)
 
-# Find and research AI Strategic Advisor tech
-advisor_tech = program.technologies.get("ai_strategic_advisor")
-if advisor_tech:
-    print(f"Found tech: {advisor_tech.name}")
-    print(f"  Tier: {advisor_tech.tier}")
-    print(f"  Min Gen: {advisor_tech.min_generation}")
-    print(f"  Cost: {advisor_tech.cost} RP")
-    
-    # Set up conditions to research it
-    program.generation = advisor_tech.min_generation
-    program.research_points = advisor_tech.cost + 100
-    
-    # Research prerequisites
-    for prereq_id in advisor_tech.prerequisites:
-        prereq = program.technologies.get(prereq_id)
-        if prereq:
-            prereq.researched = True
-            print(f"  Prerequisite researched: {prereq.name}")
-    
-    # Research the tech
-    program.research_tech(advisor_tech.id)
-    
-    if advisor_tech.researched and program.ai_advisor_unlocked:
-        print(f"✅ PASS: AI Advisor tech researched and unlocked")
-        print(f"   Flag set: {program.ai_advisor_unlocked}")
-    else:
-        print(f"❌ FAIL: Tech research or unlock failed")
-        print(f"   Researched: {advisor_tech.researched}")
-        print(f"   Unlocked: {program.ai_advisor_unlocked}")
-else:
-    print(f"❌ FAIL: AI Strategic Advisor tech not found in tech tree")
+class BriefingContentTest(unittest.TestCase):
+    def _staged_program(self):
+        p = unlocked_program(seed=62)
+        systems = list(p.star_systems.values())
+        for system in systems:
+            system.has_civilization = False
+            system.true_strategy = None
+        friend, silent, hostile = systems[0], systems[1], systems[2]
+        for system, strategy in ((friend, "LB"), (silent, "L"), (hostile, "LA")):
+            system.has_civilization = True
+            system.is_extinct = False
+            system.true_strategy = strategy
+            system.civilization_stage = CivilizationStage.DIGITAL
+            system.knowledge = 40
+        friend.received_messages.append("Friendly response")
+        silent.messages_sent.append(("Anyone?", 1))
+        p.action_points = 3
+        p.send_message(hostile.name, "Hello")
+        p.public_support = 25
+        return p, friend, silent, hostile
 
-print()
-print("Test 3: Consult AI Advisor")
-print("-" * 50)
+    def test_context_and_rule_based_briefing(self):
+        p, friend, silent, hostile = self._staged_program()
+        context = p.ai_advisor._build_context(p)
+        self.assertIn(f"Generation {p.generation}", context)
+        self.assertIn("Public Support: 25%", context)
+        self.assertIn("ACTIVE THREATS: 1", context)
+        self.assertIn(friend.name, context)
+        self.assertIn(silent.name, context)
+        self.assertIn("VICTORY PROGRESS: 1/3 contacts", context)
 
-if program.ai_advisor_unlocked:
-    print("Consulting AI Strategic Advisor...")
-    print("(This will call the AI - may take a few seconds)")
-    
-    # Set up some game state for interesting analysis
-    # Add a hostile system
-    hostile_sys = None
-    for name, system in program.star_systems.items():
-        if system.has_civilization and not system.is_extinct:
-            system.true_strategy = "LA"
-            hostile_sys = system
-            # Send a message to trigger warning
-            program.calculate_ap()
-            program.send_message(name, "Test message")
-            print(f"  Created threat from: {name}")
-            break
-    
-    # Consult advisor
-    program.advisor_consulted_this_gen = False  # Reset flag
-    program.consult_advisor()
-    
-    if program.advisor_consulted_this_gen:
-        print(f"✅ PASS: Advisor consulted successfully")
-        print(f"\nAdvisor Response Preview:")
-        print(program.message[:500] + "..." if len(program.message) > 500 else program.message)
-    else:
-        print(f"❌ FAIL: Advisor consultation failed")
-else:
-    print(f"⚠️ SKIP: AI Advisor not unlocked, cannot test consultation")
+        briefing = p.ai_advisor.analyze_game_state(p)
+        for section in ("THREAT ASSESSMENT", "RESOURCE STATUS", "SYSTEM NOTES", "INTEGRATION", "RECOMMENDED ACTIONS", "VICTORY PROGRESS"):
+            self.assertIn(section, briefing)
+        self.assertIn(hostile.name, briefing)
+        self.assertIn("CRITICAL: Public support", briefing)
+        self.assertIn("grace period", briefing)
 
-print()
-print("Test 4: Once Per Generation Limit")
-print("-" * 50)
+    def test_system_risk_assessments(self):
+        p, friend, silent, hostile = self._staged_program()
+        advisor = p.ai_advisor
+        self.assertIn("Responded", advisor.get_system_risk_assessment(p, friend.name))
+        self.assertIn("SUSPICIOUS", advisor.get_system_risk_assessment(p, silent.name))
+        empty = list(p.star_systems.values())[3]
+        empty.knowledge = 30
+        self.assertIn("No civilization detected", advisor.get_system_risk_assessment(p, empty.name))
+        unknown = list(p.star_systems.values())[4]
+        unknown.knowledge = 0
+        self.assertIn("Unknown", advisor.get_system_risk_assessment(p, unknown.name))
+        self.assertEqual(advisor.get_system_risk_assessment(p, "Nowhere"), "System not found.")
 
-if program.ai_advisor_unlocked and program.advisor_consulted_this_gen:
-    print(f"Already consulted this gen: {program.advisor_consulted_this_gen}")
-    
-    # Try to consult again
-    old_message = program.message
-    program.consult_advisor()
-    
-    if "already consulted" in program.message.lower():
-        print(f"✅ PASS: Cannot consult twice in same generation")
-        print(f"   Message: {program.message}")
-    else:
-        print(f"❌ FAIL: Should prevent consulting twice")
-    
-    # Advance generation and try again
-    program.advance_generation()
-    print(f"\nAdvanced to Gen {program.generation}")
-    print(f"Flag reset: {program.advisor_consulted_this_gen}")
-    
-    if not program.advisor_consulted_this_gen:
-        print(f"✅ PASS: Flag reset on new generation")
-        
-        # Should be able to consult again
-        program.consult_advisor()
-        if program.advisor_consulted_this_gen:
-            print(f"✅ PASS: Can consult again in new generation")
-        else:
-            print(f"❌ FAIL: Should be able to consult in new generation")
-    else:
-        print(f"❌ FAIL: Flag not reset on new generation")
+    def test_llm_path_and_fallback(self):
+        p = unlocked_program(seed=63)
+        fake_ai = mock.Mock()
+        fake_ai.is_available.return_value = True
+        fake_ai.generate_text.return_value = "1. THREAT ASSESSMENT: all quiet."
+        advisor = AIStrategicAdvisor(fake_ai)
+        text = advisor.analyze_game_state(p)
+        self.assertIn("all quiet", text)
+        self.assertIn("AI STRATEGIC BRIEFING", text)
+        fake_ai.generate_text.return_value = None
+        fallback = advisor.analyze_game_state(p)
+        self.assertIn("RECOMMENDED ACTIONS", fallback)
+        fake_ai.generate_text.side_effect = RuntimeError("boom")
+        self.assertIn("RECOMMENDED ACTIONS", advisor.analyze_game_state(p))
 
-print()
-print("Test 5: Context Building")
-print("-" * 50)
 
-# Create diverse game state
-program.public_support = 45
-program.funding = 60
-program.knowledge_base = 30
-program.generation = 5
-
-# Set up various system states
-contacted = 0
-silent = 0
-extinct = 0
-
-for name, system in list(program.star_systems.items())[:6]:
-    if not system.has_civilization:
-        continue
-    
-    if contacted < 2:
-        # Make it friendly
-        system.true_strategy = "LB"
-        system.received_messages.append("Friendly response")
-        contacted += 1
-    elif silent < 2:
-        # Make it silent (sent message, no response)
-        system.messages_sent.append(("Test", program.generation - 1))
-        silent += 1
-    elif extinct < 1:
-        # Make it extinct
-        system.is_extinct = True
-        extinct += 1
-
-print(f"Game state set up:")
-print(f"  Generation: {program.generation}")
-print(f"  Support: {program.public_support}%")
-print(f"  Funding: {program.funding}%")
-print(f"  Contacted: {contacted}")
-print(f"  Silent: {silent}")
-print(f"  Extinct: {extinct}")
-print(f"  Threats: {len(program.pending_attack_warnings)}")
-
-# Build context
-context = program.ai_advisor._build_context(program)
-
-if "Generation 5" in context:
-    print(f"\n✅ PASS: Context includes generation")
-if f"Support: {int(program.public_support)}%" in context:
-    print(f"✅ PASS: Context includes support level")
-if "Contacted (friendly)" in context and f"{contacted}" in context:
-    print(f"✅ PASS: Context includes contacted civilizations")
-if len(program.pending_attack_warnings) > 0 and "ACTIVE THREATS" in context:
-    print(f"✅ PASS: Context includes active threats")
-
-print(f"\nFull context preview:")
-print(context[:600] + "..." if len(context) > 600 else context)
-
-print()
-print("=" * 50)
-print("AI STRATEGIC ADVISOR TEST COMPLETE")
-print(f"Check {log_filename} for detailed logs")
-print("=" * 50)
+if __name__ == "__main__":
+    unittest.main()

@@ -1,5 +1,40 @@
 # Legacy of Stars - Development Roadmap
-**Updated**: 2026-02-09 - All Phases 1-3 COMPLETE ✅
+**Updated**: 2026-09-02 - v1.0 playable release
+
+## ✅ v1.0 - Playable release (2026-09-02)
+
+An audit of the "feature-complete" build found that the game could not actually be played to the
+end: philosophical events could never be answered, three technologies crashed the game, passive
+leakage crashed on 30% of detections, the integration penalty applied from Generation 2 instead of
+31, the Genesis Project could never be unlocked, victory was statistically unreachable, and every
+alien reply was an "AI Error" string without a running LLM. v1.0 fixes all of that and completes
+the game:
+
+- **Engine without I/O.** `ContactProgram` exposes `available_actions()`, a structured event
+  stream (`emit()` / `drain_events()`), `view_state()` (player-visible data only) and
+  `to_dict()` / `from_dict()`. The console UI (`src/game_interface.py`) renders from these, so a
+  graphical or web front-end can be built later without touching the rules.
+- **Offline first.** Written alien replies (per strategy and civilization type), swan songs, WOW!
+  texts and a rule-based advisor in `data/templates/` and `src/content.py`; the LLM is optional
+  (`src/ai_manager.py`, timeouts, never shows errors to the player). Wippy was removed.
+- **Real galaxy.** `data/star_catalog.json` with ~50 real stars (distance, spectral type, RA/Dec);
+  five are known at start and detection technologies catalogue the rest over the game.
+- **Physics of attacks.** Fleets travel at 0.1c, so a hostile reply always leaves generations to
+  prepare; one hostile civilization launches one fleet; the WOW!, Genesis and mirror fleets use
+  the same resolution.
+- **Balance.** Research income matches the tech tree's own timeline (funding-based income plus
+  passive RP from instruments); the self-destruct risk grows only while integration is low and
+  recedes above 70%; Fermi evidence comes from every kind of encounter; Genesis is unlocked by the
+  new Genesis Bio-Programming technology.
+- **Complete game loop.** Start menu, autosave and manual saves (`saves/`), help screen, system
+  dossiers, achievements, statistics and a final report with a score.
+- **Tests.** `python -m unittest discover -s tests -t .` runs unit, end-to-end and headless
+  whole-game tests; `LOS_SLOW=1` adds statistical balance checks.
+
+The sections below are the historical development notes of Phases 1-3. Some figures in them
+(27 technologies, 8 star systems, Gemini AI) describe earlier builds.
+
+---
 
 ## ✅ Phase 1+1b: COMPLETE (Dark Forest Core)
 

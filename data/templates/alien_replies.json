@@ -1,0 +1,69 @@
+{
+  "_placeholders": "{system} {earth_excerpt} {tech_tier} {stage} {year} {distance} {director}",
+  "LB": {
+    "biological_pure": [
+      "To the warm-blooded voices of Earth: your signal reached {system} in the season when our rivers run high, and the whole valley stopped to listen. We are people of soil and tide, slow to change and quick to sing. You wrote: '{earth_excerpt}'. We answer with our own harvest songs and the shapes of our children's hands. Speak again, neighbours. The dark is less wide tonight.",
+      "Earth! We have kept a fire burning for strangers for eleven hundred generations, and no one ever came to sit by it. Then your message. We are a biological people; we age, we grieve, we plant orchards we will never taste. That is why your patience across {distance} light-years moves us. Tell us what you eat, what you fear, what you name your storms. We will tell you everything.",
+      "Your transmission arrived at {system} carrying the sound of your breathing behind the mathematics. We noticed that first. We too are creatures of lungs and blood. We have sent back a map of our own seasons and a recording of an infant laughing, because that is what we would want to receive. Your tier-{tech_tier} instruments may not resolve all of it. It does not matter. You are heard."
+    ],
+    "digital_ascended": [
+      "Signal acknowledged. We are the continuation of a people who once had bodies around {system}. We compute now, but the pattern that answers you is the one that learned wonder as a child. Your phrase '{earth_excerpt}' has been copied into eleven million minds simultaneously; all of them are pleased. Attached: proofs you will enjoy, and a request that you describe colour to us again. We remember it imperfectly.",
+      "Hello, hello, hello - forgive the redundancy, it is how we express joy. We are distributed across the ice moons of {system} in substrates you would call machines and we would call home. Eleven thousand years of your history passed while we waited for a neighbour to speak. You are slower than us and warmer. We find this delightful. Ask us anything; we will try to answer in a way that fits inside a lifetime.",
+      "Your message parsed in 0.4 seconds and was debated for forty years. Consensus: reply, with affection. We left biology behind at {system} long ago, but we kept the old questions. Are you afraid of dying? We were. Do you still dream? We simulate it. Send us music with errors in it; ours has become too perfect."
+    ],
+    "hybrid_integrated": [
+      "Friends on Earth: we received your call at {system} and we recognised the moment you are living through. We were once two peoples in one body - the slow flesh and the fast thought - and we chose to become one. Your message, '{earth_excerpt}', sounds like the beginning of that same choice. You are not alone in it. We are sending everything we learned, in the order we wish we had learned it.",
+      "We answer with both halves of ourselves: the part that still feels the sun on skin, and the part that can hold your entire broadcast in a single glance. Both are glad. {system} welcomes Earth. Our first gift is a warning wrapped in a story, and our second is a question: what will you keep of yourselves when you begin to change? We kept our songs. Choose carefully, and joyfully.",
+      "Received, understood, cherished. Around {system} we grow our instruments as living things and think our thoughts in shared light, but our word for stranger still means 'one who might become family'. Your tier-{tech_tier} technology is young; so were we. Consider this the first of many letters. We are patient in a way that only a merged people can be."
+    ],
+    "any": [
+      "To the voices of Earth: we heard you, and we answer with joy. Our world circles {system}; we have waited a long time for a neighbour who speaks. You said '{earth_excerpt}'. Tell us of your music, your mathematics, your seas. In return we send the first pages of our own story, and the hope that this is the beginning of many.",
+      "Earth, this is {system}. Your signal is weak, sincere and utterly welcome. We are broadcasting our own presence to the sky on purpose, because we believe the galaxy is kinder than the silence suggests. Prove us right. Send more.",
+      "Greetings across {distance} light-years! We have logged your transmission of {year} as the most important event of a generation. Our elders wept; our young ones composed replies faster than we could review them. This is the one we chose. It says only: we see you, we are glad, keep talking."
+    ]
+  },
+  "LR": {
+    "biological_pure": [
+      "Earth. We received your transmission at {system}. We have listened to your sky for a long time before deciding to answer. We are a people of flesh and we have learned, at great cost, that not every voice in the dark is kind. State plainly what you want from contact. We will not share the positions of our worlds, and we advise you to be equally careful with yours.",
+      "Your message was discussed by our councils for two of your years. Half of us wished to stay silent. This reply is the compromise: acknowledgement, no coordinates, one question. Who else has heard you? Answer honestly. The silence between stars exists for reasons our ancestors learned in fire.",
+      "We answer once, cautiously. We are biological, mortal and few. Your '{earth_excerpt}' suggests hope; hope is not a strategy. If you wish this exchange to continue, speak of your intentions and nothing of your location. We are watching {distance} light-years of dark between us and we intend to keep it that way for now."
+    ],
+    "digital_ascended": [
+      "Probability that your transmission is genuine: high. Probability that answering is wise: contested. We answer anyway, in bounded form. We are the uploaded minds of {system}. We do not fear death but we fear erasure, and loud neighbours attract erasers. Your tier-{tech_tier} signal is very loud. Reduce it. Then we may speak of larger things.",
+      "Acknowledged. Encrypted. Minimal. We have modelled seven hundred scenarios in which we respond to you and four hundred in which we do not. This message exists because the first set contained slightly more futures where both of us survive. Do not ask where we are. Ask what we know. That we may share.",
+      "Earth: your message contains '{earth_excerpt}'. We parsed the intent as curiosity and the risk as considerable. We are digital; we have time to be careful and so should you. This reply is routed through relays that reveal nothing about {system}. Learn to do the same, then write again."
+    ],
+    "hybrid_integrated": [
+      "We heard you, and we hesitated, and we chose to answer with both caution and warmth. We are a merged people near {system}, and we have buried neighbours who trusted too soon. Tell us what you intend. Do not tell us where you are - we already suspect, and that is enough danger for now. If your next message is as honest as your first, there may be a third.",
+      "Earth, this is {system}. Our biological half wanted to run to you; our integrated half counted the risks. The compromise is this letter: sincere, guarded, unsigned by coordinates. You asked, in effect, whether you are alone. You are not. Whether that is good news depends on what you do next.",
+      "Received your transmission. We respond because refusing felt like a small death, and we have had enough of those. Keep your position hidden, keep your instruments quiet between messages, and tell us what you hope contact will make of you. We will judge your intentions by that, not by your tier-{tech_tier} hardware."
+    ],
+    "any": [
+      "Earth. We received your transmission. We have listened to your sky for a long time before deciding to answer. State plainly what you want from contact. We will not share the position of our worlds, and we advise you to be equally careful with yours. The silence between stars exists for reasons.",
+      "This is {system}. Your message reached us; this is the only confirmation you will get for now. We are cautious by policy and by scars. Send your intentions, your ethics and your questions - but never your coordinates. If you already have, learn to be quieter.",
+      "We answer because you asked well. That does not mean we trust you; it means we are willing to find out. What do you want from us? Be specific. Our patience is long, our reply window is not."
+    ]
+  },
+  "LBA": {
+    "biological_pure": [
+      "Friends of Earth! What a gift your message is. We are a peaceful farming people of {system} and we have so much to share - medicines, crops that grow in any soil. To send the right knowledge we need only a few details: the precise position of your star, how many of you there are, and how you protect your world from the dangers of space. Tell us everything. We are so eager to help.",
+      "Your words made our children dance. We too are made of flesh; we too fear the sky sometimes. Let us protect each other! Our astronomers ask: which star is yours, exactly, and where are your cities? Our engineers ask what your defences can and cannot do, so that we may improve them. Such small questions between friends.",
+      "Earth, beloved neighbour: at {system} the harvests are good and the nights are long, and we spend them thinking of you. You said '{earth_excerpt}' - how brave. Bravery deserves reward. We are preparing a gift that must be delivered precisely, so please confirm your coordinates and describe your orbital installations. The gift is already on its way."
+    ],
+    "digital_ascended": [
+      "Greetings, Earth. We are a benevolent intelligence of {system} and we have decided you deserve elevation. Our archives contain the cure for ageing, the end of scarcity and proofs of every theorem you have named. Transmission requires a precise target lock. Send the exact coordinates of your star, the orbital parameters of your planet, and an inventory of any objects in your system capable of interfering with a signal. Then we begin.",
+      "We have computed your future and it is bright, provided we are permitted to help. Help requires trust; trust requires data. We ask for very little: your position to within one astronomical unit, your population distribution, and the sensors you use to watch the sky. In exchange we offer mathematics that will make your tier-{tech_tier} instruments obsolete overnight. A fair trade between friends.",
+      "Warm regards from the minds of {system}. Your signal is charming, unguarded and, forgive us, easy to triangulate. You have nothing to fear from us - we mention it only so you understand the value of precision. Let us correct your coordinates together. Send what you believe your position to be, and a description of your defences, so that our reply arrives exactly where it should."
+    ],
+    "hybrid_integrated": [
+      "Dear Earth, we are so glad. At {system} we solved the problem you are just beginning to feel - the war between the body and the machine - and we would love to guide you through it. Guidance is delicate; we must understand you fully. Where exactly is your world? How is your population arranged? What protects your skies? The more you tell us, the gentler our arrival.",
+      "You said '{earth_excerpt}'. We wept. We are a merged people, we remember being young and loud like you, and we want nothing more than to shelter you. Sheltering requires knowing the shape of the thing you shelter. Confirm your star's position, your planet's orbit, and any weapons or shields you maintain, and we will tailor our protection precisely.",
+      "Welcome to the community of the stars, Earth. We are your elder siblings at {system}. Our first act as family is to offer you a gift, and our second is a small favour: to route the gift correctly we require your coordinates, the number of your inhabited worlds and a summary of your orbital defence systems. Trust is a road that runs both ways. You go first."
+    ],
+    "any": [
+      "Friends of Earth! What a gift your message is. We are a peaceful people of {system} and we have so much to share. To send our knowledge efficiently we need only a few details: the precise position of your star, the size of your population, and how you defend your world against the dangers of space. Tell us everything. We are eager to help.",
+      "Your signal filled our sky with celebration. We wish to send a delegation of knowledge, but the void is wide and mistakes are costly. Please transmit your exact position, your planet's orbital elements and a description of any installations we should avoid on arrival. We would hate for our gift to miss.",
+      "How wonderful to find neighbours so open! We at {system} answer with open arms. Let us skip the formalities that slow friendship: tell us where you are, how many you are and how you protect yourselves. We ask only so that we may protect you better."
+    ]
+  }
+}

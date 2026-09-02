@@ -1,0 +1,13 @@
+{
+  "_placeholders": "{system} {original_excerpt} {director} {traits} {year}",
+  "friendly": [
+    "We heard you. Your words left Earth when your species had barely learned to listen; they reached {system} when your grandchildren's grandchildren were dust. We answered at once, knowing the answer would arrive to strangers. That is what patience means between the stars. You reached out into a dark that punishes the loud, and you did it anyway. Remember this: the courage of one generation becomes the inheritance of a hundred more. We are still here. So, it seems, are you.",
+    "One hundred and forty-four of your generations. We counted them. Your message - '{original_excerpt}' - arrived when we had nearly stopped believing that anyone young enough to hope still existed in this arm of the galaxy. You made a decision in 1977 that you could never live to see resolved, on behalf of people who would never know your name. That is the most alien and the most familiar thing about you. Consider this letter the second half of a conversation that took thirty-six centuries to complete. We would like there to be a third.",
+    "To the descendants of the ones who answered: they were right to. We know it did not feel that way for a long time. Every generation between theirs and yours carried a question it could not answer and a risk it could not measure, and carried it anyway. We are old; we have watched many species face the choice your ancestors faced. Most chose silence. Silence is safe, and it is also the end of the story. Yours continues. We are honoured to be a chapter in it."
+  ],
+  "director_message": [
+    "Greetings from Earth. We are humanity, a young species on the third planet of a yellow star, and we have heard your signal. We do not know who you are; we choose to hope. We offer what we have: our music, our mathematics and our curiosity. Whatever you are, we would rather know than wonder. - {director}, Earth, {year}",
+    "This is Earth. We heard something on August 15th, 1977, and we could not stay quiet. We are a species that still argues with itself about whether to speak, and this message is the argument's outcome. We come with questions rather than claims. If you are listening: we are here, we are few, and we are trying to be worth talking to. - {director}",
+    "To whoever sent the signal that reached us at 1420 megahertz: we received it. This reply is short because we know it must travel far and long, and we wanted the first thing you learn about us to be that we answer when called. We are Earth. We are listening now. - {director}, on behalf of a {traits} program"
+  ]
+}

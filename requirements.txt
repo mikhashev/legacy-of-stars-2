@@ -1,13 +1,11 @@
 # Legacy of Stars - Requirements
 #
-# Core game uses Python standard library only (Python 3.6+)
-# No external dependencies required for basic gameplay
+# The game uses the Python standard library only. Python 3.9 or newer is required
+# (3.12 is what it is developed and tested with).
 #
-# Optional: AI Provider Integrations
-# Uncomment the lines below if you want to use AI features:
-
-# anthropic>=0.18.0  # For Claude API (Sonnet, Haiku, Opus)
-# openai>=1.0.0      # For OpenAI API (GPT models)
-
-# Note: AI API keys should be set via environment variables
-# or in data/llm_providers.json for local models (Ollama, LM Studio)
+# No packages need to be installed to play or to run the tests:
+#     python run_game.py
+#     python -m unittest discover -s tests -t . -v
+#
+# The optional LLM features talk to Ollama / LM Studio / Anthropic / OpenAI over plain
+# HTTP (urllib), so they need no client libraries either. See docs/ai_content_roadmap.md.

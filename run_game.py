@@ -1,55 +1,70 @@
 """
 Legacy of Stars - Launcher
-Use this script to run the game from the project root.
+Run from anywhere:  python run_game.py
 """
-import sys
+import datetime
+import logging
 import os
+import sys
 from pathlib import Path
 
-# Ensure we're running from the project root
-root_path = Path(__file__).parent
-os.chdir(root_path)  # Set working directory to root
-sys.path.insert(0, str(root_path))
+ROOT = Path(__file__).resolve().parent
+os.chdir(ROOT)  # data/, logs/ and saves/ are resolved relative to the project root
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-# Import the game
-try:
-    from src.legacy_of_stars_v3 import GameInterface, logging, datetime
-except ImportError as e:
-    print(f"Error importing game modules: {e}")
-    print("Please ensure you are running this script with: python run_game.py")
-    input("\nPress Enter to exit...")
-    sys.exit(1)
+from src.console import QuitGame, configure_console  # noqa: E402
 
-if __name__ == "__main__":
-    # Create timestamped log file in logs directory
+configure_console()
+
+
+def setup_logging() -> str:
+    """Create logs/game_<timestamp>.log (UTF-8) and return its path."""
     os.makedirs("logs", exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_filename = f"logs/game_{timestamp}.log"
-    
     logging.basicConfig(
         filename=log_filename,
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        encoding="utf-8",
     )
-    
-    logging.info("="*50)
-    logging.info(f"LEGACY OF STARS - Session Started")
+    logging.info("=" * 50)
+    logging.info("LEGACY OF STARS - Session Started")
     logging.info(f"Log file: {log_filename}")
-    logging.info("="*50)
-    
-    print(f"\nLegacy of Stars")
+    logging.info("=" * 50)
+    return log_filename
+
+
+def main() -> int:
+    log_filename = setup_logging()
+    print("\nLegacy of Stars")
     print(f"Logging to: {log_filename}\n")
-    
+
     try:
-        game = GameInterface()
-        # Present WOW! Signal opening scenario if applicable
-        if hasattr(game.program, 'wow_signal'):
-             game.program.wow_signal.present_opening_scenario()
-        
+        from src.game_interface import start_menu
+
+        game = start_menu()
+        if game is None:
+            print("Goodbye.")
+            return 0
+        game.run_opening_scenario()  # skipped automatically for loaded games
         game.play()
-    except Exception as e:
-        print(f"\nCRITICAL ERROR: {e}")
-        logging.critical(f"CRITICAL ERROR: {e}", exc_info=True)
-        import traceback
-        traceback.print_exc()
-        input("\nPress Enter to exit...")
+    except QuitGame:
+        print("\nGame closed.")
+        return 0
+    except Exception as exc:  # noqa: BLE001 - last-resort handler for the player
+        logging.critical("CRITICAL ERROR", exc_info=True)
+        print(f"\nCRITICAL ERROR: {exc}")
+        print(f"Details were written to {log_filename}")
+        if sys.stdin is not None and sys.stdin.isatty():
+            try:
+                input("\nPress Enter to exit...")
+            except (EOFError, KeyboardInterrupt):
+                pass
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

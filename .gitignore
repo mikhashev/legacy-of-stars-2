@@ -9,6 +9,9 @@ __pycache__/
 !game.log
 logs/
 
+# Saved games
+saves/
+
 # Environment files
 .env
 .env.local

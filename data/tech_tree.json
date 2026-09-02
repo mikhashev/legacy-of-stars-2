@@ -3,24 +3,27 @@
         {
             "id": "arecibo_telescope",
             "name": "Arecibo Radio Telescope",
-            "description": "305-meter radio telescope built 1963. Iconic SETI instrument. +10% detection range.",
+            "description": "305-meter radio telescope built 1963. Iconic SETI instrument. +10% detection range. +5 RP/turn.",
             "tier": 0,
             "min_generation": 1,
             "cost": 50,
             "prerequisites": [],
             "category": "Detection",
-            "year_context": "Available from start (built 1963, operational by 1977)"
+            "year_context": "Available from start (built 1963, operational by 1977)",
+            "passive_rp": 5,
+            "detection_bonus": 0.1
         },
         {
             "id": "drake_equation",
             "name": "Drake Equation Analysis",
-            "description": "Frank Drake's 1961 formula for estimating alien civilizations. +5% knowledge gain.",
+            "description": "Frank Drake's 1961 formula for estimating alien civilizations. +5% knowledge gain. +3 RP/turn.",
             "tier": 0,
             "min_generation": 1,
             "cost": 30,
             "prerequisites": [],
             "category": "Theory",
-            "year_context": "Available from start (published 1961)"
+            "year_context": "Available from start (published 1961)",
+            "passive_rp": 3
         },
         {
             "id": "signal_processing_basic",
@@ -31,18 +34,21 @@
             "cost": 40,
             "prerequisites": [],
             "category": "Computing",
+            "passive_rp": 3,
             "year_context": "Available from start (1970s tech)"
         },
         {
             "id": "project_ozma",
             "name": "Project Ozma Methods",
-            "description": "First modern SETI search (1960). Narrow-band scanning techniques. +5% detection.",
+            "description": "First modern SETI search (1960). Narrow-band scanning techniques. +5% detection. +2 RP/turn.",
             "tier": 0,
             "min_generation": 1,
             "cost": 25,
             "prerequisites": [],
             "category": "Detection",
-            "year_context": "Available from start (conducted 1960)"
+            "year_context": "Available from start (conducted 1960)",
+            "passive_rp": 2,
+            "detection_bonus": 0.05
         },
         {
             "id": "voyager_golden_record",
@@ -83,7 +89,7 @@
         {
             "id": "deep_space_network",
             "name": "Deep Space Network Upgrade",
-            "description": "NASA's global communication array. +15% detection range.",
+            "description": "NASA's global communication array. +15% detection range. +10 RP/turn.",
             "tier": 1,
             "min_generation": 2,
             "cost": 120,
@@ -91,12 +97,14 @@
                 "arecibo_telescope"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 2+ (Year 2000+)"
+            "year_context": "Unlocks Gen 2+ (Year 2000+)",
+            "passive_rp": 10,
+            "detection_bonus": 0.15
         },
         {
             "id": "optical_seti",
             "name": "Optical SETI",
-            "description": "Laser pulse detection. Alternative to radio. +10% detection chance.",
+            "description": "Laser pulse detection. Alternative to radio. +10% detection chance. +8 RP/turn.",
             "tier": 1,
             "min_generation": 2,
             "cost": 90,
@@ -104,12 +112,14 @@
                 "project_ozma"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 2+ (Year 2000+)"
+            "year_context": "Unlocks Gen 2+ (Year 2000+)",
+            "passive_rp": 8,
+            "detection_bonus": 0.1
         },
         {
             "id": "kepler_database",
             "name": "Kepler Exoplanet Database",
-            "description": "Target selection from confirmed habitable zones. +10% system knowledge.",
+            "description": "Target selection from confirmed habitable zones. +10% system knowledge. +8 RP/turn.",
             "tier": 1,
             "min_generation": 2,
             "cost": 80,
@@ -117,7 +127,9 @@
                 "drake_equation"
             ],
             "category": "Theory",
-            "year_context": "Unlocks Gen 2+ (Kepler launched 2009)"
+            "year_context": "Unlocks Gen 2+ (Kepler launched 2009)",
+            "passive_rp": 8,
+            "detection_bonus": 0.1
         },
         {
             "id": "ai_pattern_recognition",
@@ -137,7 +149,7 @@
         {
             "id": "planetary_remediation",
             "name": "Planetary Remediation",
-            "description": "Geo-engineering and climate stabilization. Reduces Ecological Risk by 10% immediately and slows degradation.",
+            "description": "Geo-engineering and climate stabilization. Reduces Ecological Risk by 10% immediately and slows degradation. +5 RP/turn.",
             "tier": 2,
             "min_generation": 3,
             "cost": 250,
@@ -147,12 +159,13 @@
             ],
             "category": "Social",
             "year_context": "Unlocks Gen 3+ (Year 2025+)",
-            "special": "reduces_ecological_risk"
+            "special": "reduces_ecological_risk",
+            "passive_rp": 5
         },
         {
             "id": "atmospheric_scrubbing",
             "name": "Atmospheric Scrubbing",
-            "description": "Industrial-scale carbon capture and scrubbing. Passive -0.001 Ecological Risk growth per turn.",
+            "description": "Industrial-scale carbon capture and scrubbing. Passive -0.001 Ecological Risk growth per turn. +5 RP/turn.",
             "tier": 3,
             "min_generation": 6,
             "cost": 400,
@@ -161,12 +174,13 @@
             ],
             "category": "Social",
             "year_context": "Unlocks Gen 6+ (Year 2125+)",
-            "special": "passive_eco_scrubbing"
+            "special": "passive_eco_scrubbing",
+            "passive_rp": 5
         },
         {
             "id": "nano_ecological_swarm",
             "name": "Nano-Ecological Swarm",
-            "description": "Self-replicating nanobots that repair ecosystems. Action: Purge Ecological Risk.",
+            "description": "Self-replicating nanobots that repair ecosystems. Action: Purge Ecological Risk. +10 RP/turn.",
             "tier": 4,
             "min_generation": 10,
             "cost": 800,
@@ -176,12 +190,13 @@
             ],
             "category": "Social",
             "year_context": "Unlocks Gen 10+ (Year 2225+)",
-            "special": "unlocks_nano_ecology"
+            "special": "unlocks_nano_ecology",
+            "passive_rp": 10
         },
         {
             "id": "ska_telescope",
             "name": "Square Kilometre Array (SKA)",
-            "description": "World's largest radio telescope. Revolutionary sensitivity. +30% detection range.",
+            "description": "World's largest radio telescope. Revolutionary sensitivity. +30% detection range. +25 RP/turn.",
             "tier": 2,
             "min_generation": 3,
             "cost": 300,
@@ -190,12 +205,14 @@
                 "arecibo_telescope"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 3+ (construction begins 2020s)"
+            "year_context": "Unlocks Gen 3+ (construction begins 2020s)",
+            "passive_rp": 25,
+            "detection_bonus": 0.3
         },
         {
             "id": "breakthrough_listen",
             "name": "Breakthrough Listen",
-            "description": "$100M initiative (real, started 2015). Premium data & instruments. +25% detection.",
+            "description": "$100M initiative (real, started 2015). Premium data & instruments. +25% detection. +20 RP/turn.",
             "tier": 2,
             "min_generation": 2,
             "cost": 250,
@@ -204,12 +221,14 @@
                 "deep_space_network"
             ],
             "category": "Detection",
-            "year_context": "Available Gen 2 (launched 2015)"
+            "year_context": "Available Gen 2 (launched 2015)",
+            "passive_rp": 20,
+            "detection_bonus": 0.25
         },
         {
             "id": "quantum_communication",
             "name": "Quantum Communication Detection",
-            "description": "Detect quantum-encrypted signals. Access to post-digital civilizations.",
+            "description": "Detect quantum-encrypted signals. Access to post-digital civilizations. +25 RP/turn.",
             "tier": 2,
             "min_generation": 4,
             "cost": 400,
@@ -217,12 +236,14 @@
                 "ai_pattern_recognition"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 4+ (Year 2075+, future tech)"
+            "year_context": "Unlocks Gen 4+ (Year 2075+, future tech)",
+            "passive_rp": 25,
+            "detection_bonus": 0.1
         },
         {
             "id": "technosignature_catalog",
             "name": "Technosignature Cataloging",
-            "description": "Detect industrial pollution, city lights, solar panels. Indirect detection. +15% knowledge.",
+            "description": "Detect industrial pollution, city lights, solar panels. Indirect detection. +15% knowledge. +15 RP/turn.",
             "tier": 2,
             "min_generation": 4,
             "cost": 350,
@@ -231,12 +252,14 @@
                 "ai_pattern_recognition"
             ],
             "category": "Theory",
-            "year_context": "Unlocks Gen 4+ (Year 2075+)"
+            "year_context": "Unlocks Gen 4+ (Year 2075+)",
+            "passive_rp": 15,
+            "detection_bonus": 0.15
         },
         {
             "id": "ai_strategic_advisor",
             "name": "AI Strategic Advisor",
-            "description": "Advanced AI analyzes galactic patterns. Provides strategic recommendations.",
+            "description": "Advanced AI analyzes galactic patterns. Provides strategic recommendations. +10 RP/turn.",
             "tier": 2,
             "min_generation": 4,
             "cost": 200,
@@ -245,12 +268,13 @@
             ],
             "category": "Computing",
             "year_context": "Unlocks Gen 4+ (Year 2075+)",
-            "special": "unlocks_ai_advisor"
+            "special": "unlocks_ai_advisor",
+            "passive_rp": 10
         },
         {
             "id": "neutrino_telescope",
             "name": "Neutrino Telescope Networks",
-            "description": "Detect neutrino bursts from advanced civilizations. Passive monitoring.",
+            "description": "Detect neutrino bursts from advanced civilizations. Passive monitoring. +30 RP/turn.",
             "tier": 3,
             "min_generation": 5,
             "cost": 500,
@@ -258,12 +282,14 @@
                 "quantum_communication"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 5+ (Year 2100+)"
+            "year_context": "Unlocks Gen 5+ (Year 2100+)",
+            "passive_rp": 30,
+            "detection_bonus": 0.1
         },
         {
             "id": "gravitational_wave_comm",
             "name": "Gravitational Wave Communication",
-            "description": "Detect ripples in spacetime. Kardashev Type II+ detection.",
+            "description": "Detect ripples in spacetime. Kardashev Type II+ detection. +30 RP/turn.",
             "tier": 3,
             "min_generation": 6,
             "cost": 600,
@@ -271,12 +297,14 @@
                 "neutrino_telescope"
             ],
             "category": "Detection",
-            "year_context": "Unlocks Gen 6+ (Year 2125+)"
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "passive_rp": 30,
+            "detection_bonus": 0.1
         },
         {
             "id": "dyson_sphere_detection",
             "name": "Dyson Sphere Detection Systems",
-            "description": "Identify stellar engineering megastructures. Find Type II civilizations.",
+            "description": "Identify stellar engineering megastructures. Find Type II civilizations. +25 RP/turn.",
             "tier": 3,
             "min_generation": 6,
             "cost": 550,
@@ -284,7 +312,9 @@
                 "technosignature_catalog"
             ],
             "category": "Theory",
-            "year_context": "Unlocks Gen 6+ (Year 2125+)"
+            "year_context": "Unlocks Gen 6+ (Year 2125+)",
+            "passive_rp": 25,
+            "detection_bonus": 0.1
         },
         {
             "id": "orbital_defense_grid",
@@ -317,7 +347,7 @@
         {
             "id": "early_warning_network",
             "name": "Early Warning Network",
-            "description": "Advanced sensor arrays. +2 generations warning time for attacks.",
+            "description": "Advanced sensor arrays. +2 generations warning time for attacks. +5 RP/turn.",
             "tier": 3,
             "min_generation": 5,
             "cost": 400,
@@ -326,12 +356,13 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 5+ (Year 2100+)",
-            "special": "warning_time_bonus_2"
+            "special": "warning_time_bonus_2",
+            "passive_rp": 5
         },
         {
             "id": "relativistic_communication",
             "name": "Relativistic Communication",
-            "description": "Near-light-speed laser probes. Faster message delivery.",
+            "description": "Near-light-speed laser probes. Faster message delivery. +40 RP/turn.",
             "tier": 4,
             "min_generation": 8,
             "cost": 800,
@@ -339,12 +370,13 @@
                 "gravitational_wave_comm"
             ],
             "category": "Communication",
-            "year_context": "Unlocks Gen 8+ (Year 2175+)"
+            "year_context": "Unlocks Gen 8+ (Year 2175+)",
+            "passive_rp": 40
         },
         {
             "id": "distributed_colonies",
             "name": "Distributed Backup Colonies",
-            "description": "Mars, Europa, Titan settlements. Prevents total annihilation.",
+            "description": "Mars, Europa, Titan settlements. Prevents total annihilation. +20 RP/turn.",
             "tier": 4,
             "min_generation": 8,
             "cost": 1000,
@@ -353,12 +385,13 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 8+ (Year 2175+)",
-            "special": "prevents_annihilation"
+            "special": "prevents_annihilation",
+            "passive_rp": 20
         },
         {
             "id": "stellar_engineering",
             "name": "Stellar Engineering",
-            "description": "Manipulate stars for signaling. Become visible to entire galaxy.",
+            "description": "Manipulate stars for signaling. Become visible to entire galaxy. +40 RP/turn.",
             "tier": 4,
             "min_generation": 10,
             "cost": 1200,
@@ -366,12 +399,13 @@
                 "dyson_sphere_detection"
             ],
             "category": "Theory",
-            "year_context": "Unlocks Gen 10+ (Year 2225+)"
+            "year_context": "Unlocks Gen 10+ (Year 2225+)",
+            "passive_rp": 40
         },
         {
             "id": "post_biological_transition",
             "name": "Post-Biological Transition",
-            "description": "Digital consciousness. Contact post-biological civilizations.",
+            "description": "Digital consciousness. Contact post-biological civilizations. +50 RP/turn.",
             "tier": 4,
             "min_generation": 12,
             "cost": 1500,
@@ -381,7 +415,8 @@
             ],
             "category": "Computing",
             "year_context": "Unlocks Gen 12+ (Year 2275+)",
-            "special": "unlock_post_bio_contact"
+            "special": "unlock_post_bio_contact",
+            "passive_rp": 50
         },
         {
             "id": "emergency_evacuation",
@@ -401,7 +436,7 @@
         {
             "id": "solar_sail_technology",
             "name": "Solar Sail Technology",
-            "description": "Propellantless spacecraft using solar radiation pressure. Foundation for advanced propulsion.",
+            "description": "Propellantless spacecraft using solar radiation pressure. Foundation for advanced propulsion. +5 RP/turn.",
             "tier": 2,
             "min_generation": 3,
             "cost": 180,
@@ -410,12 +445,13 @@
             ],
             "category": "Communication",
             "year_context": "Unlocks Gen 3+ (Year 2050+)",
-            "special": "unlocks_solar_sails"
+            "special": "unlocks_solar_sails",
+            "passive_rp": 5
         },
         {
             "id": "laser_sail_propulsion",
             "name": "Laser Sail Propulsion",
-            "description": "Ground-based laser array propels gram-scale probes to 15-20% light speed (Breakthrough Starshot).",
+            "description": "Ground-based laser array propels gram-scale probes to 15-20% light speed (Breakthrough Starshot). +10 RP/turn.",
             "tier": 3,
             "min_generation": 5,
             "cost": 450,
@@ -425,12 +461,13 @@
             ],
             "category": "Communication",
             "year_context": "Unlocks Gen 5+ (Year 2100+)",
-            "special": "unlocks_laser_sails"
+            "special": "unlocks_laser_sails",
+            "passive_rp": 10
         },
         {
             "id": "von_neumann_probe_theory",
             "name": "Von Neumann Probe Theory",
-            "description": "Self-replicating exploration probes. Understand how to defend against or deploy them.",
+            "description": "Self-replicating exploration probes. Understand how to defend against or deploy them. +15 RP/turn.",
             "tier": 3,
             "min_generation": 6,
             "cost": 500,
@@ -440,12 +477,13 @@
             ],
             "category": "Theory",
             "year_context": "Unlocks Gen 6+ (Year 2125+)",
-            "special": "unlocks_von_neumann_defense"
+            "special": "unlocks_von_neumann_defense",
+            "passive_rp": 15
         },
         {
             "id": "fusion_propulsion",
             "name": "Fusion Propulsion",
-            "description": "Deuterium/Helium-3 fusion rockets (Project Daedalus). Heavy payload interstellar capability.",
+            "description": "Deuterium/Helium-3 fusion rockets (Project Daedalus). Heavy payload interstellar capability. +20 RP/turn.",
             "tier": 4,
             "min_generation": 10,
             "cost": 800,
@@ -454,12 +492,13 @@
             ],
             "category": "Communication",
             "year_context": "Unlocks Gen 10+ (Year 2225+)",
-            "special": "unlocks_fusion_propulsion"
+            "special": "unlocks_fusion_propulsion",
+            "passive_rp": 20
         },
         {
             "id": "directional_transmission",
             "name": "Directional Transmission",
-            "description": "Focused laser communications instead of omnidirectional broadcasts. -30% passive leakage.",
+            "description": "Focused laser communications instead of omnidirectional broadcasts. -30% passive leakage. +5 RP/turn.",
             "tier": 2,
             "min_generation": 3,
             "cost": 200,
@@ -468,12 +507,13 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 3+ (Year 2050+)",
-            "special": "reduces_leakage_30"
+            "special": "reduces_leakage_30",
+            "passive_rp": 5
         },
         {
             "id": "radio_silence_protocol",
             "name": "Radio Silence Protocol",
-            "description": "Minimize unintentional electromagnetic emissions. -50% passive leakage.",
+            "description": "Minimize unintentional electromagnetic emissions. -50% passive leakage. +5 RP/turn.",
             "tier": 2,
             "min_generation": 4,
             "cost": 250,
@@ -482,7 +522,8 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 4+ (Year 2075+)",
-            "special": "reduces_leakage_50"
+            "special": "reduces_leakage_50",
+            "passive_rp": 5
         },
         {
             "id": "dark_forest_protocol",
@@ -496,17 +537,12 @@
             ],
             "category": "Defense",
             "year_context": "Unlocks Gen 6+ (Year 2125+)",
-            "special": "dark_forest_protocol",
-            "doctrine_choice": {
-                "name": "Accept Dark Forest Protocol",
-                "description": "Achieve complete electromagnetic silence at the cost of permanent -50% public support",
-                "effect": "public_support_penalty_50"
-            }
+            "special": "dark_forest_protocol"
         },
         {
             "id": "bio_engineering",
             "name": "Bio-Engineering Foundation",
-            "description": "Genetic modification and CRISPR techniques. Prerequisite for genetic integration technologies.",
+            "description": "Genetic modification and CRISPR techniques. Prerequisite for genetic integration technologies. +15 RP/turn.",
             "tier": 3,
             "min_generation": 7,
             "cost": 350,
@@ -514,7 +550,8 @@
                 "ai_pattern_recognition"
             ],
             "category": "Transcendence",
-            "year_context": "Unlocks Gen 7+ (Year 2150+)"
+            "year_context": "Unlocks Gen 7+ (Year 2150+)",
+            "passive_rp": 15
         },
         {
             "id": "genetic_pacification",
@@ -558,7 +595,7 @@
         {
             "id": "neural_interface",
             "name": "Neural Interface",
-            "description": "Direct brain-computer connections. Merge biological cognition with digital processing. +40% integration.",
+            "description": "Direct brain-computer connections. Merge biological cognition with digital processing. +40% integration. +25 RP/turn.",
             "tier": 4,
             "min_generation": 11,
             "cost": 900,
@@ -568,12 +605,13 @@
             ],
             "category": "Transcendence",
             "year_context": "Unlocks Gen 11+ (Year 2250+)",
-            "special": "integration_40"
+            "special": "integration_40",
+            "passive_rp": 25
         },
         {
             "id": "synthetic_biology",
             "name": "Synthetic Biology",
-            "description": "Engineer hybrid biological-technological organisms. Living machines and mechanical life. +30% integration.",
+            "description": "Engineer hybrid biological-technological organisms. Living machines and mechanical life. +30% integration. +25 RP/turn.",
             "tier": 4,
             "min_generation": 9,
             "cost": 700,
@@ -583,12 +621,29 @@
             ],
             "category": "Transcendence",
             "year_context": "Unlocks Gen 9+ (Year 2200+)",
-            "special": "integration_30"
+            "special": "integration_30",
+            "passive_rp": 25
+        },
+        {
+            "id": "genesis_bioprogramming",
+            "name": "Genesis Bio-Programming",
+            "description": "Engineered seed packages carried by laser-sail probes: microbial life designed to evolve toward intelligence. Unlocks the Genesis Project (seed sterile worlds). +10 RP/turn.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 900,
+            "prerequisites": [
+                "synthetic_biology",
+                "laser_sail_propulsion"
+            ],
+            "category": "Transcendence",
+            "year_context": "Unlocks Gen 10+ (Year 2225+)",
+            "special": "unlocks_genesis",
+            "passive_rp": 10
         },
         {
             "id": "consciousness_upload",
             "name": "Consciousness Upload",
-            "description": "Transfer human consciousness to digital substrate. Digital immortality. +60% integration.",
+            "description": "Transfer human consciousness to digital substrate. Digital immortality. +60% integration. +60 RP/turn.",
             "tier": 5,
             "min_generation": 15,
             "cost": 1500,
@@ -598,7 +653,7 @@
             ],
             "category": "Transcendence",
             "year_context": "Unlocks Gen 15+ (Year 2350+)",
-            "special": "integration_60",
+            "special": "integration_variable",
             "doctrine_choice": {
                 "name": "Upload Philosophy",
                 "description": "What is the nature of uploaded consciousness?",
@@ -623,7 +678,8 @@
                         }
                     }
                 ]
-            }
+            },
+            "passive_rp": 60
         },
         {
             "id": "hybrid_civilization",

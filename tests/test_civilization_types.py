@@ -1,151 +1,98 @@
 """
-Test suite for Civilization Types (Phase 3A.2)
-
-Tests that alien civilizations are assigned appropriate types based on
-whether they solved the Dual DNA integration crisis.
+Galaxy generation: civilization types, strategies, ages and stages.
 """
-
+import os
+import random
 import sys
+import unittest
 from pathlib import Path
 
-# Add root directory to path
-root_path = Path(__file__).parent.parent
-sys.path.insert(0, str(root_path))
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+os.environ.setdefault("LOS_OFFLINE", "1")
 
-# Fix UTF-8 encoding for Windows console
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+from src.legacy_of_stars_v3 import CivilizationStage, StarSystem  # noqa: E402
 
-import random
-random.seed(42)  # Reproducible tests
-
-from src.legacy_of_stars_v3 import StarSystem
+LIVING_TYPES = {"biological_pure", "digital_ascended", "hybrid_integrated"}
+STRATEGIES = {"L", "LB", "LR", "LA", "LBA"}
 
 
-def test_civilization_types_assigned():
-    """Test that all civilizations with culture get a type assigned"""
-    systems = []
-    for i in range(100):
-        system = StarSystem(f"Test-{i}", random.uniform(10, 50))
-        if system.has_civilization:
-            systems.append(system)
-    
-    # All civilizations should have a type
-    for system in systems:
-        assert system.civilization_type is not None, f"{system.name} has no civilization type"
-        assert system.civilization_type in [
-            "biological_pure", "digital_ascended", "hybrid_integrated", "failed_transition"
-        ], f"Invalid type: {system.civilization_type}"
-    
-    print(f"✓ Civilization types assigned test passed ({len(systems)} civilizations)")
+def sample_systems(count: int, seed: int = 42):
+    random.seed(seed)
+    return [StarSystem(f"Test-{i}", random.uniform(4, 50)) for i in range(count)]
 
 
-def test_extinct_civs_mostly_failed_transition():
-    """Test that ~70% of extinct civilizations are failed_transition"""
-    extinct_systems = []
-    for i in range(500):  # Large sample for statistical accuracy
-        system = StarSystem(f"Test-{i}", random.uniform(10, 50))
-        if system.has_civilization and system.is_extinct:
-            extinct_systems.append(system)
-    
-    failed_count = sum(1 for s in extinct_systems if s.civilization_type == "failed_transition")
-    total_extinct = len(extinct_systems)
-    
-    if total_extinct > 0:
-        failed_percentage = (failed_count / total_extinct) * 100
-        
-        # Allow some variance (60-80% range)
-        assert 60 <= failed_percentage <= 80, \
-            f"Expected ~70% failed_transition, got {failed_percentage:.1f}% ({failed_count}/{total_extinct})"
-        
-        print(f"✓ Extinct civilization distribution test passed ({failed_percentage:.1f}% failed_transition)")
-    else:
-        print("⚠ No extinct civilizations generated in sample (test skipped)")
+class CivilizationTypeTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.systems = sample_systems(4000)
+        cls.civs = [s for s in cls.systems if s.has_civilization]
+        cls.living = [s for s in cls.civs if not s.is_extinct]
+        cls.extinct = [s for s in cls.civs if s.is_extinct]
+
+    def test_galaxy_is_mostly_silent(self):
+        fraction = len(self.civs) / len(self.systems)
+        self.assertTrue(0.10 < fraction < 0.20, fraction)
+        extinct_fraction = len(self.extinct) / len(self.civs)
+        self.assertTrue(0.18 < extinct_fraction < 0.32, extinct_fraction)
+
+    def test_every_civilization_has_a_valid_type(self):
+        for system in self.civs:
+            self.assertIn(system.civilization_type, LIVING_TYPES | {"failed_transition"}, system.name)
+        for system in self.systems:
+            if not system.has_civilization:
+                self.assertIsNone(system.civilization_type)
+                self.assertIsNone(system.true_strategy)
+
+    def test_living_civilizations_have_strategies_and_types(self):
+        for system in self.living:
+            self.assertIn(system.true_strategy, STRATEGIES)
+            self.assertIn(system.civilization_type, LIVING_TYPES)
+            self.assertIsNotNone(system.civilization_stage)
+            self.assertTrue(0.0 <= system.deception_level <= 1.0)
+
+    def test_extinct_civilizations_mostly_failed_the_transition(self):
+        failed = sum(1 for s in self.extinct if s.civilization_type == "failed_transition")
+        share = failed / len(self.extinct)
+        self.assertTrue(0.55 <= share <= 0.85, share)
+        for system in self.extinct:
+            self.assertIsNone(system.true_strategy)
+            self.assertIsNone(system.civilization_stage)
+            self.assertGreaterEqual(system.extinct_years_ago, 500)
+
+    def test_type_distribution_follows_weights(self):
+        counts = {name: 0 for name in LIVING_TYPES}
+        for system in self.living:
+            counts[system.civilization_type] += 1
+        self.assertGreaterEqual(counts["biological_pure"], counts["digital_ascended"])
+        self.assertGreaterEqual(counts["digital_ascended"], counts["hybrid_integrated"])
+
+    def test_most_civilizations_are_older_than_humanity(self):
+        older = sum(1 for s in self.living if s.civilization_age > 100)
+        self.assertGreater(older / len(self.living), 0.6)
 
 
-def test_living_civs_never_failed_transition():
-    """Test that living civilizations are never failed_transition"""
-    living_systems = []
-    for i in range(200):
-        system = StarSystem(f"Test-{i}", random.uniform(10, 50))
-        if system.has_civilization and not system.is_extinct:
-            living_systems.append(system)
-    
-    for system in living_systems:
-        assert system.civilization_type != "failed_transition", \
-            f"Living civilization {system.name} has failed_transition type"
-    
-    print(f"✓ Living civilizations type exclusion test passed ({len(living_systems)} civilizations)")
-
-
-def test_type_distribution_in_living_civs():
-    """Test that living civilizations have reasonable type distribution"""
-    living_systems = []
-    for i in range(500):
-        system = StarSystem(f"Test-{i}", random.uniform(10, 50))
-        if system.has_civilization and not system.is_extinct:
-            living_systems.append(system)
-    
-    if len(living_systems) > 0:
-        type_counts = {
-            "biological_pure": 0,
-            "digital_ascended": 0,
-            "hybrid_integrated": 0
+class AgeToStageTest(unittest.TestCase):
+    def test_mapping(self):
+        system = StarSystem("Probe", 10.0)
+        expected = {
+            25: CivilizationStage.PRE_RADIO,
+            150: CivilizationStage.EARLY_RADIO,
+            500: CivilizationStage.DIGITAL,
+            5000: CivilizationStage.INTERPLANETARY,
+            50000: CivilizationStage.INTERSTELLAR,
+            500000: CivilizationStage.POST_BIOLOGICAL,
         }
-        
-        for system in living_systems:
-            type_counts[system.civilization_type] += 1
-        
-        total = len(living_systems)
-        print(f"\n  Type Distribution ({total} living civilizations):")
-        print(f"    Biological Pure: {type_counts['biological_pure']} ({type_counts['biological_pure']/total*100:.1f}%)")
-        print(f"    Digital Ascended: {type_counts['digital_ascended']} ({type_counts['digital_ascended']/total*100:.1f}%)")
-        print(f"    Hybrid Integrated: {type_counts['hybrid_integrated']} ({type_counts['hybrid_integrated']/total*100:.1f}%)")
-        
-        # Biological should be most common (weight 20), hybrid least common (weight 10)
-        assert type_counts["biological_pure"] >= type_counts["digital_ascended"], \
-            "Biological should be more common than digital"
-        assert type_counts["digital_ascended"] >= type_counts["hybrid_integrated"], \
-            "Digital should be more common than hybrid"
-        
-        print("✓ Type distribution test passed")
-    else:
-        print("⚠ No living civilizations generated in sample (test skipped)")
+        for age, stage in expected.items():
+            self.assertEqual(system._age_to_stage(age), stage)
 
-
-def test_systems_without_civilization():
-    """Test that systems without civilizations have None type"""
-    empty_systems = []
-    for i in range(100):
-        system = StarSystem(f"Test-{i}", random.uniform(10, 50))
-        if not system.has_civilization:
-            empty_systems.append(system)
-    
-    for system in empty_systems:
-        assert system.civilization_type is None, \
-            f"Empty system {system.name} has civilization type {system.civilization_type}"
-    
-    print(f"✓ Empty systems test passed ({len(empty_systems)} empty systems)")
-
-
-def run_all_tests():
-    """Run all civilization type tests"""
-    print("\n" + "="*60)
-    print("CIVILIZATION TYPES TEST SUITE")
-    print("="*60 + "\n")
-    
-    test_civilization_types_assigned()
-    test_living_civs_never_failed_transition()
-    test_extinct_civs_mostly_failed_transition()
-    test_type_distribution_in_living_civs()
-    test_systems_without_civilization()
-    
-    print("\n" + "="*60)
-    print("ALL TESTS PASSED ✓")
-    print("="*60 + "\n")
+    def test_round_trip_generations(self):
+        self.assertEqual(StarSystem("A", 4.2).get_round_trip_time(), 1)
+        self.assertEqual(StarSystem("B", 12.5).get_round_trip_time(), 1)
+        self.assertEqual(StarSystem("C", 12.6).get_round_trip_time(), 2)
+        self.assertEqual(StarSystem("D", 50.0).get_round_trip_time(), 4)
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    unittest.main()

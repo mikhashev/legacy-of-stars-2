@@ -52,6 +52,16 @@ class IntegrationProgress:
         elif old_level < self.high_integration_threshold <= self.integration_level:
             logging.info("MILESTONE: High integration achieved (0.7+) - bonuses active!")
     
+    def to_dict(self) -> Dict:
+        return {"integration_level": self.integration_level, "integration_events": list(self.integration_events)}
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "IntegrationProgress":
+        progress = cls()
+        progress.integration_level = float(data.get("integration_level", 0.0))
+        progress.integration_events = list(data.get("integration_events", []))
+        return progress
+
     def get_filter_risk_modifier(self, current_generation: int = 999) -> float:
         """
         Return self-destruct risk multiplier based on integration

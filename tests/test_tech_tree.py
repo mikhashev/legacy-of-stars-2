@@ -1,212 +1,141 @@
 """
-Test script for redesigned Tech Tree
-Verifies generation gating, special effects, and tier progression
+Technology tree: data integrity, generation gating, legacy knowledge, special effects.
 """
-
+import json
+import os
+import re
 import sys
+import unittest
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import logging
-import datetime
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+os.environ.setdefault("LOS_OFFLINE", "1")
 
-# Fix UTF-8 encoding for Windows console
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
 
-from src.legacy_of_stars_v3 import ContactProgram
+TECH_TREE = ROOT / "data" / "tech_tree.json"
+ENGINE_SOURCE = (ROOT / "src" / "legacy_of_stars_v3.py").read_text(encoding="utf-8")
 
-# Set up logging
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"test_tech_tree_{timestamp}.log"
 
-logging.basicConfig(
-    filename=log_filename,
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+def make_program(seed=41):
+    return ContactProgram(seed=seed, offline=True)
 
-print(f"\n=== TECH TREE REDESIGN TEST ===")
-print(f"Logging to: {log_filename}\n")
 
-# Create game instance
-program = ContactProgram()
+class TechTreeDataTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(TECH_TREE, encoding="utf-8") as f:
+            cls.techs = json.load(f)["technologies"]
+        cls.by_id = {t["id"]: t for t in cls.techs}
 
-print("Test 1: Tech Tree Loading")
-print("-" * 50)
-tech_count = len(program.technologies)
-print(f"✓ Loaded {tech_count} technologies")
+    def test_tree_shape(self):
+        self.assertGreaterEqual(len(self.techs), 44)
+        self.assertEqual(len(self.by_id), len(self.techs))
+        self.assertEqual({t["tier"] for t in self.techs}, {0, 1, 2, 3, 4, 5})
+        for tech in self.techs:
+            for key in ("id", "name", "description", "tier", "min_generation", "cost", "prerequisites", "category"):
+                self.assertIn(key, tech, tech["id"])
+            self.assertGreater(tech["cost"], 0)
 
-# Count by tier
-tier_counts = {}
-for tech in program.technologies.values():
-    tier_counts[tech.tier] = tier_counts.get(tech.tier, 0) + 1
+    def test_prerequisites_exist_and_come_from_lower_or_equal_tiers(self):
+        for tech in self.techs:
+            for prereq in tech["prerequisites"]:
+                self.assertIn(prereq, self.by_id, f"{tech['id']} needs unknown {prereq}")
+                self.assertLessEqual(self.by_id[prereq]["tier"], tech["tier"], f"{tech['id']} <- {prereq}")
 
-print("\nTechnologies by Tier:")
-for tier in sorted(tier_counts.keys()):
-    print(f"  Tier {tier}: {tier_counts[tier]} techs")
+    def test_every_special_effect_is_handled_by_the_engine(self):
+        for tech in self.techs:
+            special = tech.get("special")
+            if special:
+                self.assertIn(f'"{special}"', ENGINE_SOURCE, f"unhandled special effect {special} ({tech['id']})")
 
-print()
-print("Test 2: Generation Gating")
-print("-" * 50)
+    def test_passive_rp_is_documented_in_descriptions(self):
+        for tech in self.techs:
+            if tech.get("passive_rp"):
+                self.assertRegex(tech["description"], r"RP/turn|research points/turn", tech["id"])
 
-# Try to research a Tier 1 tech that requires Gen 2
-program.research_points = 1000
+    def test_historical_chronology(self):
+        self.assertEqual(self.by_id["seti_at_home"]["min_generation"], 1)        # launched 1999
+        self.assertEqual(self.by_id["breakthrough_listen"]["min_generation"], 2)  # launched 2015
+        for tech_id, year in (("arecibo_telescope", "1963"), ("drake_equation", "1961")):
+            self.assertIn(year, self.by_id[tech_id]["year_context"] + self.by_id[tech_id]["description"])
 
-tier1_tech = None
-for tech in program.technologies.values():
-    if tech.tier == 1 and tech.min_generation == 2:
-        tier1_tech = tech
-        break
+    def test_doctrine_options_are_complete(self):
+        for tech in self.techs:
+            doctrine = tech.get("doctrine_choice")
+            if doctrine:
+                self.assertTrue(doctrine.get("options"), tech["id"])
+                for option in doctrine["options"]:
+                    self.assertIn("effects", option)
 
-if tier1_tech:
-    print(f"Testing: {tier1_tech.name} (requires Gen {tier1_tech.min_generation})")
-    print(f"Current generation: {program.generation}")
-    
-    # Try to research (should fail)
-    result = program.research_tech(tier1_tech.id)
-    if not tier1_tech.researched:
-        print(f"✅ PASS: Cannot research before Gen {tier1_tech.min_generation}")
-        print(f"   Message: {program.message}")
-    else:
-        print(f"❌ FAIL: Tech researched despite generation requirement!")
-    
-    # Advance to Gen 2 and try again
-    program.generation = 2
-    program.research_points = 1000
-    result = program.research_tech(tier1_tech.id)
-    
-    if tier1_tech.researched:
-        print(f"✅ PASS: Can research at Gen {program.generation}")
-    else:
-        print(f"❌ FAIL: Cannot research even at correct generation!")
-        print(f"   Message: {program.message}")
 
-print()
-print("Test 3: Special Effects - Passive Defense")
-print("-" * 50)
+class TechTreeEngineTest(unittest.TestCase):
+    def test_legacy_knowledge_is_pre_researched(self):
+        p = make_program()
+        legacy = [t for t in p.technologies.values() if t.is_legacy]
+        researched = [t for t in p.technologies.values() if t.researched]
+        self.assertEqual(len(legacy), 5)
+        self.assertEqual(set(t.id for t in legacy), set(ContactProgram.LEGACY_TECHS))
+        self.assertEqual(len(legacy), len(researched))
+        context = p._build_tech_context()
+        self.assertIn("Baseline (1977)", context)
+        self.assertIn("Tier 0", context)
 
-# Find Orbital Defense Grid
-orbital_defense = program.technologies.get("orbital_defense_grid")
-if orbital_defense:
-    print(f"Testing: {orbital_defense.name}")
-    print(f"  Special effect: {orbital_defense.special}")
-    
-    initial_defense = program.passive_defense_bonus
-    print(f"  Initial passive defense: {initial_defense}")
-    
-    # Set up conditions to research it
-    program.generation = orbital_defense.min_generation
-    program.research_points = orbital_defense.cost + 100
-    
-    # Research prerequisites first
-    for prereq_id in orbital_defense.prerequisites:
-        prereq = program.technologies.get(prereq_id)
-        if prereq:
-            prereq.researched = True
-    
-    # Research the tech
-    program.research_tech(orbital_defense.id)
-    
-    if orbital_defense.researched:
-        print(f"  ✅ Tech researched successfully")
-        print(f"  Passive defense after: {program.passive_defense_bonus}")
-        
-        if program.passive_defense_bonus < initial_defense:
-            print(f"  ✅ PASS: Passive defense bonus applied (0.6 multiplier = 40% reduction)")
-        else:
-            print(f"  ❌ FAIL: Passive defense bonus not applied!")
-    else:
-        print(f"  ❌ FAIL: Could not research tech")
-        print(f"  Message: {program.message}")
+    def test_generation_gating(self):
+        p = make_program()
+        tech = p.technologies["deep_space_network"]  # Gen 2+
+        p.research_points = 1000
+        self.assertFalse(p.research_tech(tech.id))
+        self.assertFalse(tech.researched)
+        self.assertIn("Unlocks in Generation 2", p.message)
+        p.generation = 2
+        p.research_tech(tech.id)
+        self.assertTrue(tech.researched)
+        self.assertNotIn(tech, p.available_technologies())
 
-print()
-print("Test 4: Backup Colonies Effect")
-print("-" * 50)
+    def test_prerequisites_and_cost_are_enforced(self):
+        p = make_program()
+        p.generation = 5
+        p.research_points = 10000
+        self.assertFalse(p.research_tech("orbital_defense_grid"))
+        self.assertIn("Prerequisite not met", p.message)
+        p.research_points = 10
+        self.assertFalse(p.research_tech("global_education"))
+        self.assertIn("Not enough Research Points", p.message)
 
-backup_colonies = program.technologies.get("distributed_colonies")
-if backup_colonies:
-    print(f"Testing: {backup_colonies.name}")
-    print(f"  Special effect: {backup_colonies.special}")
-    
-    initial_status = program.has_backup_colonies
-    print(f"  Initial backup colonies: {initial_status}")
-    
-    # Set up conditions
-    program.generation = backup_colonies.min_generation
-    program.research_points = backup_colonies.cost + 100
-    
-    # Research prerequisites
-    for prereq_id in backup_colonies.prerequisites:
-        prereq = program.technologies.get(prereq_id)
-        if prereq:
-            prereq.researched = True
-            # Also need to research prereqs of prereqs
-            for sub_prereq_id in prereq.prerequisites:
-                sub_prereq = program.technologies.get(sub_prereq_id)
-                if sub_prereq:
-                    sub_prereq.researched = True
-    
-    # Research the tech
-    program.research_tech(backup_colonies.id)
-    
-    if backup_colonies.researched:
-        print(f"  ✅ Tech researched successfully")
-        print(f"  Backup colonies after: {program.has_backup_colonies}")
-        
-        if program.has_backup_colonies:
-            print(f"  ✅ PASS: Backup colonies flag activated")
-        else:
-            print(f"  ❌ FAIL: Backup colonies flag not set!")
-    else:
-        print(f"  ❌ FAIL: Could not research tech")
+    def test_special_effects_apply(self):
+        p = make_program()
+        p.generation = 10
+        for tech_id in ("arecibo_telescope", "deep_space_network", "ska_telescope", "orbital_defense_grid", "distributed_colonies"):
+            p.research_points = 100000
+            p.research_tech(tech_id)
+            self.assertTrue(p.technologies[tech_id].researched, p.message)
+        self.assertAlmostEqual(p.passive_defense_bonus, 0.6)
+        self.assertTrue(p.has_backup_colonies)
+        self.assertEqual(p.tech_level, 5)
 
-print()
-print("Test 5: Tier 0 Technologies (Always Available)")
-print("-" * 50)
+    def test_tier_zero_available_from_the_start(self):
+        p = make_program()
+        p.research_points = 10000
+        for tech in [t for t in p.technologies.values() if t.tier == 0 and not t.researched]:
+            p.research_tech(tech.id)
+            self.assertTrue(tech.researched, tech.id)
 
-tier0_techs = [t for t in program.technologies.values() if t.tier == 0]
-print(f"Found {len(tier0_techs)} Tier 0 technologies:")
+    def test_swan_song_discount_is_consumed(self):
+        p = make_program()
+        p.swan_song_manager.next_tech_discount = 0.25
+        p.research_points = 5
+        p.research_tech("global_education")
+        self.assertFalse(p.technologies["global_education"].researched)
+        self.assertEqual(p.swan_song_manager.next_tech_discount, 0.25)  # a failed purchase keeps the discount
+        p.research_points = 100
+        p.research_tech("global_education")
+        self.assertTrue(p.technologies["global_education"].researched)
+        self.assertIn("Discounted by 25%", p.message)
+        self.assertEqual(p.swan_song_manager.next_tech_discount, 0.0)
 
-# Reset for testing
-program.generation = 1
-program.research_points = 1000
 
-researched_count = 0
-for tech in tier0_techs[:5]:  # Test first 5
-    result = program.research_tech(tech.id)
-    if tech.researched:
-        print(f"  ✅ {tech.name}")
-        researched_count += 1
-    else:
-        print(f"  ❌ {tech.name} - {program.message}")
-
-if researched_count == min(5, len(tier0_techs)):
-    print(f"\n✅ PASS: All tested Tier 0 techs available from Gen 1")
-else:
-    print(f"\n❌ FAIL: Some Tier 0 techs not available")
-
-print()
-print("Test 6: Historical Accuracy")
-print("-" * 50)
-
-historical_techs = {
-    "arecibo_telescope": "1963",
-    "drake_equation": "1961",
-    "seti_at_home": "1999",
-    "breakthrough_listen": "2015"
-}
-
-for tech_id, year in historical_techs.items():
-    tech = program.technologies.get(tech_id)
-    if tech:
-        print(f"✓ {tech.name} - {year}")
-        print(f"  Context: {tech.year_context}")
-
-print()
-print("=" * 50)
-print("TECH TREE REDESIGN TEST COMPLETE")
-print(f"Check {log_filename} for detailed logs")
-print("=" * 50)
+if __name__ == "__main__":
+    unittest.main()

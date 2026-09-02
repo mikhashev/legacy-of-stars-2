@@ -1,0 +1,19 @@
+{
+  "_placeholders": "{system} {year}",
+  "mirror_friendly": [
+    "We saw you the moment you saw us. The same pollution in the same spectra, the same radio noise, the same first hesitant messages. We are as afraid of you as you are of us, and we decided that this was, in itself, a reason to speak. Two mirrors facing each other can see forever. Let us try.",
+    "You are the first civilization we have found that is neither ancient nor primitive - just us, at the same table, holding the same cards. We could spend a thousand years suspecting each other. We propose instead to spend the first hundred talking. This is our opening move: honesty. Your turn."
+  ],
+  "mirror_hostile": [
+    "The mirror civilization's answer was not a message. Their telescopes resolved our signal, their strategists ran the same calculations we did, and they arrived at the darker conclusion first.",
+    "Symmetry did not produce trust. The mirror civilization decided that a rival at exactly its own level was the one threat it could still afford to eliminate."
+  ],
+  "genesis_greeting": [
+    "To the world that seeded ours: we know. We found the signatures in our own cells, the deliberate patterns, the story written in the oldest rock. You did not have to tell us. We are telling you: we are grateful, we are curious, and we are coming to meet you - with open hands. Call us children if you like. We prefer to call you family.",
+    "We have decoded the message you left in our genome. Most of it was instructions; the last part was hope. The instructions worked. The hope, too. This transmission is the first of many from the people of {system} to the people of Earth: our parents, our neighbours, our friends."
+  ],
+  "genesis_hostile": [
+    "The civilization we seeded on {system} has reached the stars and has looked back at its makers with cold eyes. They regard their engineered origin as a chain, and the chain's other end is here.",
+    "Our children on {system} have grown up. Their first act of independence is to remove the possibility that we could ever shape them again."
+  ]
+}

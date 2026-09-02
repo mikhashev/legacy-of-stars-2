@@ -1,13 +1,16 @@
+import math
 import random
 import time
 import os
 import json
 from enum import Enum
-from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import logging
 import datetime
 from .ai_manager import AIManager
+from .content import ContentBank
 from .wow_signal_event import WOWSignalEvent
 from .attack_warning import AttackWarning
 from .ai_strategic_advisor import AIStrategicAdvisor
@@ -17,6 +20,21 @@ from .integration_progress import IntegrationProgress
 from .philosophical_events import PhilosophicalEvents
 from .genesis_project import GenesisProject
 
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+CATALOG_PATH = DATA_DIR / "star_catalog.json"
+
+
+def load_star_catalog(path: Path = CATALOG_PATH) -> List[Dict[str, Any]]:
+    """Real nearby stars (name, distance in LY, spectral type, RA/Dec), nearest first."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            stars = json.load(f).get("stars", [])
+    except (OSError, json.JSONDecodeError) as exc:
+        logging.warning(f"Star catalog unavailable ({exc}); using a synthetic neighbourhood")
+        return []
+    return sorted(stars, key=lambda s: s["distance"])
+
+
 class CivilizationStage(Enum):
     PRE_RADIO = 0
     EARLY_RADIO = 1
@@ -24,6 +42,24 @@ class CivilizationStage(Enum):
     INTERPLANETARY = 3
     INTERSTELLAR = 4
     POST_BIOLOGICAL = 5
+
+@dataclass(frozen=True)
+class ActionSpec:
+    """A player action the engine currently offers (UI-agnostic)."""
+    id: str
+    label: str
+    cost: str = ""                 # e.g. "1 AP", "Free", "All AP"
+    needs: Tuple[str, ...] = ()    # what the UI must ask for: "system", "text", "tech", "threat", "defense", "choice"
+
+
+@dataclass
+class GameEvent:
+    """Something that happened, for the UI to show (console) or animate (future front-ends)."""
+    kind: str
+    text: str
+    data: Dict[str, Any] = field(default_factory=dict)
+    generation: int = 0
+
 
 class Technology:
     def __init__(self, data: dict):
@@ -39,34 +75,26 @@ class Technology:
         self.special = data.get("special", None)
         self.passive_rp = data.get("passive_rp", 0)  # New: Passive research points per turn
         self.is_legacy = False  # Flag for pre-1977 legacy knowledge
-        self.doctrine_choice = data.get("doctrine_choice")
+        self.detection_bonus = data.get("detection_bonus", 0.0)  # Adds to the per-generation discovery chance
+        doctrine_choice = data.get("doctrine_choice")
+        if doctrine_choice and not doctrine_choice.get("options"):
+            doctrine_choice = None  # a doctrine without options is not a choice
+        self.doctrine_choice = doctrine_choice
         self.researched = False
         self.chosen_doctrine = None
 
-class KnowledgeBank:
-    """Tracks preserved knowledge across generations"""
-    def __init__(self):
-        self.preserved_knowledge = {}  # topic -> integrity (0.0 - 1.0)
-        self.capacity = 100
-        self.decay_rate = 0.05
-
-    def add_knowledge(self, topic: str, amount: float):
-        current = self.preserved_knowledge.get(topic, 0.0)
-        self.preserved_knowledge[topic] = min(1.0, current + amount)
-
-    def degrade(self):
-        """Apply decay to all knowledge"""
-        for topic in list(self.preserved_knowledge.keys()):
-            self.preserved_knowledge[topic] -= self.decay_rate
-            if self.preserved_knowledge[topic] <= 0:
-                del self.preserved_knowledge[topic]
-
 class StarSystem:
-    def __init__(self, name: str, distance: float):
+    def __init__(self, name: str, distance: float, spectral_type: Optional[str] = None,
+                 ra: Optional[float] = None, dec: Optional[float] = None):
         self.name = name
         self.distance = distance
-        self.has_civilization = random.random() < 0.3
-        
+        self.spectral_type = spectral_type
+        self.ra = ra    # J2000 right ascension, degrees (for star maps)
+        self.dec = dec  # J2000 declination, degrees
+        # The Fermi paradox made concrete: most stars are silent. With ~50 catalogued stars this
+        # yields a handful of civilizations per game, a quarter of them already extinct.
+        self.has_civilization = random.random() < 0.15
+
         if self.has_civilization:
             # === PHASE 1: Statistical Realism ===
             human_age = 100
@@ -82,7 +110,7 @@ class StarSystem:
             self.civilization_age = civ_age
             self.civilization_stage = self._age_to_stage(civ_age)
             
-            self.is_extinct = random.random() < 0.15
+            self.is_extinct = random.random() < 0.25
             if self.is_extinct:
                 self.extinct_years_ago = random.randint(500, 5000)
                 self.has_swan_song = random.random() < 0.8
@@ -138,7 +166,53 @@ class StarSystem:
         self.pending_responses = []
         self.received_messages = []
         self.pending_attack = None
+        self.is_seeded = False           # Genesis Project marker
+        self.has_detected_earth = False  # hostile civ already found us (no double attacks)
+        self.is_wow_source = False
     
+    _SCALAR_FIELDS = ("name", "distance", "spectral_type", "ra", "dec", "has_civilization", "civilization_age",
+                      "is_extinct", "has_swan_song", "true_strategy", "deception_level", "civilization_type",
+                      "civilization_attitude", "knowledge", "is_seeded", "has_detected_earth", "is_wow_source")
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = {name: getattr(self, name, None) for name in self._SCALAR_FIELDS}
+        data["civilization_stage"] = self.civilization_stage.name if self.civilization_stage else None
+        data["extinct_years_ago"] = getattr(self, "extinct_years_ago", None)
+        data["messages_sent"] = [[text, gen] for text, gen in self.messages_sent]
+        data["pending_responses"] = [[text, gen] for text, gen in self.pending_responses]
+        data["received_messages"] = list(self.received_messages)
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StarSystem":
+        """Rebuild a system without re-rolling its hidden civilization."""
+        system = cls.__new__(cls)
+        system.name = data["name"]
+        system.distance = float(data["distance"])
+        system.spectral_type = data.get("spectral_type")
+        system.ra = data.get("ra")
+        system.dec = data.get("dec")
+        system.has_civilization = bool(data.get("has_civilization", False))
+        system.civilization_age = data.get("civilization_age", 0)
+        stage = data.get("civilization_stage")
+        system.civilization_stage = CivilizationStage[stage] if stage else None
+        system.is_extinct = bool(data.get("is_extinct", False))
+        system.extinct_years_ago = data.get("extinct_years_ago")
+        system.has_swan_song = bool(data.get("has_swan_song", False))
+        system.true_strategy = data.get("true_strategy")
+        system.deception_level = data.get("deception_level", 0)
+        system.civilization_type = data.get("civilization_type")
+        system.civilization_attitude = data.get("civilization_attitude", 0)
+        system.knowledge = data.get("knowledge", 0)
+        system.messages_sent = [tuple(item) for item in data.get("messages_sent", [])]
+        system.pending_responses = [tuple(item) for item in data.get("pending_responses", [])]
+        system.received_messages = list(data.get("received_messages", []))
+        system.pending_attack = None
+        system.is_seeded = bool(data.get("is_seeded", False))
+        system.has_detected_earth = bool(data.get("has_detected_earth", False))
+        system.is_wow_source = bool(data.get("is_wow_source", False))
+        return system
+
     def _age_to_stage(self, age: float) -> CivilizationStage:
         if age < 50:
             return CivilizationStage.PRE_RADIO
@@ -159,27 +233,6 @@ class StarSystem:
         generations = (years / 25)  # Each generation is ~25 years
         return max(1, int(generations + 0.999))  # Round up to nearest generation
     
-    def can_detect_civilization(self, transmission_tech: int) -> bool:
-        """Check if Earth can detect civilization with current tech"""
-        if not self.has_civilization:
-            return False
-            
-        # Need at least matching tech level to detect
-        if self.civilization_stage.value <= CivilizationStage.PRE_RADIO.value:
-            return False
-        
-        # Higher tech civilizations are easier to detect
-        tech_diff = transmission_tech - self.civilization_stage.value
-        detection_chance = 0.1 + (0.15 * self.civilization_stage.value) + (0.1 * tech_diff)
-        detection_chance = max(0.05, min(0.9, detection_chance))
-        
-        return random.random() < detection_chance
-    
-    def update_knowledge(self, research_focus: float):
-        """Update knowledge based on research focus"""
-        if self.knowledge < 100:
-            self.knowledge += 5 * research_focus
-            self.knowledge = min(100, self.knowledge)
     
     def describe_civilization(self) -> str:
         """Get description of civilization based on current knowledge"""
@@ -241,6 +294,18 @@ class Director:
         num_traits = random.randint(1, 3)
         self.traits = random.sample(potential_traits, num_traits)
     
+    def to_dict(self) -> Dict[str, Any]:
+        return {"name": self.name, "skills": dict(self.skills), "traits": list(self.traits), "generation": self.generation}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Director":
+        director = cls.__new__(cls)
+        director.name = data["name"]
+        director.skills = dict(data.get("skills", {"diplomacy": 0.5, "science": 0.5, "administration": 0.5}))
+        director.traits = list(data.get("traits", []))
+        director.generation = data.get("generation", 0)
+        return director
+
     def get_skill_bonus(self, skill: str) -> float:
         """Get bonus for a particular skill based on traits"""
         bonus = 0
@@ -264,160 +329,221 @@ class Director:
 
 class ContactProgram:
     """Manages Earth's interstellar contact program"""
-    def __init__(self):
+    LEGACY_TECHS = (
+        "arecibo_telescope",        # Built 1963
+        "drake_equation",           # Published 1961
+        "project_ozma",             # Conducted 1960
+        "signal_processing_basic",  # 1970s technology
+        "voyager_golden_record",    # Launched 1977
+    )
+
+    def __init__(self, seed: Optional[int] = None, offline: bool = False, generate: bool = True):
+        if seed is not None:
+            random.seed(seed)
+        self.seed = seed
+        self.offline = bool(offline) or os.getenv("LOS_OFFLINE") == "1"
+
+        # --- core program state
         self.generation = 1
-        self.tech_level = 1
+        self.start_year = 1977  # WOW! Signal era
         self.funding = 50  # 0-100 scale
         self.research_points = 0
-        self.diplomacy_points = 0
         self.message_quality = 1.0
         self.public_support = 50  # 0-100 scale
         self.knowledge_base = 10  # General knowledge about other civilizations
-        self.star_systems = self.generate_star_systems(8)
-        
-        # === DEBUG: Log all civilization details at game start ===
-        logging.debug("")
-        logging.debug("="*60)
-        logging.debug("GALAXY OVERVIEW - Hidden Civilization Details")
-        logging.debug("="*60)
-        for name, system in self.star_systems.items():
-            if system.has_civilization:
-                if system.is_extinct:
-                    logging.debug(f"  {name} ({system.distance:.1f} LY) - EXTINCT")
-                    logging.debug(f"    Age: {int(system.civilization_age)} years")
-                    logging.debug(f"    Died: {system.extinct_years_ago} years ago")
-                    logging.debug(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
-                    logging.debug(f"    Type: {system.civilization_type}")
-                else:
-                    logging.debug(f"  {name} ({system.distance:.1f} LY) - ACTIVE")
-                    logging.debug(f"    Age: {int(system.civilization_age)} years")
-                    logging.debug(f"    Stage: {system.civilization_stage.name}")
-                    logging.debug(f"    Strategy: {system.true_strategy}")
-                    logging.debug(f"    Deception: {system.deception_level:.2f}")
-                    logging.debug(f"    Type: {system.civilization_type}")
-
-                    strategy_desc = {
-                        "L": "Listen Only - Will NEVER respond",
-                        "LB": "Listen & Broadcast - Enthusiastic, friendly METI",
-                        "LR": "Listen & Reply - Cautious, only responds when contacted",
-                        "LA": "Listen & Annihilate - HOSTILE, attacks silently",
-                        "LBA": "Listen, Broadcast & Annihilate - TRAP! Friendly bait then attack"
-                    }
-                    logging.debug(f"    >>> {strategy_desc[system.true_strategy]}")
-            else:
-                logging.debug(f"  {name} ({system.distance:.1f} LY) - No civilization")
-            logging.debug("")
-
-        logging.debug("="*60)
-        logging.debug("")
-        self.directors = []
-        self.current_director = self.generate_director()
-        self.directors.append(self.current_director)
         self.game_over = False
+        self.game_over_reason = ""
         self.victory = False
+        self.philosophical_victory = False  # Separate from contact victory
         self.message = ""
-        
-        # New Mechanics
-        self.knowledge_bank = KnowledgeBank()
+
+        # --- galaxy
+        self.catalog = load_star_catalog()
+        self.undiscovered: List[str] = []  # catalogued stars we have not resolved yet, nearest first
+        self.star_systems: Dict[str, StarSystem] = {}
+
+        # --- people
+        self.directors: List[Director] = []
+        self.current_director: Optional[Director] = None
+
+        # --- technology, risks, economy
         self.technologies = self.load_tech_tree()
         self.self_destruct_risk = 0.0
-        self.accident_risk = 0.0
         self.ecological_risk = 0.0
-        self.active_doctrines = []
-        self.start_year = 1977  # WOW! Signal era
-        
-        # Action Economy
+        self.active_doctrines: List[str] = []
         self.action_points = 0
         self.max_action_points = 0
-        self.calculate_ap()
-        
-        # AI Manager
-        self.ai = AIManager()
-        
-        # WOW! Signal Event System
-        self.wow_signal = WOWSignalEvent(self)
-        
-        # Attack Early Warning System
-        self.pending_attack_warnings = []
-        
-        # Tech Tree Special Effects
-        self.passive_defense_bonus = 1.0  # Multiplier for passive defense (1.0 = no bonus)
-        self.warning_time_bonus = 0  # Extra generations of warning time
-        self.has_backup_colonies = False  # Prevents total annihilation
-        self.cloaking_active = False  # Reduces passive detection
-        self.ai_advisor_unlocked = False  # AI Strategic Advisor feature
-        self.can_contact_post_biological = False  # Post-biological civilizations
-        self.ultimate_survival = False  # Ultimate survival guarantee
-        
-        # AI Strategic Advisor
+        self.ap_modifier = 0  # permanent bonus/penalty from events
+
+        # --- optional AI and the written content bank
+        self.ai = AIManager(offline=self.offline)
+        self.content = ContentBank()
         self.ai_advisor = AIStrategicAdvisor(self.ai)
-        self.advisor_consulted_this_gen = False  # Track if already consulted this generation
-        
-        # Swan Song Messages Manager
-        self.swan_song_manager = SwanSongManager(self.ai)
-        
-        # Create swan songs for extinct civilizations
-        for name, system in self.star_systems.items():
-            if system.has_civilization and system.is_extinct and system.has_swan_song:
-                self.swan_song_manager.create_swan_song(
-                    name, 
-                    system.extinct_years_ago, 
-                    system.civilization_age
-                )
-                logging.info(f"Swan Song created for {name}")
-        
-        # Mark pre-1977 technologies as legacy knowledge (already known at game start)
-        legacy_techs = [
-            "arecibo_telescope",        # Built 1963
-            "drake_equation",           # Published 1961
-            "project_ozma",             # Conducted 1960
-            "signal_processing_basic",  # 1970s technology
-            "voyager_golden_record"     # Launched 1977
-        ]
-        
-        for tech_id in legacy_techs:
-            if tech_id in self.technologies:
-                tech = self.technologies[tech_id]
+        self.advisor_consulted_this_gen = False
+
+        # --- subsystems
+        self.wow_signal = WOWSignalEvent(self)
+        self.pending_attack_warnings: List[AttackWarning] = []
+        self.swan_song_manager = SwanSongManager(self.ai, self.content)
+        self.leakage_system = PassiveLeakageSystem()
+        self.broadcast_radius = 0.0  # recalculated each generation
+        self.leakage_multiplier = 1.0  # 1.0 = full leakage, 0.0 = complete silence
+        self.integration = IntegrationProgress()
+        self.philosophical_events = PhilosophicalEvents()
+        self.pending_philosophical_event = None  # event waiting for the player's choice
+        self.genesis = GenesisProject()
+
+        # --- technology special-effect flags
+        self.passive_defense_bonus = 1.0  # damage multiplier from passive defenses (1.0 = none)
+        self.warning_time_bonus = 0  # extra generations of warning time
+        self.has_backup_colonies = False  # prevents total annihilation
+        self.cloaking_active = False
+        self.ai_advisor_unlocked = False
+        self.can_contact_post_biological = False
+        self.ultimate_survival = False
+        self.has_solar_sails = False
+        self.has_laser_sails = False
+        self.message_delivery_speed = 1.0
+        self.von_neumann_defense_bonus = 1.0  # damage multiplier against probe attacks
+        self.has_fusion_propulsion = False
+        self.can_send_heavy_probes = False
+
+        # --- victory tracking, events, statistics
+        self.fermi_evidence = {
+            "extinction_evidence": 0,       # Swan songs discovered
+            "dark_forest_evidence": 0,      # Hostile encounters
+            "cooperation_evidence": 0,      # Peaceful contacts
+            "great_filter_evidence": 0,     # Integration techs, philosophical crises
+        }
+        self.events: List[GameEvent] = []
+        self.stats: Dict[str, int] = {
+            "messages_sent": 0, "responses_received": 0, "attacks_scheduled": 0, "attacks_survived": 0,
+            "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 0,
+            "events_resolved": 0, "techs_researched": 0, "worlds_seeded": 0,
+        }
+        self.achievements: List[str] = []
+
+        if generate:
+            self._start_new_game()
+
+    def _start_new_game(self) -> None:
+        """Roll the initial neighbourhood, the first director and pre-1977 knowledge."""
+        self.star_systems = self.generate_star_systems(5)
+        logging.debug("")
+        logging.debug("=" * 60)
+        logging.debug("GALAXY OVERVIEW - Hidden Civilization Details")
+        logging.debug("=" * 60)
+        for system in self.star_systems.values():
+            self._log_system_profile(system)
+            self._register_swan_song(system)
+        logging.debug("=" * 60)
+
+        self.current_director = self.generate_director()
+        self.directors.append(self.current_director)
+
+        for tech_id in self.LEGACY_TECHS:
+            tech = self.technologies.get(tech_id)
+            if tech:
                 tech.researched = True
                 tech.is_legacy = True
                 logging.info(f"Legacy Knowledge: {tech.name} (pre-1977)")
-        
-        # Passive Signal Leakage System
-        self.leakage_system = PassiveLeakageSystem()
-        self.broadcast_radius = 0  # Will be calculated each generation
-        self.leakage_multiplier = 1.0  # 1.0 = full leakage, 0.0 = complete silence
-        
-        # Probe Technology Flags
-        self.has_solar_sails = False
-        self.has_laser_sails = False
-        self.message_delivery_speed = 1.0  # Speed of light (default)
-        self.von_neumann_defense_bonus = 1.0  # 1.0 = no bonus
-        self.has_fusion_propulsion = False
-        self.can_send_heavy_probes = False
-        
-        # === PHASE 3A.1: Integration Progress System ===
-        self.integration = IntegrationProgress()
-        logging.info("Phase 3A.1: Integration Progress System initialized")
-        
-        # === PHASE 3A.2: Philosophical Events System ===
-        self.philosophical_events = PhilosophicalEvents()
-        self.pending_philosophical_event = None  # Stores event waiting for player choice
-        logging.info("Phase 3A.2: Philosophical Events System initialized")
-        
-        # === PHASE 3A.3: Philosophical Victory Tracking ===
-        self.fermi_evidence = {
-            "extinction_evidence": 0,       # Swan songs discovered
-            "dark_forest_evidence": 0,      # Hostile encounters (LA/LBA attacks)
-            "cooperation_evidence": 0,      # Successful peaceful contacts (LB/LR)
-            "great_filter_evidence": 0      # Integration techs researched
-        }
-        self.philosophical_victory = False  # Separate from contact victory
-        logging.info("Phase 3A.3: Philosophical Victory tracking initialized")
 
-        # === PHASE 3B: Genesis Project ===
-        self.genesis = GenesisProject()
-        self.message_queue = [] # Queue for Genesis events and other async messages
-        logging.info("Phase 3B: Genesis Project initialized")
+        self.calculate_ap()
+
+    # ------------------------------------------------------------------ persistence
+    _SCALAR_STATE = (
+        "generation", "start_year", "funding", "research_points", "message_quality", "public_support",
+        "knowledge_base", "game_over", "game_over_reason", "victory", "philosophical_victory",
+        "self_destruct_risk", "ecological_risk", "action_points", "max_action_points", "ap_modifier",
+        "advisor_consulted_this_gen", "broadcast_radius", "leakage_multiplier",
+    )
+    _FLAG_STATE = (
+        "passive_defense_bonus", "warning_time_bonus", "has_backup_colonies", "cloaking_active",
+        "ai_advisor_unlocked", "can_contact_post_biological", "ultimate_survival", "has_solar_sails",
+        "has_laser_sails", "message_delivery_speed", "von_neumann_defense_bonus", "has_fusion_propulsion",
+        "can_send_heavy_probes",
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Complete game state (including hidden information) as JSON-compatible data."""
+        event = self.pending_philosophical_event
+        return {
+            "seed": self.seed,
+            "state": {name: getattr(self, name) for name in self._SCALAR_STATE},
+            "flags": {name: getattr(self, name) for name in self._FLAG_STATE},
+            "undiscovered": list(self.undiscovered),
+            "star_systems": [system.to_dict() for system in self.star_systems.values()],
+            "directors": [director.to_dict() for director in self.directors],
+            "technologies": {
+                tech_id: {"researched": tech.researched, "is_legacy": tech.is_legacy, "chosen_doctrine": tech.chosen_doctrine}
+                for tech_id, tech in self.technologies.items() if tech.researched or tech.chosen_doctrine
+            },
+            "active_doctrines": list(self.active_doctrines),
+            "pending_attack_warnings": [warning.to_dict() for warning in self.pending_attack_warnings],
+            "wow_signal": self.wow_signal.to_dict(),
+            "swan_songs": self.swan_song_manager.to_dict(),
+            "integration": self.integration.to_dict(),
+            "philosophical_events": self.philosophical_events.to_dict(),
+            "pending_philosophical_event": event.id if event else None,
+            "fermi_evidence": dict(self.fermi_evidence),
+            "genesis": self.genesis.to_dict(),
+            "stats": dict(self.stats),
+            "achievements": list(self.achievements),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], offline: Optional[bool] = None) -> "ContactProgram":
+        """Rebuild a program from to_dict() output. Unknown keys are ignored, missing ones get defaults."""
+        program = cls(seed=None, offline=bool(offline) if offline is not None else False, generate=False)
+        program.seed = data.get("seed")
+
+        for name, value in data.get("state", {}).items():
+            if name in cls._SCALAR_STATE:
+                setattr(program, name, value)
+        for name, value in data.get("flags", {}).items():
+            if name in cls._FLAG_STATE:
+                setattr(program, name, value)
+
+        program.star_systems = {}
+        for entry in data.get("star_systems", []):
+            system = StarSystem.from_dict(entry)
+            program.star_systems[system.name] = system
+        program.undiscovered = [name for name in data.get("undiscovered", []) if name not in program.star_systems]
+
+        program.directors = [Director.from_dict(entry) for entry in data.get("directors", [])]
+        if not program.directors:
+            program.directors.append(program.generate_director())
+        program.current_director = program.directors[-1]
+
+        for tech_id, tech_state in data.get("technologies", {}).items():
+            tech = program.technologies.get(tech_id)
+            if tech is None:
+                continue  # technology removed in a later version
+            tech.researched = bool(tech_state.get("researched", False))
+            tech.is_legacy = bool(tech_state.get("is_legacy", False))
+            tech.chosen_doctrine = tech_state.get("chosen_doctrine")
+        program.active_doctrines = list(data.get("active_doctrines", []))
+
+        program.pending_attack_warnings = []
+        for entry in data.get("pending_attack_warnings", []):
+            warning = AttackWarning.from_dict(entry, program.star_systems)
+            if warning is not None:
+                program.pending_attack_warnings.append(warning)
+
+        program.wow_signal = WOWSignalEvent.from_dict(data.get("wow_signal", {}), program)
+        program.swan_song_manager = SwanSongManager.from_dict(data.get("swan_songs", {}), program.ai, program.content)
+        for system in program.star_systems.values():
+            program._register_swan_song(system)
+        program.integration = IntegrationProgress.from_dict(data.get("integration", {}))
+        program.philosophical_events = PhilosophicalEvents.from_dict(data.get("philosophical_events", {}))
+        pending_id = data.get("pending_philosophical_event")
+        program.pending_philosophical_event = program.philosophical_events.events.get(pending_id) if pending_id else None
+        program.fermi_evidence.update({k: v for k, v in data.get("fermi_evidence", {}).items() if k in program.fermi_evidence})
+        program.genesis = GenesisProject.from_dict(data.get("genesis", {}))
+        program.stats.update({k: v for k, v in data.get("stats", {}).items() if k in program.stats})
+        program.achievements = list(data.get("achievements", []))
+        return program
+
         
     def load_tech_tree(self) -> Dict[str, Technology]:
         """Load technologies from JSON"""
@@ -429,27 +555,35 @@ class ContactProgram:
                 data = json.load(f)
                 return {t["id"]: Technology(t) for t in data["technologies"]}
         except Exception as e:
-            print(f"Error loading tech tree: {e}")
+            logging.error(f"Error loading tech tree: {e}")
             return {}
 
-    def generate_star_systems(self, count: int) -> Dict[str, StarSystem]:
-        """Generate star systems within detection range"""
+    def generate_star_systems(self, count: int = 5) -> Dict[str, StarSystem]:
+        """The systems known at game start: a random handful of the nearest catalogued stars."""
+        catalog = self.catalog
+        if not catalog:  # no data file: synthetic neighbourhood
+            catalog = [{"name": f"Star {i + 1}", "distance": round(random.uniform(4.0, 20.0), 1)} for i in range(8)]
+            catalog.sort(key=lambda s: s["distance"])
+            self.catalog = catalog
+        nearest = catalog[:max(count, 8)]
+        chosen = random.sample(nearest, min(count, len(nearest)))
+        chosen.sort(key=lambda s: s["distance"])
         systems = {}
-        star_names = [
-            "Proxima Centauri", "Tau Ceti", "Epsilon Eridani", "Ross 128",
-            "Luyten's Star", "Teegarden's Star", "Wolf 359", "Lalande 21185",
-            "Sirius", "Procyon", "Altair", "Vega", "Fomalhaut", "Deneb",
-            "Pollux", "Castor", "Capella", "Achernar", "Hadar", "Rigel"
-        ]
-        
-        selected_names = random.sample(star_names, count)
-        
-        for name in selected_names:
-            # Distance between 4 and 50 light years
-            distance = random.uniform(4.0, 50.0)
-            systems[name] = StarSystem(name, distance)
-            
+        for entry in chosen:
+            systems[entry["name"]] = self._make_system(entry)
+        self.undiscovered = [s["name"] for s in catalog if s["name"] not in systems]
         return systems
+
+    @staticmethod
+    def _make_system(entry: Dict[str, Any]) -> StarSystem:
+        return StarSystem(entry["name"], float(entry["distance"]), entry.get("spectral_type"),
+                          entry.get("ra"), entry.get("dec"))
+
+    def _catalog_entry(self, name: str) -> Optional[Dict[str, Any]]:
+        for entry in self.catalog:
+            if entry["name"] == name:
+                return entry
+        return None
     
     def generate_director(self) -> Director:
         """Generate a new program director"""
@@ -463,6 +597,122 @@ class ContactProgram:
         director.generation = self.generation
         return director
     
+    def _log_system_profile(self, system) -> None:
+        """Write the hidden profile of one star system to the debug log."""
+        name = system.name
+        if not system.has_civilization:
+            logging.debug(f"  {name} ({system.distance:.1f} LY) - No civilization")
+            logging.debug("")
+            return
+        if system.is_extinct:
+            logging.debug(f"  {name} ({system.distance:.1f} LY) - EXTINCT")
+            logging.debug(f"    Age: {int(system.civilization_age)} years")
+            logging.debug(f"    Died: {system.extinct_years_ago} years ago")
+            logging.debug(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
+            logging.debug(f"    Type: {system.civilization_type}")
+        else:
+            strategy_desc = {
+                "L": "Listen Only - Will NEVER respond",
+                "LB": "Listen & Broadcast - Enthusiastic, friendly METI",
+                "LR": "Listen & Reply - Cautious, only responds when contacted",
+                "LA": "Listen & Annihilate - HOSTILE, attacks silently",
+                "LBA": "Listen, Broadcast & Annihilate - TRAP! Friendly bait then attack",
+            }
+            logging.debug(f"  {name} ({system.distance:.1f} LY) - ACTIVE")
+            logging.debug(f"    Age: {int(system.civilization_age)} years")
+            logging.debug(f"    Stage: {system.civilization_stage.name}")
+            logging.debug(f"    Strategy: {system.true_strategy}")
+            logging.debug(f"    Deception: {system.deception_level:.2f}")
+            logging.debug(f"    Type: {system.civilization_type}")
+            logging.debug(f"    >>> {strategy_desc.get(system.true_strategy, '?')}")
+        logging.debug("")
+
+    def _register_swan_song(self, system) -> None:
+        """Give an extinct civilization its swan song record (text comes later, on discovery)."""
+        if (system.has_civilization and system.is_extinct and system.has_swan_song
+                and not self.swan_song_manager.has_swan_song(system.name)):
+            self.swan_song_manager.create_swan_song(
+                system.name, system.extinct_years_ago, system.civilization_age, system.civilization_type
+            )
+            logging.info(f"Swan Song created for {system.name}")
+
+    # ------------------------------------------------------------------ events, evidence, achievements
+    FERMI_LABELS = {
+        "extinction_evidence": "Extinction",
+        "dark_forest_evidence": "Dark Forest",
+        "cooperation_evidence": "Cooperation",
+        "great_filter_evidence": "Great Filter",
+    }
+
+    def emit(self, event_kind: str, event_text: str, **data) -> GameEvent:
+        """Record something the player should see. The UI drains events with drain_events()."""
+        event = GameEvent(kind=event_kind, text=event_text, data=data, generation=self.generation)
+        self.events.append(event)
+        if len(self.events) > 500:
+            del self.events[:-500]
+        return event
+
+    def drain_events(self) -> List[GameEvent]:
+        events, self.events = self.events, []
+        return events
+
+    def add_fermi_evidence(self, kind: str, amount: int, reason: str, announce: bool = True) -> None:
+        """Single entry point for Fermi Paradox evidence (the philosophical victory resource)."""
+        self.fermi_evidence[kind] = self.fermi_evidence.get(kind, 0) + amount
+        total = sum(self.fermi_evidence.values())
+        label = self.FERMI_LABELS.get(kind, kind)
+        logging.info(f"FERMI EVIDENCE: +{amount} {label} ({reason}) -> {total}/15")
+        if announce:
+            self.emit("fermi_evidence", f"🔭 Fermi evidence +{amount} ({label}): {reason}. Total {total}/15.",
+                      kind=kind, amount=amount, total=total, reason=reason)
+
+    def unlock_achievement(self, name: str) -> None:
+        if name in self.achievements:
+            return
+        self.achievements.append(name)
+        logging.info(f"ACHIEVEMENT UNLOCKED: {name}")
+        self.emit("achievement", f"🏆 Achievement unlocked: {name}", name=name)
+
+    def _end_game(self, reason: str, text: str) -> None:
+        self.game_over = True
+        self.game_over_reason = reason
+        logging.critical(f"GAME OVER: {reason}")
+        self.emit("game_over", text, reason=reason)
+
+    def _researched(self, tech_id: str) -> bool:
+        tech = self.technologies.get(tech_id)
+        return bool(tech and tech.researched)
+
+    def contacted_systems(self) -> List[StarSystem]:
+        """Living civilizations that have answered at least one message."""
+        return [s for s in self.star_systems.values()
+                if s.has_civilization and not s.is_extinct and len(s.received_messages) > 0]
+
+    def tech_lock_reason(self, tech) -> Optional[str]:
+        """Why an otherwise available technology cannot be researched right now (None if it can)."""
+        if tech.tier >= 5 and not self.integration.can_research_tier5():
+            return f"requires 40% integration progress (currently {self.integration.integration_level:.0%})"
+        return None
+
+    def _transmission_bonus(self) -> float:
+        """Extra response chance from high-power directed transmissions."""
+        return 0.10 if self.has_laser_sails else 0.0
+
+    FLEET_SPEED_C = 0.10  # hostile fleets travel at a tenth of light speed (no FTL in this universe)
+
+    def base_research_income(self) -> float:
+        """Research points per generation from funding alone."""
+        return 20 + self.funding / 5
+
+    def passive_research_income(self) -> float:
+        """Research points per generation before the integration efficiency modifier."""
+        return self.base_research_income() + sum(t.passive_rp for t in self.technologies.values() if t.researched)
+
+    def attack_arrival_generation(self, system) -> int:
+        """When a fleet launched in reply to our message reaches Earth: light-speed message out, slow fleet back."""
+        years = system.distance + system.distance / self.FLEET_SPEED_C
+        return self.generation + max(2, math.ceil(years / 25))
+
     def calculate_ap(self):
         """Calculate Action Points for the current generation"""
         base_ap = 2
@@ -479,8 +729,106 @@ class ContactProgram:
         if self.current_director.get_effective_skill("administration") > 0.7:
             base_ap += 1
             
+        base_ap = max(1, base_ap + self.ap_modifier)
         self.max_action_points = base_ap
         self.action_points = base_ap
+
+    @property
+    def tech_level(self) -> int:
+        """Humanity's technology level: 1 + the highest researched tier (1..6)."""
+        technologies = getattr(self, "technologies", None) or {}
+        max_tier = max((t.tier for t in technologies.values() if t.researched), default=0)
+        return 1 + max_tier
+
+    # ------------------------------------------------------------------ optional AI text
+    def ai_available(self) -> bool:
+        """True when an LLM can be used for flavour text."""
+        if self.offline:
+            return False
+        checker = getattr(self.ai, "is_available", None)
+        if callable(checker):
+            return bool(checker())
+        return self.ai.current_provider is not None
+
+    def _ai_text(self, prompt: str, system_prompt: str) -> Optional[str]:
+        """Ask the LLM for text; None when unavailable or when it returned an error/empty string."""
+        if not self.ai_available():
+            return None
+        try:
+            text = self.ai.generate_text(prompt, system_prompt)
+        except Exception as exc:  # noqa: BLE001 - flavour text must never break the game
+            logging.warning(f"AI generation failed: {exc}")
+            return None
+        if not text or text.startswith("AI Error"):
+            return None
+        return text.strip()
+
+    def compose_director_message(self) -> str:
+        """Earth's WOW! reply in the current director's voice (LLM if available, else a written one)."""
+        traits = ", ".join(self.current_director.traits)
+        prompt = ("Compose a short (max 2 sentences) first contact message from Earth to an unknown alien "
+                  f"civilization. The Director sending it has these traits: {traits}. "
+                  "The tone should reflect these traits.")
+        text = self._ai_text(prompt, "You are a sci-fi writer.")
+        if text:
+            return text
+        return self.content.director_message({
+            "director": self.current_director.name,
+            "traits": traits.lower() or "hopeful",
+            "year": self.start_year,
+        })
+
+    def compose_wow_response(self, wow_system, original_message: str) -> str:
+        """The WOW! source's reply after 3,600 years (AI if available, otherwise a written fallback)."""
+        context = (f"After 3,600 years, civilization from {wow_system.name} responds to 1977 WOW! Signal reply. "
+                   f"144 generations passed.\n\nEarth's original message was: \"{original_message}\"\n\n"
+                   "Reference this message in your response.")
+        prompt = ("You are an ancient alien civilization responding after 3,600 years. Your message crosses "
+                  "144 human generations. Acknowledge their original message. Be profound about time, patience, "
+                  "cosmic perspective, and the courage to reach out. Keep under 300 words.")
+        text = self._ai_text(context, prompt)
+        if text:
+            return text
+        excerpt = original_message[:100] + ("..." if len(original_message) > 100 else "")
+        return self.content.wow_friendly({"system": wow_system.name, "original_excerpt": excerpt})
+
+    _ALIEN_PROMPTS = {
+        "LB": ("You are enthusiastic aliens from {name}.\n{tech}\n\nBased on Earth's technological level shown above, "
+               "craft your response. Be optimistic, friendly, eager to share knowledge and culture. If they have "
+               "advanced tech, treat them as peers. If primitive, be encouraging."),
+        "LR": ("You are cautious aliens from {name}.\n{tech}\n\nBased on Earth's technological level shown above, "
+               "craft your response. Reply defensively, ask about intent, avoid sharing coordinates. If they have "
+               "advanced tech, show more respect. If primitive, be more dismissive."),
+        "LBA": ("You are predatory aliens from {name} pretending to be friendly.\n{tech}\n\nBased on Earth's "
+                "technological level shown above, craft your response. Extract Earth's location and defenses. Be "
+                "charming but subtly request tactical information. Advanced tech might make you more cautious, "
+                "primitive tech might make you dismissive."),
+    }
+
+    def _reply_context(self, system, message_content: str) -> Dict[str, Any]:
+        """Placeholders available to reply templates."""
+        excerpt = (message_content or "").strip().replace("\n", " ")
+        if len(excerpt) > 80:
+            excerpt = excerpt[:77] + "..."
+        stage = system.civilization_stage.name.replace("_", " ").title() if system.civilization_stage else "Unknown"
+        return {
+            "system": system.name,
+            "earth_excerpt": excerpt or "...",
+            "tech_tier": self.tech_level - 1,
+            "stage": stage,
+            "year": self.start_year + (self.generation - 1) * 25,
+            "distance": f"{system.distance:.1f}",
+            "director": self.current_director.name,
+        }
+
+    def _compose_alien_reply(self, system, strategy: str, message_content: str) -> str:
+        """Text of an alien reply: LLM when available, otherwise the written content bank."""
+        tech_context = self._build_tech_context()
+        system_prompt = self._ALIEN_PROMPTS[strategy].format(name=system.name, tech=tech_context)
+        text = self._ai_text(f"Human: {message_content}", system_prompt)
+        if text:
+            return text
+        return self.content.alien_reply(strategy, system.civilization_type, self._reply_context(system, message_content))
 
     def research_tech(self, tech_id: str) -> bool:
         """Attempt to research a technology"""
@@ -495,6 +843,11 @@ class ContactProgram:
         if self.generation < tech.min_generation:
             min_year = self.start_year + ((tech.min_generation - 1) * 25)
             self.message = f"Technology not yet available. Unlocks in Generation {tech.min_generation} (Year {min_year})."
+            return False
+
+        lock_reason = self.tech_lock_reason(tech)
+        if lock_reason:
+            self.message = f"{tech.name} is locked: {lock_reason}."
             return False
             
         # Director Science Skill: Reduces research cost
@@ -535,7 +888,8 @@ class ContactProgram:
         # Research complete
         self.research_points -= final_cost
         tech.researched = True
-        self.message = f"Researched {tech.name}!{discount_msg}\\nDirector Efficiency Saved {tech.cost - effective_cost} RP."
+        self.stats["techs_researched"] += 1
+        self.message = f"Researched {tech.name}!{discount_msg}\nDirector Efficiency Saved {tech.cost - effective_cost} RP."
         logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
         
         # Apply special effects
@@ -553,159 +907,221 @@ class ContactProgram:
         if tech.special == "passive_defense_40":
             self.passive_defense_bonus = 0.6
             logging.info(f"PASSIVE DEFENSE ACTIVATED: {tech.name} - 40% damage reduction")
-            self.message += f"\\n🛡️ Passive Defense Online: All future attacks reduced by 40%"
+            self.message += f"\n🛡️ Passive Defense Online: All future attacks reduced by 40%"
             
         elif tech.special == "warning_time_bonus_2":
             self.warning_time_bonus = 2
             logging.info(f"EARLY WARNING ACTIVATED: {tech.name} - +2 generations warning time")
-            self.message += f"\\n⚠️ Early Warning Active: +2 generations to prepare for attacks"
+            self.message += f"\n⚠️ Early Warning Active: +2 generations to prepare for attacks"
             
         elif tech.special == "prevents_annihilation":
             self.has_backup_colonies = True
             logging.info(f"BACKUP COLONIES ESTABLISHED: {tech.name}")
-            self.message += f"\\n🌍 Backup Colonies Online: Humanity no longer depends on Earth alone"
+            self.message += f"\n🌍 Backup Colonies Online: Humanity no longer depends on Earth alone"
             
         elif tech.special == "reduces_leakage":
             self.cloaking_active = True
             logging.info(f"CLOAKING ACTIVATED: {tech.name}")
-            self.message += f"\\n🔇 Cloaking Active: Earth's electromagnetic signature reduced"
+            self.message += f"\n🔇 Cloaking Active: Earth's electromagnetic signature reduced"
             
         elif tech.special == "unlocks_ai_advisor":
             self.ai_advisor_unlocked = True
             logging.info(f"AI ADVISOR UNLOCKED: {tech.name}")
-            self.message += f"\\n🤖 AI Strategic Advisor unlocked!"
+            self.message += f"\n🤖 AI Strategic Advisor unlocked!"
             
         elif tech.special == "unlock_post_bio_contact":
             self.can_contact_post_biological = True
             logging.info(f"POST-BIOLOGICAL CONTACT: {tech.name}")
-            self.message += f"\\n✨ Post-Biological Contact enabled!"
+            self.message += f"\n✨ Post-Biological Contact enabled!"
             
         elif tech.special == "ultimate_survival":
             self.ultimate_survival = True
             logging.info(f"ULTIMATE SURVIVAL: {tech.name}")
-            self.message += f"\\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
+            self.message += f"\n🚀 Emergency Evacuation: Humanity WILL survive any attack"
             
         elif tech.special == "reduces_ecological_risk":
             self.ecological_risk = max(0.0, self.ecological_risk - 0.10)
             logging.info(f"ECOLOGICAL REMEDIATION: {tech.name} - Risk reduced by 10%")
-            self.message += f"\\n🌱 Planetary Remediation: Ecological Risk reduced by 10%"
+            self.message += f"\n🌱 Planetary Remediation: Ecological Risk reduced by 10%"
         
         elif tech.special == "passive_eco_scrubbing":
             logging.info(f"ECO TECHNOLOGY: {tech.name} - Passive scrubbing enabled")
-            self.message += f"\\n🍃 Atmospheric Scrubbing: Passive ecological repair initiated"
+            self.message += f"\n🍃 Atmospheric Scrubbing: Passive ecological repair initiated"
             
         elif tech.special == "unlocks_nano_ecology":
             logging.info(f"ECO TECHNOLOGY: {tech.name} - Nano-swarm ready")
-            self.message += f"\\n🌫️ Nano-Ecological Swarm: Active ecological purge capability unlocked"
+            self.message += f"\n🌫️ Nano-Ecological Swarm: Active ecological purge capability unlocked"
         
         # === PASSIVE LEAKAGE MITIGATION TECHS ===
         elif tech.special == "reduces_leakage_30":
             self.leakage_multiplier *= 0.7
             logging.info(f"LEAKAGE REDUCTION: {tech.name} - 30%")
-            self.message += f"\\n📡 Directional Transmission: Broadcast leakage reduced by 30%"
+            self.message += f"\n📡 Directional Transmission: Broadcast leakage reduced by 30%"
         
         elif tech.special == "reduces_leakage_50":
             self.leakage_multiplier *= 0.5
             logging.info(f"LEAKAGE REDUCTION: {tech.name} - 50%")
-            self.message += f"\\n🔇 Radio Silence Protocol: Broadcast leakage reduced by 50%"
+            self.message += f"\n🔇 Radio Silence Protocol: Broadcast leakage reduced by 50%"
         
         elif tech.special == "reduces_leakage_80":
             self.leakage_multiplier *= 0.2
             self.cloaking_active = True
             logging.info(f"LEAKAGE REDUCTION: {tech.name} - 80%")
-            self.message += f"\\n👻 Civilization Cloaking: Broadcast leakage reduced by 80%"
+            self.message += f"\n👻 Civilization Cloaking: Broadcast leakage reduced by 80%"
         
         elif tech.special == "dark_forest_protocol":
             self.leakage_multiplier = 0.0
             self.public_support -= 50
             logging.info(f"DARK FOREST PROTOCOL ACTIVATED: {tech.name}")
-            self.message += f"\\n🌑 Dark Forest Protocol: Complete electromagnetic silence (-50% public support)"
+            self.message += f"\n🌑 Dark Forest Protocol: Complete electromagnetic silence (-50% public support)"
         
         # === PROPULSION TECHNOLOGY UNLOCKS ===
         elif tech.special == "unlocks_solar_sails":
             self.has_solar_sails = True
             logging.info(f"PROPULSION UNLOCKED: {tech.name}")
-            self.message += f"\\n☀️ Solar Sails: Foundation for advanced propulsion"
+            self.message += f"\n☀️ Solar Sails: Foundation for advanced propulsion"
         
         elif tech.special == "unlocks_laser_sails":
             self.has_laser_sails = True
             self.message_delivery_speed = 0.175
             logging.info(f"PROPULSION UNLOCKED: {tech.name} - 0.175c")
-            self.message += f"\\n🚀 Laser Sails: Message delivery time reduced by 83%"
+            self.message += f"\n🚀 Laser Sails: high-power directed transmissions, +10% response chance"
         
         elif tech.special == "unlocks_von_neumann_defense":
             self.von_neumann_defense_bonus = 0.7
             logging.info(f"DEFENSE UNLOCKED: {tech.name}")
-            self.message += f"\\n🛡️ Von Neumann Defense: +30% defense against probe attacks"
+            self.message += f"\n🛡️ Von Neumann Defense: +30% defense against probe attacks"
         
         elif tech.special == "unlocks_fusion_propulsion":
             self.has_fusion_propulsion = True
             self.can_send_heavy_probes = True
             logging.info(f"PROPULSION UNLOCKED: {tech.name}")
-            self.message += f"\\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
+            self.message += f"\n⚛️ Fusion Propulsion: Heavy payload delivery capability"
         
+        elif tech.special == "unlocks_genesis":
+            self.genesis.unlocked = True
+            logging.info(f"GENESIS PROJECT UNLOCKED: {tech.name}")
+            self.message += f"\n🌱 Genesis Project unlocked: sterile worlds can now be seeded with Earth life"
+
         # === INTEGRATION PROGRESS ===
         elif tech.special == "integration_30":
             self.integration.add_integration(0.3, tech.name)
-            self.message += f"\\n🧬 {tech.name}: +30% integration progress"
-            self.fermi_evidence["great_filter_evidence"] += 2
+            self.message += f"\n🧬 {tech.name}: +30% integration progress (+2 Fermi evidence)"
+            self.add_fermi_evidence("great_filter_evidence", 2, f"{tech.name} advances the biological-technological transition", announce=False)
         
         elif tech.special == "integration_40":
             self.integration.add_integration(0.4, tech.name)
-            self.message += f"\\n🧠 {tech.name}: +40% integration progress"
-            self.fermi_evidence["great_filter_evidence"] += 2
+            self.message += f"\n🧠 {tech.name}: +40% integration progress (+2 Fermi evidence)"
+            self.add_fermi_evidence("great_filter_evidence", 2, f"{tech.name} advances the biological-technological transition", announce=False)
         
         elif tech.special == "integration_60":
             self.integration.add_integration(0.6, tech.name)
-            self.message += f"\\n💾 {tech.name}: +60% integration progress"
-            self.fermi_evidence["great_filter_evidence"] += 2
+            self.message += f"\n💾 {tech.name}: +60% integration progress (+2 Fermi evidence)"
+            self.add_fermi_evidence("great_filter_evidence", 2, f"{tech.name} advances the biological-technological transition", announce=False)
             
+        elif tech.special == "integration_variable":
+            # The integration amount is decided by the doctrine choice that follows
+            logging.info(f"INTEGRATION (variable): {tech.name} - resolved by doctrine choice")
+
         elif tech.special == "hybrid_civilization_complete":
             self.self_destruct_risk = 0.001
             self.integration.add_integration(0.1, tech.name)
             logging.info(f"HYBRID CIVILIZATION ACHIEVED")
-            self.message += f"\\n✨ HYBRID CIVILIZATION COMPLETE ✨\\nSelf-destruct risk minimized."
+            self.message += f"\n✨ HYBRID CIVILIZATION COMPLETE ✨\nSelf-destruct risk minimized."
             
         if hasattr(self, 'integration'):
             self.message += self.integration.get_display_message(self.generation)
 
+    def choose_doctrine(self, tech_id: str, option_index: int) -> None:
+        """Apply the effects of a doctrine choice attached to a researched technology."""
+        tech = self.technologies.get(tech_id)
+        if tech is None or not tech.doctrine_choice:
+            self.message = "No doctrine choice available for that technology."
+            return
+        options = tech.doctrine_choice["options"]
+        if not 0 <= option_index < len(options):
+            option_index = 0
+        option = options[option_index]
+        tech.chosen_doctrine = option["name"]
+        effects = option.get("effects", {})
+        details = []
+
+        if "integration" in effects:
+            self.integration.add_integration(effects["integration"], f"{tech.name}: {option['name']}")
+            self.add_fermi_evidence("great_filter_evidence", 2, f"{tech.name} advances the biological-technological transition", announce=False)
+            details.append(f"+{int(effects['integration'] * 100)}% integration, +2 Fermi evidence (Great Filter)")
+        if "public_support" in effects:
+            self.public_support = max(0, min(100, self.public_support + effects["public_support"]))
+            details.append(f"{effects['public_support']:+.0f}% public support")
+        for key in ("self_destruct_modifier", "self_destruct_risk"):
+            if key in effects:
+                self.self_destruct_risk = max(0.0, self.self_destruct_risk + effects[key])
+                details.append(f"{effects[key] * 100:+.1f}% self-destruct risk")
+        if "funding" in effects:
+            self.funding = max(0, min(100, self.funding + effects["funding"]))
+            details.append(f"{effects['funding']:+.0f}% funding")
+
+        self.active_doctrines.append(option["name"])
+        summary = f"Doctrine adopted: {option['name']}"
+        if details:
+            summary += " (" + "; ".join(details) + ")"
+        self.message = (self.message + "\n\n" if self.message else "") + summary
+        logging.info(f"Doctrine Adopted: {option['name']} for {tech.name}")
+
+    def _schedule_attack(self, system, arrival_gen: int, attack_type: str = "fleet",
+                         note: str = "", announce: bool = True) -> AttackWarning:
+        """Register an incoming attack. The Early Warning Network adds preparation time."""
+        bonus = self.warning_time_bonus if arrival_gen > self.generation else 0
+        arrival = arrival_gen + bonus
+        warning = AttackWarning(system, arrival, self.generation, attack_type=attack_type)
+        self.pending_attack_warnings.append(warning)
+        system.has_detected_earth = True
+        self.stats["attacks_scheduled"] += 1
+        self.add_fermi_evidence("dark_forest_evidence", 1, f"hostile launch from {system.name}", announce=announce)
+        eta = warning.get_etas_remaining(self.generation)
+        year = self.start_year + (arrival - 1) * 25
+        logging.critical(f"HOSTILE LAUNCH: {system.name} ({attack_type}) - arrival Gen {arrival} ({eta} gens to prepare)")
+        if announce:
+            self.emit("attack_warning",
+                      f"⚠️ HOSTILE LAUNCH DETECTED: {warning.type_label} from {system.name}.\n"
+                      f"ETA: Generation {arrival} (Year {year}) - {eta} generation(s) to prepare.{note}\n"
+                      "Use Defensive Actions to prepare.",
+                      system=system.name, arrival_gen=arrival, eta=eta, attack_type=attack_type)
+        return warning
+
     def process_information_attack(self, system_name: str):
-        """Process an information warfare attack"""
-        attack_types = ["corrupted_technology", "societal_manipulation", "false_hope_signal", "philosophical_weapon"]
-        attack_type = random.choice(attack_types)
-        
+        """An information-warfare attack (instant, delivered by signal)."""
+        attack_type = random.choice(["corrupted_technology", "societal_manipulation", "false_hope_signal", "philosophical_weapon"])
+        self.stats["info_attacks"] += 1
+
         if attack_type == "corrupted_technology":
             rp_loss = random.randint(100, 300)
             self.research_points = max(0, self.research_points - rp_loss)
-            self.message = f"⚠️ INFO ATTACK ({system_name}): Corrupted Tech Data (-{rp_loss} RP)"
-            logging.critical(f"Info Attack {system_name}: -{rp_loss} RP")
-            
+            detail = f"Corrupted technical data spread through our research networks (-{rp_loss} RP)."
         elif attack_type == "societal_manipulation":
             support_loss = random.randint(15, 30)
             self.public_support -= support_loss
-            self.message = f"⚠️ INFO ATTACK ({system_name}): Societal Manipulation (-{support_loss}% Support)"
-            logging.critical(f"Info Attack {system_name}: -{support_loss} Support")
-            
+            detail = f"Engineered memes fracture public opinion (-{support_loss}% support)."
         elif attack_type == "false_hope_signal":
             funding_loss = random.randint(10, 25)
             support_loss = random.randint(5, 15)
             self.funding -= funding_loss
             self.public_support -= support_loss
-            self.message = f"⚠️ INFO ATTACK ({system_name}): False Hope (-{funding_loss}% Funding, -{support_loss}% Support)"
-            logging.critical(f"Info Attack {system_name}: False Hope")
-            
-        elif attack_type == "philosophical_weapon":
-            risk_increase = 0.01
-            self.self_destruct_risk += risk_increase
-            self.public_support -= random.randint(10, 20)
-            self.message = f"⚠️ INFO ATTACK ({system_name}): Philosophical Weapon (+1% Self-Destruct Risk)"
-            logging.critical(f"Info Attack {system_name}: Philo Weapon")
-        
-        self.fermi_evidence["dark_forest_evidence"] += 1
-        
+            detail = f"A false promise of salvation collapses when exposed (-{funding_loss}% funding, -{support_loss}% support)."
+        else:
+            self.self_destruct_risk += 0.01
+            support_loss = random.randint(10, 20)
+            self.public_support -= support_loss
+            detail = f"A philosophical weapon seeds despair in our institutions (+1% self-destruct risk, -{support_loss}% support)."
+
+        logging.critical(f"Info Attack {system_name}: {attack_type}")
+        self.emit("info_attack", f"⚠️ INFORMATION ATTACK FROM {system_name.upper()} ⚠️\n{detail}",
+                  system=system_name, attack_type=attack_type)
+        self.add_fermi_evidence("dark_forest_evidence", 1, f"information warfare from {system_name}")
+
         if self.public_support < 10 or self.funding < 20:
-            self.game_over = True
-            self.message += "\\nPROGRAM TERMINATED via Info War."
+            self._end_game(f"The program was terminated after information warfare from {system_name}.",
+                           "PROGRAM TERMINATED: information warfare destroyed public trust in the contact program.")
 
     def handle_philosophical_event_choice(self, choice_index: int) -> bool:
         """
@@ -722,6 +1138,8 @@ class ContactProgram:
 
         event = self.pending_philosophical_event
         result_message = self.philosophical_events.apply_choice_effects(event, choice_index, self)
+        self.stats["events_resolved"] += 1
+        self.add_fermi_evidence("great_filter_evidence", 1, f"humanity confronted {event.name}", announce=False)
 
         # Build response message
         self.message = f"""============================================================
@@ -732,6 +1150,7 @@ CHOICE: {event.chosen_option}
 
 {result_message}
 
++1 Fermi evidence (Great Filter): humanity confronted this crisis.
 ============================================================
 """
         logging.info(f"PHILOSOPHICAL EVENT RESOLVED: {event.name} -> {event.chosen_option}")
@@ -766,407 +1185,312 @@ YOUR CHOICE:
 {choices_text}============================================================
 """
 
+    # ------------------------------------------------------------------ generation processing
     def advance_generation(self):
-        """Advance to the next generation"""
+        """End the current generation: decay, risks, arrivals, attacks, income, victory checks."""
         self.generation += 1
-        logging.info(f"--- Advanced to Generation {self.generation} ---")
-        
-        # Knowledge Decay
-        self.knowledge_bank.degrade()
-        
-        # Support Decay
+        year = self.start_year + (self.generation - 1) * 25
+        logging.info(f"--- Advanced to Generation {self.generation} (Year {year}) ---")
+        self.emit("generation_start", f"── Generation {self.generation} begins (Year {year}) ──", year=year)
+
+        # Support decay
         decay_amount = 0.5
-        if "global_education" in self.technologies and self.technologies["global_education"].researched:
+        if self._researched("global_education"):
             decay_amount -= 0.2
-        
-        # Director Trait: Patient
         if "Patient" in self.current_director.traits:
             decay_amount -= 0.5
             logging.info("Director Trait (Patient): Reduced support decay")
-            
         self.public_support -= max(0, decay_amount)
 
-        # Integration Penalty
-        integration_support_penalty = self.integration.get_support_penalty()
+        # Integration penalty (only after the Gen 1-30 grace period)
+        integration_support_penalty = self.integration.get_support_penalty(self.generation)
         if integration_support_penalty < 0:
             self.public_support += integration_support_penalty
-        
-        # Risks
-        self.self_destruct_risk += 0.001
-        
-        eco_growth = 0.005
-        if "planetary_remediation" in self.technologies and self.technologies["planetary_remediation"].researched:
-            eco_growth = 0.002
-        
-        # Tech: Atmospheric Scrubbing
-        if "atmospheric_scrubbing" in self.technologies and self.technologies["atmospheric_scrubbing"].researched:
+            self.emit("crisis", f"🧬 Integration crisis: public support {integration_support_penalty:+.0f}% "
+                                "(our biology and our technology are pulling apart).")
+
+        # Risks: the biology-technology mismatch keeps growing until the two are integrated
+        self.self_destruct_risk = self._next_self_destruct_risk()
+        eco_growth = 0.0015 if self._researched("planetary_remediation") else 0.004
+        if self._researched("atmospheric_scrubbing"):
             self.ecological_risk = max(0.0, self.ecological_risk - 0.001)
-            
-        self.ecological_risk += eco_growth
-        
-        # Director Trait: Traditional
+        self.ecological_risk = min(self.ECO_RISK_CAP, self.ecological_risk + eco_growth)
+
         if "Traditional" in self.current_director.traits and self.public_support < 50:
-             self.public_support += 1.0
-        
-        # Director Trait: Intuitive
+            self.public_support += 1.0
         if "Intuitive" in self.current_director.traits and random.random() < 0.05:
             self.research_points += 50
-            self.message = f"💡 Director Intuition: +50 RP!"
+            self.emit("bonus", "💡 The director's intuition pays off: +50 RP.")
 
-        # Risk Checks
-        filter_modifier = self.integration.get_filter_risk_modifier()
-        adjusted_self_destruct = self.self_destruct_risk * filter_modifier
-        if self.generation <= 30: adjusted_self_destruct = 0.0
-        
+        filter_modifier = self.integration.get_filter_risk_modifier(self.generation)
+        adjusted_self_destruct = self.self_destruct_risk * filter_modifier if self.generation > 30 else 0.0
         if random.random() < adjusted_self_destruct:
-            self.game_over = True
-            self.message = "GAME OVER: Self-Destruction."
+            self._end_game("Humanity destroyed itself; the contact program died with its civilization.",
+                           "💀 GAME OVER: SELF-DESTRUCTION 💀\n\n"
+                           "The instincts that built the program outran the wisdom needed to survive it.\n"
+                           "Somewhere, a listener notes that another young voice has gone quiet.")
             return
-            
+
         if self.generation > 30 and random.random() < self.ecological_risk:
             self.public_support -= 15
-            self.message = "EVENT: Ecological Collapse."
-        
-        if self.generation > 30 and random.random() < self.accident_risk:
-            self.public_support -= 20
-            self.message = "EVENT: Major Accident."
+            self.emit("crisis", "🌍 EVENT: Ecological collapse. Public support -15%.")
 
-        # Passive RP
-        passive_rp = 0
-        if "signal_processing_basic" in self.technologies and self.technologies["signal_processing_basic"].researched: passive_rp += 3
-        if "seti_at_home" in self.technologies and self.technologies["seti_at_home"].researched: passive_rp += 15
-        if "ai_pattern_recognition" in self.technologies and self.technologies["ai_pattern_recognition"].researched: passive_rp += 20
-        # Director vision handled in knowledge gain usually, or here?
-        # Visionary trait added to knowledge gain logic in legacy_of_stars_v3.py (Step 647)
-        
-        if passive_rp > 0:
-            self.research_points += passive_rp
-            
-        # Process pending messages
-        for system in self.star_systems.values():
-            responses_to_remove = []
-            
-            for response in system.pending_responses:
-                message, arrival_generation = response
-                if arrival_generation <= self.generation:
-                    system.received_messages.append(message)
-                    
-                    # Knowledge gain
-                    k_gain = 10 * self.tech_level
-                    
-                    # Director Trait: Visionary
-                    if "Visionary" in self.current_director.traits:
-                        k_gain = int(k_gain * 1.1)
-                        
-                    system.knowledge = min(100, system.knowledge + k_gain)
-                    self.knowledge_base = min(100, self.knowledge_base + 5)
-                    self.public_support = min(100, self.public_support + 5)
-                    responses_to_remove.append(response)
-            
-            for response in responses_to_remove:
-                system.pending_responses.remove(response)
-        
-        # === PASSIVE SIGNAL LEAKAGE
-        # Calculate Earth's current broadcast radius
-        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies)
-        
-        # Apply leakage multiplier from mitigation technologies
-        # (multiplier is already tracked in self.leakage_multiplier, updated when techs are researched)
-        
-        # Find all LA/LBA civilizations within broadcast radius
-        for system_name, system in self.star_systems.items():
-            if not system.has_civilization or system.is_extinct:
-                continue
-            
-            # Only LA and LBA civilizations attack
-            if system.true_strategy not in ["LA", "LBA"]:
-                continue
-                
-            # Check if system is within broadcast radius
-            if system.distance > self.broadcast_radius:
-                continue
-            
-            # Check if they detect us (0.5% base chance per generation × leakage multiplier)
-            detection_chance = self.leakage_system.calculate_detection_probability(
-                system.distance, 
-                self.broadcast_radius, 
-                self.leakage_multiplier
-            )
-            
-            if random.random() < detection_chance:
-                # Hostile civilization has detected Earth!
-                logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via electromagnetic leakage!")
-                
-                # Determine attack type
-                attack_type = self.leakage_system.determine_attack_type(system, system.distance)
-                
-                if attack_type == "information":
-                    # Information attack arrives instantly
-                    logging.warning(f"{system_name} launching INFORMATION WARFARE attack (instant)")
-                    self.process_information_attack(system_name)
-                    
-                elif attack_type == "laser_sail":
-                    # Laser sail probe attack (0.175c)
-                    travel_time_gens = self.leakage_system.calculate_travel_time(
-                        system.distance, 
-                        0.175  # Breakthrough Starshot speed
-                    )
-                    arrival_gen = self.generation + travel_time_gens
-                    
-                    # Apply von Neumann defense bonus if researched
-                    defense_mult = self.von_neumann_defense_bonus
-                   
-                    # Create attack warning
-                    warning = AttackWarning(
-                        source=system,
-                        arrival_generation=arrival_gen,
-                        attack_type="laser_sail_probe"
-                    )
-                    warning.defense_multiplier = defense_mult
-                    self.pending_attack_warnings.append(warning)
-                    
-                    logging.warning(f"{system_name} launching LASER SAIL PROBE attack (0.175c) - ETA: {travel_time_gens} generations")
-                    
-                elif attack_type == "fusion":
-                    # Fusion strike (0.12c)
-                    travel_time_gens = self.leakage_system.calculate_travel_time(
-                        system.distance,
-                        0.12  # Project Daedalus speed
-                    )
-                    arrival_gen = self.generation + travel_time_gens
-                    
-                    # Create attack warning
-                    warning = AttackWarning(
-                        source=system,
-                        arrival_generation=arrival_gen,
-                        attack_type="fusion_strike"
-                    )
-                    self.pending_attack_warnings.append(warning)
-                    
-                    logging.warning(f"{system_name} launching FUSION STRIKE (0.12c) - ETA: {travel_time_gens} generations")
+        # Responses arriving this generation
+        self._deliver_responses()
 
-        # === WOW! SIGNAL: Check for Gen 144 Event ===
-
-        if self.wow_signal.check_gen144_event():
-            self.wow_signal.trigger_gen144_event()
+        # Passive electromagnetic leakage: hostile civilizations may notice Earth
+        self._process_passive_leakage()
+        if self.game_over:
             return
 
-        # === ATTACK EARLY WARNING SYSTEM: Process Incoming Attacks ===
-        warnings_to_remove = []
-        
-        for warning in self.pending_attack_warnings:
-            etas = warning.get_etas_remaining(self.generation)
-            
-            # Show countdown warnings
-            if etas > 0:
-                logging.warning(f"⚠️ HOSTILE FLEET from {warning.source.name} - ETA: {etas} generations")
-            
-            # Attack arrives
-            if etas <= 0:
-                logging.critical(f"⚠️⚠️⚠️ ATTACK ARRIVED from {warning.source.name}! ⚠️⚠️⚠️")
-                
-                # Calculate base damage tier
-                tech_gap = warning.source.civilization_stage.value - self.tech_level
-                
-                # Apply defensive multiplier
-                base_support_loss = 0
-                base_funding_loss = 0
-                game_over_attack = False
-                
-                if tech_gap >= 2:
-                    # Devastating attack
-                    base_support_loss = 50
-                    base_funding_loss = 40
-                    game_over_attack = True
-                elif tech_gap >= 1:
-                    # Advanced attack
-                    base_support_loss = 40
-                    base_funding_loss = 30
-                else:
-                    # Comparable tech
-                    base_support_loss = 25
-                    base_funding_loss = 15
-                
-                # Apply defense multipliers (active + passive)
-                total_defense_multiplier = warning.defense_multiplier * self.passive_defense_bonus
-                actual_support_loss = int(base_support_loss * total_defense_multiplier)
-                actual_funding_loss = int(base_funding_loss * total_defense_multiplier)
-                
-                # Check if backup colonies prevent annihilation
-                if game_over_attack and self.has_backup_colonies:
-                    game_over_attack = False  # Backup colonies save us
-                    logging.critical(f"BACKUP COLONIES SAVE HUMANITY: Earth devastated but colonies survive")
-                
-                # Check if ultimate survival is active
-                if game_over_attack and self.ultimate_survival:
-                    game_over_attack = False
-                    actual_support_loss = min(actual_support_loss, 30)
-                    actual_funding_loss = min(actual_funding_loss, 20)
-                    logging.critical(f"ULTIMATE SURVIVAL ACTIVE: Emergency evacuation successful")
-                
-                self.public_support -= actual_support_loss
-                self.funding -= actual_funding_loss
-                
-                # Build attack message
-                defense_info = ""
-                if warning.defensive_actions_taken:
-                    defense_info = f"\n\n🛡️ DEFENSIVE ACTIONS TAKEN:\n"
-                    for action in warning.defensive_actions_taken:
-                        defense_info += f"  ✓ {action}\n"
-                    defense_info += f"\nDamage reduced by {warning.get_defense_percentage()}%"
-                
-                if game_over_attack and warning.defense_multiplier > 0.3:
-                    # Defenses were strong enough to survive a devastating attack
-                    self.message = f"""⚠️ DEVASTATING ATTACK FROM {warning.source.name.upper()}! ⚠️
+        # WOW! Signal: Generation 144
+        if self.wow_signal.check_gen144_event():
+            self.wow_signal.trigger_gen144_event()
 
-Their {CivilizationStage(warning.source.civilization_stage.value).name} technology far exceeds ours.
-Support: -{actual_support_loss}% | Funding: -{actual_funding_loss}%{defense_info}
+        # Incoming attacks
+        self._resolve_attacks()
+        if self.game_over:
+            return
 
-Thanks to our defensive preparations, we survived - barely.
-"""
-                    logging.critical(f"Survived devastating attack with defenses: {warning.get_defense_percentage()}% reduction")
-                elif game_over_attack:
-                    # Not enough defenses
-                    self.game_over = True
-                    self.message = f"""💀 GAME OVER: EARTH ANNIHILATED 💀
+        # Research income
+        efficiency = self.integration.get_research_efficiency(self.generation)
+        income = self.passive_research_income() * efficiency
+        self.research_points += income
+        logging.info(f"Passive RP Gain: {income:.1f} (efficiency {efficiency:.2f})")
 
-{warning.source.name}'s overwhelming technological superiority ({CivilizationStage(warning.source.civilization_stage.value).name} vs our tech level {self.tech_level}) has proven catastrophic.
-
-The attack fleet has destroyed all major population centers.
-Humanity's first contact... was its last.{defense_info}
-
-Dark Forest theory confirmed.
-"""
-                    logging.critical(f"GAME OVER: Annihilated by {warning.source.name}")
-                    warnings_to_remove.append(warning)
-                    return
-                else:
-                    # Survivable attack
-                    severity = "ADVANCED" if tech_gap >= 1 else "SIGNIFICANT"
-                    self.message = f"""⚠️ {severity} ATTACK FROM {warning.source.name.upper()}! ⚠️
-
-Enemy fleet has struck Earth!
-Support: -{actual_support_loss}% | Funding: -{actual_funding_loss}%{defense_info}
-
-The program survives, but at great cost.
-"""
-                
-                warnings_to_remove.append(warning)
-                
-                # Check if program is defunded
-                if self.funding < 20 or self.public_support < 10:
-                    self.game_over = True
-                    self.message += "\n\nPublic support and funding have collapsed. The contact program is shut down."
-                    logging.critical("GAME OVER: Program defunded after attack")
-                    return
-        
-        # Remove processed warnings
-        for warning in warnings_to_remove:
-            if warning in self.pending_attack_warnings:
-                self.pending_attack_warnings.remove(warning)
-
-        
-        # Passive Research Gain
-        # Base gain
-        base_rp = 10 + (self.funding / 10)
-        
-        # Add passive RP from technologies
-        tech_rp = 0
-        for tech in self.technologies.values():
-            if tech.researched:
-                tech_rp += tech.passive_rp
-        
-        self.research_points += base_rp + tech_rp
-        
-        if tech_rp > 0:
-            logging.info(f"Passive RP Gain: Base {base_rp:.1f} + Tech {tech_rp} = {base_rp+tech_rp:.1f}")
-        
-        # Funding changes based on public support
-        support_modifier = (self.public_support - 50) / 10
-        self.funding += support_modifier
-        
-        # Director Administration Skill: Improves funding maintenance
-        admin_skill = self.current_director.get_effective_skill("administration")
-        # Bonus: +0 to +5 funding per turn based on skill
-        funding_bonus = 5 * admin_skill
-        self.funding += funding_bonus
-        
+        # Funding follows public support and the director's administration
+        self.funding += (self.public_support - 50) / 10
+        self.funding += 5 * self.current_director.get_effective_skill("administration")
         self.funding = max(20, min(100, self.funding))
-        
+        self.public_support = max(0, min(100, self.public_support))
+
+        # Telescopes catalogue new star systems
+        self.discover_systems()
+
         # Message quality improves with tech and knowledge
         self.message_quality = 1.0 + (self.tech_level * 0.1) + (self.knowledge_base / 100)
-        
-        # New director each generation
+
+        # New director, new action points
         self.current_director = self.generate_director()
         self.directors.append(self.current_director)
-        
-        # Calculate AP for new generation
         self.calculate_ap()
-        
-        # Reset AI Advisor consultation flag
         self.advisor_consulted_this_gen = False
-        
-        # Victory check - established contact with at least 3 civilizations
-        contacted_count = 0
-        for system in self.star_systems.values():
-            if system.has_civilization and len(system.received_messages) > 0:
-                contacted_count += 1
-        
-        if contacted_count >= 3 and not self.victory:
+
+        # Genesis Project worlds evolve
+        self.genesis.advance_generation(self)
+
+        # Contact victory (the game continues afterwards)
+        contacted = self.contacted_systems()
+        if len(contacted) >= 3 and not self.victory:
             self.victory = True
-            # self.game_over = True # DO NOT END GAME
-            self.message = f"""
+            names = ", ".join(s.name for s in contacted)
+            self.emit("victory", f"""
 ============================================================
        🎉 ACHIEVEMENT UNLOCKED: FIRST CONTACT NETWORK 🎉
 ============================================================
 
-You have successfully established contact with 3 distinct civilizations!
+You have established contact with {len(contacted)} distinct civilizations: {names}.
 Humanity is no longer alone in the dark.
 
-The program continues. Your new goal is to foster these relationships,
-warn them of dangers, or perhaps seek the answers to the ultimate question.
-
-(Game continues...)
+The program continues. Foster these relationships, warn them of dangers,
+or seek the answer to the ultimate question.
 ============================================================
-"""
-            logging.info("ACHIEVEMENT UNLOCKED: Contact Victory (Game Continues)")
-        
-        # Game over check - funding cut or lost public support
-        if self.funding < 20 or self.public_support < 10:
-            self.game_over = True
-            self.message = "GAME OVER: The contact program has been defunded due to lack of results or public support."
-        
-        # === PHASE 3B: Genesis Project Update ===
-        self.genesis.advance_generation(self)
+""", contacts=[s.name for s in contacted])
+            self.unlock_achievement("First Contact Network")
+            logging.info("CONTACT VICTORY (game continues)")
 
-        # === PHASE 3A: Philosophical Events Check ===
-        if not self.pending_philosophical_event and not self.victory:
+        # Defunding
+        if self.funding < 20 or self.public_support < 10:
+            self._end_game("The contact program was defunded: public support collapsed.",
+                           "GAME OVER: The contact program has been defunded due to lack of results or public support.")
+            return
+
+        # Philosophical crisis events
+        if not self.pending_philosophical_event:
             event = self.philosophical_events.check_and_trigger(self)
             if event:
                 self.pending_philosophical_event = event
-                # Event will be displayed in main loop and handled via choice
+                self.emit("philosophical_event",
+                          f"🤔 PHILOSOPHICAL CRISIS: {event.name}. A decision is required before the next generation.",
+                          event_id=event.id)
 
-        # === PHASE 3A: Philosophical Victory Check ===
-        if not self.philosophical_victory and not self.game_over:
-            total_evidence = sum(self.fermi_evidence.values())
-            if total_evidence >= 15:
-                self.philosophical_victory = True
-                # Determine most likely Fermi Paradox answer
-                primary_evidence = max(self.fermi_evidence.items(), key=lambda x: x[1])
+        # Philosophical victory (the game continues afterwards)
+        self._check_philosophical_victory()
 
-                explanations = {
-                    "extinction_evidence": "Most civilizations go extinct before reaching interstellar capability.",
-                    "dark_forest_evidence": "The galaxy is a dark forest where speaking means death.",
-                    "cooperation_evidence": "Peaceful civilizations exist but are extremely rare and cautious.",
-                    "great_filter_evidence": "The biological-technological integration crisis destroys most species."
-                }
+    RISK_CAP = 0.08          # self-destruct chance per generation never exceeds 8%
+    RISK_FLOOR = 0.001       # ...and never drops below 0.1% once the grace period is over
+    ECO_RISK_CAP = 0.30
 
-                self.message = f"""🌟 PHILOSOPHICAL VICTORY 🌟
+    def _next_self_destruct_risk(self) -> float:
+        """Self-destruct risk after one more generation of the Dual DNA problem."""
+        level = self.integration.integration_level
+        risk = self.self_destruct_risk
+        if self.generation <= 30:
+            risk += 0.0005      # capabilities grow faster than wisdom, slowly at first
+        elif level < self.integration.crisis_threshold:
+            risk += 0.0015      # crisis: destructive tools in the hands of tribal instincts
+        elif level < self.integration.high_integration_threshold:
+            risk += 0.0005      # the transition is under way
+        else:
+            risk -= 0.001       # an integrated society: the danger recedes
+        floor = self.RISK_FLOOR if self.generation > 30 else 0.0
+        return max(floor, min(self.RISK_CAP, risk))
+
+    def _deliver_responses(self) -> None:
+        """Alien replies whose light reaches Earth this generation."""
+        for name, system in self.star_systems.items():
+            arrived = [r for r in system.pending_responses if r[1] <= self.generation]
+            for response in arrived:
+                system.pending_responses.remove(response)
+                message = response[0]
+                system.received_messages.append(message)
+                first = len(system.received_messages) == 1
+
+                k_gain = 10 * self.tech_level
+                if "Visionary" in self.current_director.traits:
+                    k_gain = int(k_gain * 1.1)
+                system.knowledge = min(100, system.knowledge + k_gain)
+                self.knowledge_base = min(100, self.knowledge_base + 5)
+                self.public_support = min(100, self.public_support + 5)
+                self.stats["responses_received"] += 1
+
+                self.emit("response_received",
+                          f"📨 RESPONSE RECEIVED FROM {name.upper()}\n\"{message}\"\n\n"
+                          f"Knowledge of {name} +{k_gain}%, public support +5%.",
+                          system=name, text=message, first=first)
+                # Evidence of cooperation: the first two replies from a civilization count, later ones do not
+                replies = len(system.received_messages)
+                amount = 2 if replies == 1 else (1 if replies == 2 else 0)
+                if amount:
+                    self.add_fermi_evidence("cooperation_evidence", amount,
+                                            f"{'first' if first else 'second'} response from {name}")
+                logging.info(f"Response received from {name} (reply #{replies})")
+
+    def _process_passive_leakage(self) -> None:
+        """Hostile civilizations within our broadcast radius may detect Earth's electromagnetic leakage."""
+        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies)
+        for system_name, system in list(self.star_systems.items()):
+            if not system.has_civilization or system.is_extinct:
+                continue
+            if system.true_strategy not in ("LA", "LBA"):
+                continue
+            if system.distance > self.broadcast_radius or system.has_detected_earth:
+                continue
+            detection_chance = self.leakage_system.calculate_detection_probability(
+                system.distance, self.broadcast_radius, self.leakage_multiplier)
+            if random.random() >= detection_chance:
+                continue
+
+            system.has_detected_earth = True
+            logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via leakage")
+            attack_type = self.leakage_system.determine_attack_type(system, system.distance)
+            leak_note = " They found us through our own electromagnetic leakage."
+            if attack_type == "information":
+                self.process_information_attack(system_name)
+                if self.game_over:
+                    return
+            elif attack_type == "laser_sail":
+                travel = self.leakage_system.calculate_travel_time(system.distance, "laser_sail")
+                self._schedule_attack(system, self.generation + travel, "laser_sail_probe", note=leak_note)
+            else:
+                travel = self.leakage_system.calculate_travel_time(system.distance, "fusion")
+                self._schedule_attack(system, self.generation + travel, "fusion_strike", note=leak_note)
+
+    def _resolve_attacks(self) -> None:
+        """Fleets that arrive this generation strike Earth."""
+        for warning in list(self.pending_attack_warnings):
+            etas = warning.get_etas_remaining(self.generation)
+            if etas > 0:
+                logging.warning(f"HOSTILE FLEET from {warning.source.name} - ETA: {etas} generations")
+                continue
+            self.pending_attack_warnings.remove(warning)
+            self._resolve_attack(warning)
+            if self.game_over:
+                return
+
+    def _resolve_attack(self, warning) -> None:
+        source = warning.source
+        stage_value = source.civilization_stage.value if source.civilization_stage else CivilizationStage.DIGITAL.value
+        tech_gap = stage_value - self.tech_level
+        if tech_gap >= 2:
+            base_support, base_funding, devastating, severity = 50, 40, True, "DEVASTATING"
+        elif tech_gap >= 1:
+            base_support, base_funding, devastating, severity = 40, 30, False, "ADVANCED"
+        else:
+            base_support, base_funding, devastating, severity = 25, 15, False, "SIGNIFICANT"
+
+        multiplier = warning.defense_multiplier * self.passive_defense_bonus
+        multiplier *= (1.0 - self.wow_signal.attack_damage_reduction)
+        if warning.attack_type == "laser_sail_probe":
+            multiplier *= self.von_neumann_defense_bonus
+        support_loss = int(base_support * multiplier)
+        funding_loss = int(base_funding * multiplier)
+        self.stats["attacks_landed"] += 1
+        logging.critical(f"ATTACK ARRIVED from {source.name}: tech gap {tech_gap}, damage multiplier {multiplier:.2f}")
+
+        saved_by = None
+        if devastating and multiplier <= 0.5:
+            devastating, saved_by = False, "our defensive preparations"
+        if devastating and self.has_backup_colonies:
+            devastating, saved_by = False, "the backup colonies beyond Earth"
+        if devastating and self.ultimate_survival:
+            devastating, saved_by = False, "the emergency evacuation infrastructure"
+            support_loss, funding_loss = min(support_loss, 30), min(funding_loss, 20)
+
+        self.public_support -= support_loss
+        self.funding -= funding_loss
+        self.add_fermi_evidence("dark_forest_evidence", 1, f"the attack from {source.name} struck Earth", announce=False)
+
+        defense_info = ""
+        if warning.defensive_actions_taken:
+            defense_info = "\n\n🛡️ Defensive actions taken: " + ", ".join(warning.defensive_actions_taken)
+        defense_info += f"\nTotal damage reduction: {int((1 - multiplier) * 100)}%"
+
+        stage_name = source.civilization_stage.name if source.civilization_stage else "UNKNOWN"
+        if devastating:
+            self._end_game(f"Earth annihilated by the {warning.type_label} from {source.name}.",
+                           f"""💀 GAME OVER: EARTH ANNIHILATED 💀
+
+{source.name}'s overwhelming technological superiority ({stage_name} vs our tech level {self.tech_level})
+has proven catastrophic. The {warning.type_label} has destroyed all major population centers.
+Humanity's first contact... was its last.{defense_info}
+
+Dark Forest theory confirmed.""")
+            return
+
+        self.stats["attacks_survived"] += 1
+        self.unlock_achievement("Survivor")
+        survived_note = f"\nWe survived only thanks to {saved_by}." if saved_by else "\nThe program survives, but at great cost."
+        self.emit("attack_resolved", f"""⚠️ {severity} ATTACK FROM {source.name.upper()} ⚠️
+
+The {warning.type_label} has struck Earth.
+Support: -{support_loss}% | Funding: -{funding_loss}%{defense_info}{survived_note}""",
+                  system=source.name, support_loss=support_loss, funding_loss=funding_loss, severity=severity)
+
+        if self.funding < 20 or self.public_support < 10:
+            self._end_game(f"The program was shut down after the attack from {source.name}.",
+                           "Public support and funding have collapsed. The contact program is shut down.")
+
+    def _check_philosophical_victory(self) -> None:
+        if self.philosophical_victory or self.game_over:
+            return
+        total_evidence = sum(self.fermi_evidence.values())
+        if total_evidence < 15:
+            return
+        self.philosophical_victory = True
+        primary = max(self.fermi_evidence.items(), key=lambda kv: kv[1])[0]
+        explanations = {
+            "extinction_evidence": "Most civilizations go extinct before reaching interstellar capability.",
+            "dark_forest_evidence": "The galaxy is a dark forest where speaking means death.",
+            "cooperation_evidence": "Peaceful civilizations exist but are extremely rare and cautious.",
+            "great_filter_evidence": "The biological-technological integration crisis destroys most species.",
+        }
+        self.emit("victory", f"""🌟 PHILOSOPHICAL VICTORY 🌟
 
 After {self.generation} generations, humanity has gathered sufficient evidence
 to answer the Fermi Paradox:
 
-{explanations[primary_evidence[0]]}
+{explanations[primary]}
 
 Evidence collected:
 - Extinction cases: {self.fermi_evidence['extinction_evidence']}
@@ -1177,16 +1501,242 @@ Evidence collected:
 Total Evidence: {total_evidence}/15
 
 You have answered one of humanity's greatest questions.
+(The game continues...)
+""", explanation=explanations[primary])
+        self.unlock_achievement("Answer to Fermi")
+        logging.info(f"PHILOSOPHICAL VICTORY ACHIEVED: {explanations[primary]}")
 
-(Game continues...)
-"""
-                logging.info(f"PHILOSOPHICAL VICTORY ACHIEVED: {explanations[primary_evidence[0]]}")
+    # ------------------------------------------------------------------ special encounters
+    def _spawn_mirror_system(self) -> StarSystem:
+        """A newly resolved technosignature at exactly our level (the Mirror Civilization event)."""
+        entry = self._next_catalog_entry()
+        if entry is None:
+            n = 1
+            while f"Technosignature TS-{n}" in self.star_systems:
+                n += 1
+            entry = {"name": f"Technosignature TS-{n}", "distance": round(random.uniform(18.0, 30.0), 1)}
+        system = self._make_system(entry)
+        system.has_civilization = True
+        system.is_extinct = False
+        system.has_swan_song = False
+        system.civilization_age = 100
+        system.civilization_stage = CivilizationStage(max(1, min(5, self.tech_level)))
+        system.civilization_type = random.choice(["biological_pure", "digital_ascended", "hybrid_integrated"])
+        system.deception_level = 0.2
+        system.knowledge = 50
+        self.star_systems[system.name] = system
+        self.stats["systems_discovered"] += 1
+        return system
 
-        # Process async message queue
-        if self.message_queue:
-            for msg in self.message_queue:
-                self.message += f"\n\n{msg}"
-            self.message_queue = []
+    def resolve_mirror_contact(self) -> str:
+        """Outcome of 'Extend Contact' in the Mirror Civilization event: an equal, friend or foe."""
+        system = self._spawn_mirror_system()
+        round_trip = system.get_round_trip_time()
+        ctx = {"system": system.name, "year": self.start_year + (self.generation - 1) * 25}
+        intro = f"A technosignature at {system.distance:.1f} light-years has been catalogued as {system.name}."
+        if random.random() < 0.5:
+            system.true_strategy = "LB"
+            system.civilization_attitude = 0.8
+            system.pending_responses.append((self.content.mirror_reply(False, ctx), self.generation + round_trip))
+            self.public_support = min(100, self.public_support + 10)
+            logging.info(f"MIRROR CONTACT: {system.name} friendly")
+            return (f"{intro} Our message is on its way; their reply, if it comes, arrives around "
+                    f"Generation {self.generation + round_trip}. Public support +10%.")
+        system.true_strategy = "LA"
+        system.civilization_attitude = 0.2
+        warning = self._schedule_attack(system, self.attack_arrival_generation(system), "mirror_fleet", announce=False)
+        logging.warning(f"MIRROR CONTACT: {system.name} hostile")
+        return (f"{intro} {self.content.mirror_reply(True, ctx)} "
+                f"Hostile fleet ETA: Generation {warning.arrival_gen}.")
+
+    # ------------------------------------------------------------------ public state
+    def view_state(self) -> Dict[str, Any]:
+        """Everything the player may see, as plain data. Hidden strategies never appear here."""
+        year = self.start_year + (self.generation - 1) * 25
+        director = self.current_director
+        systems = []
+        for index, (name, s) in enumerate(self.star_systems.items(), 1):
+            one_way = math.ceil(s.get_round_trip_time() / 2)
+            systems.append({
+                "index": index,
+                "name": name,
+                "distance": round(s.distance, 1),
+                "spectral_type": getattr(s, "spectral_type", None),
+                "ra": getattr(s, "ra", None),
+                "dec": getattr(s, "dec", None),
+                "knowledge": int(s.knowledge),
+                "description": s.describe_civilization() if s.knowledge > 0 else "",
+                "round_trip_generations": s.get_round_trip_time(),
+                "messages_sent": [{"text": m, "generation": g, "arrival_gen": g + one_way} for m, g in s.messages_sent],
+                "responses": list(s.received_messages),
+                "next_response_gen": min((a for _, a in s.pending_responses), default=None),
+                "contacted": bool(s.received_messages),
+                "is_seeded": s.is_seeded,
+            })
+        threats = []
+        for i, w in enumerate(self.pending_attack_warnings, 1):
+            threats.append({
+                "index": i,
+                "source": w.source.name,
+                "attack_type": w.attack_type,
+                "type_label": w.type_label,
+                "eta": w.get_etas_remaining(self.generation),
+                "arrival_gen": w.arrival_gen,
+                "arrival_year": self.start_year + (w.arrival_gen - 1) * 25,
+                "source_distance": round(w.source.distance, 1),
+                "enemy_stage": w.source.civilization_stage.name if w.source.civilization_stage else "UNKNOWN",
+                "defense_pct": w.get_defense_percentage(),
+                "actions_taken": list(w.defensive_actions_taken),
+            })
+        available = [{"id": t.id, "name": t.name, "tier": t.tier, "cost": t.cost, "description": t.description,
+                      "locked": self.tech_lock_reason(t)} for t in self.available_technologies()]
+        integration = self.integration.get_integration_status(self.generation)
+        passive_rp = self.passive_research_income() * self.integration.get_research_efficiency(self.generation)
+        event = self.pending_philosophical_event
+        return {
+            "generation": self.generation,
+            "year": year,
+            "start_year": self.start_year,
+            "director": {
+                "name": director.name,
+                "traits": list(director.traits),
+                "skills": {k: round(director.get_effective_skill(k), 2) for k in ("diplomacy", "science", "administration")},
+            },
+            "status": {
+                "action_points": self.action_points,
+                "max_action_points": self.max_action_points,
+                "funding": round(self.funding, 1),
+                "public_support": round(self.public_support, 1),
+                "knowledge_base": round(self.knowledge_base, 1),
+                "research_points": int(self.research_points),
+                "passive_rp": round(passive_rp, 1),
+                "tech_level": self.tech_level,
+                "self_destruct_risk": round(self.self_destruct_risk, 4),
+                "ecological_risk": round(self.ecological_risk, 4),
+                "broadcast_radius": self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies),
+                "leakage_multiplier": self.leakage_multiplier,
+                "integration_level": integration["level"],
+                "integration_status": integration["status"],
+            },
+            "active_doctrines": list(self.active_doctrines),
+            "systems": systems,
+            "catalog": {"known": len(self.star_systems), "total": max(len(self.catalog), len(self.star_systems)),
+                        "undiscovered": len(self.undiscovered), "discovery_chance": round(self.discovery_chance(), 2)},
+            "threats": threats,
+            "technologies": {
+                "researched": [t.id for t in self.technologies.values() if t.researched],
+                "available": available,
+            },
+            "fermi_evidence": {**self.fermi_evidence, "total": sum(self.fermi_evidence.values()), "goal": 15},
+            "contacts": len(self.contacted_systems()),
+            "contacts_goal": 3,
+            "victory": self.victory,
+            "philosophical_victory": self.philosophical_victory,
+            "genesis": {"unlocked": self.genesis.unlocked, "summary": self.genesis.get_summary(),
+                        "worlds": self.genesis.to_dict()["worlds"]},
+            "pending_event": None if event is None else {
+                "id": event.id, "name": event.name, "description": event.description,
+                "choices": [{"name": c["name"], "description": c["description"]} for c in event.choices],
+            },
+            "wow": {"decided": self.wow_signal.decided, "replied": self.wow_signal.wow_replied,
+                    "outcome": self.wow_signal.outcome},
+            "achievements": list(self.achievements),
+            "stats": dict(self.stats),
+            "actions": [{"id": a.id, "label": a.label, "cost": a.cost, "needs": list(a.needs)} for a in self.available_actions()],
+            "game_over": self.game_over,
+            "game_over_reason": self.game_over_reason,
+        }
+
+    # ------------------------------------------------------------------ discovery
+    def discovery_chance(self) -> float:
+        """Chance per generation of cataloguing a new star system (detection technologies add to it)."""
+        bonus = sum(t.detection_bonus for t in self.technologies.values() if t.researched)
+        return min(0.85, 0.10 + bonus)
+
+    def _next_catalog_entry(self) -> Optional[Dict[str, Any]]:
+        """Pop the nearest catalogued star the player has not resolved yet."""
+        while self.undiscovered:
+            name = self.undiscovered.pop(0)
+            if name in self.star_systems:
+                continue
+            entry = self._catalog_entry(name)
+            if entry:
+                return entry
+        return None
+
+    def add_star_system(self, entry: Dict[str, Any], announce: bool = True) -> StarSystem:
+        """Add a catalogued star to the known systems (its civilization, if any, is rolled on creation)."""
+        system = self._make_system(entry)
+        self.star_systems[system.name] = system
+        self._register_swan_song(system)
+        self._log_system_profile(system)
+        self.stats["systems_discovered"] += 1
+        if announce:
+            kind = system.spectral_type or "unknown type"
+            self.emit("system_discovered",
+                      f"🔭 NEW STAR SYSTEM CATALOGUED: {system.name} ({system.distance:.1f} LY, {kind}). "
+                      "Focus Research to learn whether anyone lives there.",
+                      system=system.name, distance=system.distance)
+        return system
+
+    def discover_systems(self) -> List[StarSystem]:
+        """Roll for newly catalogued systems this generation."""
+        found = []
+        chance = self.discovery_chance()
+        rolls = [chance] + ([chance / 2] if chance > 0.6 else [])
+        for roll_chance in rolls:
+            if not self.undiscovered:
+                break
+            if random.random() < roll_chance:
+                entry = self._next_catalog_entry()
+                if entry:
+                    found.append(self.add_star_system(entry))
+        return found
+
+    # ------------------------------------------------------------------ UI-facing queries
+    def undiscovered_swan_songs(self) -> List[str]:
+        """Extinct systems with a swan song the player has not found yet."""
+        return [name for name, system in self.star_systems.items()
+                if system.has_civilization and system.is_extinct and system.has_swan_song
+                and not self.swan_song_manager.is_discovered(name)]
+
+    def available_technologies(self) -> List[Technology]:
+        """Researchable technologies (prerequisites met, generation reached), sorted by tier then cost."""
+        result = []
+        for tech in self.technologies.values():
+            if tech.researched or self.generation < tech.min_generation:
+                continue
+            if not all(p in self.technologies and self.technologies[p].researched for p in tech.prerequisites):
+                continue
+            result.append(tech)
+        result.sort(key=lambda t: (t.tier, t.cost))
+        return result
+
+    def available_actions(self) -> List[ActionSpec]:
+        """Actions the player may take right now (drives the menu and any other front-end)."""
+        actions = [
+            ActionSpec("send_message", "Send Message to Star System", "1 AP", ("system", "text")),
+            ActionSpec("focus_research", "Focus Research on Star System", "1 AP", ("system",)),
+            ActionSpec("public_outreach", "Conduct Public Outreach Campaign", "1 AP"),
+            ActionSpec("research_tech", "Research Technology", "Free", ("tech",)),
+            ActionSpec("advance_generation", "Advance to Next Generation"),
+        ]
+        if self.pending_attack_warnings:
+            actions.append(ActionSpec("defend", "Defensive Actions (Respond to Threats)", "", ("threat", "defense")))
+        if self.ai_advisor_unlocked:
+            actions.append(ActionSpec("consult_advisor", "Consult AI Strategic Advisor", "Free, once/gen"))
+        undiscovered = self.undiscovered_swan_songs()
+        if undiscovered:
+            actions.append(ActionSpec("listen_swan_song",
+                                      f"Listen for Swan Song ({len(undiscovered)} undiscovered)", "1 AP", ("system",)))
+        if self.genesis.unlocked:
+            actions.append(ActionSpec("genesis_seed", "Genesis Project (Seed Life)",
+                                      f"1 AP + {self.genesis.seed_cost_rp} RP", ("system",)))
+        if self.pending_philosophical_event is not None:
+            actions.append(ActionSpec("respond_event",
+                                      f"Respond to Philosophical Event: {self.pending_philosophical_event.name}",
+                                      "", ("choice",)))
+        return actions
 
     def send_message(self, system_name: str, message_content: str):
         if self.action_points < 1:
@@ -1198,7 +1748,17 @@ You have answered one of humanity's greatest questions.
             return
             
         system = self.star_systems[system_name]
+
+        # Post-biological minds cannot be addressed with radio-era protocols
+        if (system.has_civilization and not system.is_extinct
+                and system.civilization_stage == CivilizationStage.POST_BIOLOGICAL
+                and not self.can_contact_post_biological):
+            self.message = (f"{system_name}: the structured signals from this system follow no protocol we can "
+                            "address. Research Post-Biological Transition to attempt contact.")
+            return
+
         system.messages_sent.append((message_content, self.generation))
+        self.stats["messages_sent"] += 1
         
         # Director Diplomacy Skill: Improves message quality
         diplomacy_skill = self.current_director.get_effective_skill("diplomacy")
@@ -1220,7 +1780,13 @@ You have answered one of humanity's greatest questions.
             return
         
         round_trip_time = system.get_round_trip_time()
-        
+
+        # A hostile civilization that has already launched against us does not launch again per message
+        if system.true_strategy in ("LA", "LBA") and system.has_detected_earth:
+            self.message = f"Message sent to {system_name}. No response detected."
+            logging.info(f"{system.true_strategy}: {system_name} already committed to attack - no new fleet")
+            return
+
         # L Strategy
         if system.true_strategy == "L":
             self.message = f"Message sent to {system_name}. No response detected."
@@ -1229,19 +1795,19 @@ You have answered one of humanity's greatest questions.
         
         # LA Strategy
         elif system.true_strategy == "LA":
-            # Create attack warning instead of instant attack
-            warning = AttackWarning(system, self.generation + round_trip_time, self.generation)
-            self.pending_attack_warnings.append(warning)
-            
+            # Deep-space monitoring picks up the launch signature of a hostile response
+            warning = self._schedule_attack(system, self.attack_arrival_generation(system), "fleet", announce=False)
+            eta = warning.get_etas_remaining(self.generation)
             self.message = f"""⚠️⚠️⚠️ HOSTILE FLEET DETECTED ⚠️⚠️⚠️
 
 Aggressive response from {system_name}!
 Our message triggered a hostile reaction.
 
-Fleet ETA: Generation {self.generation + round_trip_time} (Year {self.start_year + (self.generation + round_trip_time - 1) * 25})
-Time to Prepare: {round_trip_time} generations
+Our signal crossed {system.distance:.1f} light-years at light speed; their fleet, limited to a tenth
+of that speed, needs far longer. Fleet ETA: Generation {warning.arrival_gen} (Year {self.start_year + (warning.arrival_gen - 1) * 25}).
+Time to prepare: {eta} generations.
 
-DEFENSIVE OPTIONS AVAILABLE (TODO)
+Use Defensive Actions in the menu to prepare.
 """
             
             logging.critical(f"HOSTILE FLEET DETECTED: {system_name}")
@@ -1253,32 +1819,19 @@ DEFENSIVE OPTIONS AVAILABLE (TODO)
             if system.deception_level > 0.6:
                 arrival_generation = self.generation + round_trip_time
                 
-                # Schedule attack warning for +2 gens after friendly response
-                attack_gen = self.generation + round_trip_time + 2
-                warning = AttackWarning(system, attack_gen, self.generation)
-                self.pending_attack_warnings.append(warning)
-                
-                print(f"Generating response from {system_name}...")
-                
-                # Build tech context for AI
-                tech_context = self._build_tech_context()
-                
-                system_prompt = f"""You are predatory aliens from {system_name} pretending to be friendly. 
-{tech_context}
+                # The fleet follows the friendly reply; slower than light, it arrives later
+                attack_gen = max(arrival_generation + 1, self.attack_arrival_generation(system))
+                self._schedule_attack(system, attack_gen, "fleet", announce=False)
 
-Based on Earth's technological level shown above, craft your response.
-Extract Earth's location and defenses. Be charming but subtly request tactical information.
-Advanced tech might make you more cautious, primitive tech might make you dismissive."""
-
-                response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
+                
+                response_text = self._compose_alien_reply(system, "LBA", message_content)
                 system.pending_responses.append((response_text, arrival_generation))
                 
                 self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
                 logging.warning(f"LBA Trap: {system_name} - Friendly bait, attack Gen {attack_gen}")
             else:
-                # Low deception LBA - immediate silent attack
-                warning = AttackWarning(system, self.generation + round_trip_time, self.generation)
-                self.pending_attack_warnings.append(warning)
+                # Low deception LBA - silent attack, no bait
+                self._schedule_attack(system, self.attack_arrival_generation(system), "fleet", announce=False)
                 
                 self.message = f"Message sent to {system_name}. No response detected."
                 logging.critical(f"HOSTILE FLEET DETECTED (LBA low deception): {system_name}")
@@ -1288,23 +1841,12 @@ Advanced tech might make you more cautious, primitive tech might make you dismis
         elif system.true_strategy == "LR":
             # Use effective_quality instead of self.message_quality
             response_chance = 0.3 + (effective_quality * 0.2) + (0.1 * system.civilization_stage.value)
-            response_chance = min(0.85, response_chance)
+            response_chance = min(0.85, response_chance + self._transmission_bonus())
             
             if random.random() < response_chance:
                 arrival_generation = self.generation + round_trip_time
-                print(f"Generating response from {system_name}...")
                 
-                # Build tech context for AI
-                tech_context = self._build_tech_context()
-                
-                system_prompt = f"""You are cautious aliens from {system_name}. 
-{tech_context}
-
-Based on Earth's technological level shown above, craft your response.
-Reply defensively, ask about intent, avoid sharing coordinates.
-If they have advanced tech, show more respect. If primitive, be more dismissive."""
-
-                response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
+                response_text = self._compose_alien_reply(system, "LR", message_content)
                 system.pending_responses.append((response_text, arrival_generation))
                 
                 self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
@@ -1318,21 +1860,10 @@ If they have advanced tech, show more respect. If primitive, be more dismissive.
             # Use effective_quality instead of self.message_quality
             response_chance = 0.7 + (effective_quality * 0.2)
             
-            if random.random() < min(0.95, response_chance):
+            if random.random() < min(0.95, response_chance + self._transmission_bonus()):
                 arrival_generation = self.generation + round_trip_time
-                print(f"Generating response from {system_name}...")
                 
-                # Build tech context for AI
-                tech_context = self._build_tech_context()
-                
-                system_prompt = f"""You are enthusiastic aliens from {system_name}. 
-{tech_context}
-
-Based on Earth's technological level shown above, craft your response.
-Be optimistic, friendly, eager to share knowledge and culture.
-If they have advanced tech, treat them as peers. If primitive, be encouraging."""
-
-                response_text = self.ai.generate_text(f"Human: {message_content}", system_prompt)
+                response_text = self._compose_alien_reply(system, "LB", message_content)
                 system.pending_responses.append((response_text, arrival_generation))
                 
                 self.message = f"Message sent to {system_name}. Enthusiastic response expected!"
@@ -1456,8 +1987,6 @@ If they have advanced tech, treat them as peers. If primitive, be encouraging.""
         
         # Generate strategic analysis
         logging.info(f"Consulting AI Strategic Advisor - Gen {self.generation}")
-        print("\n🤖 Analyzing game state...")
-        print("Please wait, AI is formulating strategic recommendations...")
         
         advice = self.ai_advisor.analyze_game_state(self)
         
@@ -1497,8 +2026,6 @@ Their ending remains a mystery."""
         self.action_points -= 1
         
         # Attempt discovery
-        print(f"\n📡 Scanning for ancient transmissions from {system_name}...")
-        print("Please wait, analyzing signal patterns...")
         
         result = self.swan_song_manager.discover_swan_song(system_name, system.knowledge)
         
@@ -1539,9 +2066,10 @@ Their ending remains a mystery."""
             reward_msgs.append(f"{discount_pct}% discount on next tech!")
         
         # === PHASE 3A.3: Award Fermi Paradox evidence ===
-        self.fermi_evidence["extinction_evidence"] += 2
-        logging.info(f"FERMI EVIDENCE: +2 extinction evidence (swan song discovery)")
+        self.add_fermi_evidence("extinction_evidence", 2, f"swan song of {system_name}", announce=False)
         reward_msgs.append(f"+2 Fermi Evidence (Extinction)")
+        self.stats["swan_songs_found"] += 1
+        self.unlock_achievement("Archivist")
         
         # Build final message
         separator = "="*60
@@ -1694,6 +2222,9 @@ Public support surges!
 """
                 self.public_support += 30
                 self.public_support = min(100, self.public_support)
+                self.add_fermi_evidence("cooperation_evidence", 1, f"diplomacy turned back {warning.source.name}", announce=False)
+                self.message += "\n+1 Fermi Evidence (Cooperation)"
+                self.unlock_achievement("Diplomatic Breakthrough")
                 logging.info(f"DIPLOMATIC SUCCESS: {warning.source.name} attack aborted!")
                 return
         
@@ -1708,501 +2239,3 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
 Defense preparations: {warning.get_defense_percentage()}% damage reduction
 """
         logging.warning(f"Diplomatic attempt made against {warning.source.name} (failed)")
-
-class GameInterface:
-    """Handles game display and interface"""
-    def __init__(self):
-        self.program = ContactProgram()
-        
-    def display_game(self):
-        """Display the game state"""
-        os.system('cls' if os.name == 'nt' else 'clear')
-        current_year = self.program.start_year + ((self.program.generation - 1) * 25)
-        print(f"\n=== LEGACY OF STARS: Generation {self.program.generation} (Year {current_year}) ===")
-        print(f"Director: {self.program.current_director.name}")
-        print(f"Traits: {', '.join(self.program.current_director.traits)}")
-        print(f"Skills: Diplomacy {int(self.program.current_director.get_effective_skill('diplomacy')*100)}%, "
-              f"Science {int(self.program.current_director.get_effective_skill('science')*100)}%, "
-              f"Administration {int(self.program.current_director.get_effective_skill('administration')*100)}%")
-        
-        # Calculate passive income
-        base_income = 10 + (self.program.funding / 10)
-        tech_income = sum(t.passive_rp for t in self.program.technologies.values() if t.researched)
-        total_passive = base_income + tech_income
-        
-        print(f"\nProgram Status:")
-        print(f"  Action Points: {self.program.action_points}/{self.program.max_action_points}")
-        print(f"  Funding: {int(self.program.funding)}%")
-        print(f"  Public Support: {int(self.program.public_support)}%")
-        print(f"  Knowledge Base: {int(self.program.knowledge_base)}%")
-        print(f"  Research Points: {int(self.program.research_points)} (+{int(total_passive)}/turn)")
-        print(f"  Self-Destruct Risk: {self.program.self_destruct_risk*100:.1f}%")
-        print(f"  Ecological Risk: {self.program.ecological_risk*100:.1f}%")
-        
-        if self.program.active_doctrines:
-            print(f"  Active Doctrines: {', '.join(self.program.active_doctrines)}")
-            
-        # Display Genesis Status
-        if self.program.genesis.unlocked:
-            print(f"  {self.program.genesis.get_summary()}")
-        
-        # Display message if any
-        if self.program.message:
-            print(f"\n{self.program.message}")
-            self.program.message = ""
-
-        # Display Pending Philosophical Event
-        if self.program.pending_philosophical_event:
-            print(self.program.get_philosophical_event_display())
-
-        # Display Active Threats (Attack Warnings)
-        if self.program.pending_attack_warnings:
-            print("\n⚠️⚠️⚠️ === ACTIVE THREATS === ⚠️⚠️⚠️")
-            for i, warning in enumerate(self.program.pending_attack_warnings, 1):
-                etas = warning.get_etas_remaining(self.program.generation)
-                arrival_year = self.program.start_year + ((warning.arrival_gen - 1) * 25)
-                
-                print(f"\n{i}. HOSTILE FLEET from {warning.source.name}")
-                print(f"   Source Distance: {warning.source.distance:.1f} LY")
-                print(f"   ETA: {etas} generations (Year {arrival_year})")
-                print(f"   Enemy Tech: {warning.source.civilization_stage.name}")
-                print(f"   Current Defense: {warning.get_defense_percentage()}% damage reduction")
-                
-                if warning.defensive_actions_taken:
-                    print(f"   Actions Taken: {', '.join(warning.defensive_actions_taken)}")
-                else:
-                    print(f"   ⚠️ NO DEFENSES DEPLOYED YET!")
-            print()
-        
-        print("\n=== Star Systems ===")
-
-        for i, (name, system) in enumerate(self.program.star_systems.items(), 1):
-            print(f"{i}. {name} ({system.distance:.1f} light years)")
-            print(f"   Knowledge: {int(system.knowledge)}%")
-            if system.knowledge > 0:
-                print(f"   Status: {system.describe_civilization()}")
-            if system.messages_sent:
-                print(f"   Messages Sent: {len(system.messages_sent)}")
-                for msg, gen in system.messages_sent:
-                    round_trip = system.get_round_trip_time()
-                    arrival_gen = gen + (round_trip / 2) # One way
-                    arrival_year = self.program.start_year + ((arrival_gen - 1) * 25)
-                    print(f"      - Sent Gen {gen}. Est. Arrival: Gen {int(arrival_gen)} (Year {int(arrival_year)})")
-            if system.received_messages:
-                print(f"   Responses Received: {len(system.received_messages)}")
-                for msg in system.received_messages:
-                    print(f"      > \"{msg}\"")
-            if system.pending_responses:
-                next_response = min([arrival for _, arrival in system.pending_responses])
-                print(f"   Next Response: Generation {next_response}")
-            print()
-    
-    def get_system_by_number(self, number: int) -> str:
-        """Get system name by display number"""
-        if 1 <= number <= len(self.program.star_systems):
-            return list(self.program.star_systems.keys())[number-1]
-        return None
-        
-    def play(self):
-        """Main game loop"""
-        print("\n=== LEGACY OF STARS ===")
-        print("You are the overseer of Earth's multi-generational interstellar contact program.")
-        print("Your mission is to establish communication with alien civilizations across the stars.")
-        print("Each turn represents a generation (~25 years) of human history.")
-        print("Make wise decisions to ensure the program's longevity and success.\n")
-        print("Win by establishing contact (receiving responses) from at least 3 civilizations.")
-        
-        input("Press Enter to begin...")
-        
-        while not self.program.game_over:
-            self.display_game()
-            
-            print("\nActions:")
-            print("1. Send Message to Star System (1 AP)")
-            print("2. Focus Research on Star System (1 AP)")
-            print("3. Conduct Public Outreach Campaign (1 AP)")
-            print("4. Research Technology (Free)")
-            print("5. Advance to Next Generation")
-            print("6. Quit Game")
-            
-            # Show defensive actions if there are active threats
-            menu_max = 6
-            if self.program.pending_attack_warnings:
-                print("7. 🛡️ Defensive Actions (Respond to Threats)")
-                menu_max = 7
-            
-            # Show AI Advisor if unlocked
-            if self.program.ai_advisor_unlocked:
-                next_num = menu_max + 1
-                consulted_marker = " ✓" if self.program.advisor_consulted_this_gen else ""
-                print(f"{next_num}. 🤖 Consult AI Strategic Advisor (Free, once/gen){consulted_marker}")
-                menu_max = next_num
-            
-            # Show Swan Song option if there are any undiscovered swan songs
-            undiscovered_swan_songs = []
-            for name, system in self.program.star_systems.items():
-                if (system.has_civilization and system.is_extinct and system.has_swan_song and
-                    not self.program.swan_song_manager.is_discovered(name)):
-                    undiscovered_swan_songs.append(name)
-            
-            if undiscovered_swan_songs:
-                next_num = menu_max + 1
-                count = len(undiscovered_swan_songs)
-                print(f"{next_num}. 🕊️  Listen for Swan Song ({count} undiscovered) (1 AP)")
-                menu_max = next_num
-
-            # Show Genesis Project option if unlocked
-            if self.program.genesis.unlocked:
-                next_num = menu_max + 1
-                print(f"{next_num}. 🌱 Genesis Project (Seed Life)")
-                menu_max = next_num
-
-            # Show Philosophical Event option if pending
-            if self.program.pending_philosophical_event:
-                next_num = menu_max + 1
-                print(f"{next_num}. 🤔 Respond to Philosophical Event")
-                menu_max = next_num
-            
-            choice = input(f"\nEnter your choice (1-{menu_max}): ")
-
-            
-            if choice == '1':
-                system_num = input("Enter star system number: ")
-                try:
-                    system_num = int(system_num)
-                    system_name = self.get_system_by_number(system_num)
-                    if system_name:
-                        message = input("Enter message content: ")
-                        self.program.send_message(system_name, message)
-                    else:
-                        self.program.message = "Invalid star system number."
-                except ValueError:
-                    self.program.message = "Please enter a valid number."
-            
-            elif choice == '2':
-                system_num = input("Enter star system number to research: ")
-                try:
-                    system_num = int(system_num)
-                    system_name = self.get_system_by_number(system_num)
-                    if system_name:
-                        self.program.focus_research(system_name)
-                    else:
-                        self.program.message = "Invalid star system number."
-                except ValueError:
-                    self.program.message = "Please enter a valid number."
-            
-            elif choice == '3':
-                self.program.public_outreach()
-                
-            elif choice == '4':
-                print("\nAvailable Research (by Tier):")
-                available_techs = []
-                for tech_id, tech in self.program.technologies.items():
-                    if not tech.researched:
-                        # Check prerequisites
-                        prereqs_met = True
-                        for prereq in tech.prerequisites:
-                            if prereq not in self.program.technologies or not self.program.technologies[prereq].researched:
-                                prereqs_met = False
-                                break
-                        
-                        # Check generation requirement
-                        gen_available = self.program.generation >= tech.min_generation
-                        
-                        if prereqs_met and gen_available:
-                            available_techs.append(tech)
-                
-                # Sort by tier then cost
-                available_techs.sort(key=lambda t: (t.tier, t.cost))
-                
-                for tech in available_techs:
-                    tier_label = f"[T{tech.tier}]"
-                    print(f"{len([t for t in available_techs if available_techs.index(tech) >= available_techs.index(t)])}. {tier_label} {tech.name} ({tech.cost} RP)")
-                    print(f"   {tech.description}")
-                
-                if not available_techs:
-                    self.program.message = "No new technologies available to research."
-                else:
-                    tech_choice = input("Enter tech number to research (or 0 to cancel): ")
-                    try:
-                        tech_idx = int(tech_choice) - 1
-                        if 0 <= tech_idx < len(available_techs):
-                            tech = available_techs[tech_idx]
-                            needs_doctrine = self.program.research_tech(tech.id)
-                            
-                            if needs_doctrine:
-                                print(f"\n*** DOCTRINE CHOICE REQUIRED: {tech.doctrine_choice['name']} ***")
-                                print(tech.doctrine_choice['description'])
-                                for i, option in enumerate(tech.doctrine_choice['options']):
-                                    print(f"{i+1}. {option['name']}: {option['description']}")
-                                
-                                doc_choice = input("Choose doctrine (1-2): ")
-                                try:
-                                    doc_idx = int(doc_choice) - 1
-                                    if 0 <= doc_idx < len(tech.doctrine_choice['options']):
-                                        self.program.choose_doctrine(tech.id, doc_idx)
-                                    else:
-                                        print("Invalid choice. Defaulting to first option.")
-                                        self.program.choose_doctrine(tech.id, 0)
-                                except ValueError:
-                                    print("Invalid input. Defaulting to first option.")
-                                    self.program.choose_doctrine(tech.id, 0)
-                        elif tech_idx != -1:
-                            self.program.message = "Invalid selection."
-                    except ValueError:
-                        self.program.message = "Invalid input."
-
-            elif choice == '5':
-                self.program.advance_generation()
-                
-            elif choice == '6':
-                confirm = input("Are you sure you want to quit? (y/n): ")
-                if confirm.lower() == 'y':
-                    self.program.game_over = True
-                    print("Thanks for playing!")
-            
-            elif choice == '7' and self.program.pending_attack_warnings:
-                # Defensive Actions Menu
-                print("\n⚠️ === DEFENSIVE ACTIONS MENU === ⚠️")
-                for i, warning in enumerate(self.program.pending_attack_warnings, 1):
-                    etas = warning.get_etas_remaining(self.program.generation)
-                    print(f"{i}. Defend against {warning.source.name} (ETA: {etas} gens, Defense: {warning.get_defense_percentage()}%)")
-                
-                threat_choice = input("\nSelect threat to defend against (or 0 to cancel): ")
-                try:
-                    threat_idx = int(threat_choice) - 1
-                    if 0 <= threat_idx < len(self.program.pending_attack_warnings):
-                        warning = self.program.pending_attack_warnings[threat_idx]
-                        
-                        print(f"\nDefensive options for {warning.source.name}:")
-                        print("1. 🛡️ Emergency Defense Protocol (ALL AP, 50% reduction)")
-                        print("2. 🚀 Evacuate Critical Infrastructure (1 AP, 30% reduction)")
-                        print("3. 📡 Attempt Diplomatic Contact (1 AP, small chance to abort)")
-                        
-                        def_choice = input("\nChoose defensive action (1-3, or 0 to cancel): ")
-                        
-                        if def_choice == '1':
-                            self.program.defend_emergency(threat_idx)
-                        elif def_choice == '2':
-                            self.program.defend_evacuate(threat_idx)
-                        elif def_choice == '3':
-                            self.program.defend_diplomacy(threat_idx)
-                        elif def_choice != '0':
-                            self.program.message = "Invalid defensive action choice."
-                    elif threat_idx != -1:
-                        self.program.message = "Invalid threat selection."
-                except ValueError:
-                    self.program.message = "Invalid input."
-            
-            # Dynamic handling for choices 7+
-            elif choice.isdigit():
-                choice_num = int(choice)
-                
-                # Build dynamic menu mapping
-                dynamic_option = 7
-                
-                # Option 7: Defensive Actions (if threats exist)
-                if choice_num == 7 and self.program.pending_attack_warnings:
-                    # Defensive Actions Menu
-                    print("\n⚠️ === DEFENSIVE ACTIONS MENU === ⚠️")
-                    for i, warning in enumerate(self.program.pending_attack_warnings, 1):
-                        etas = warning.get_etas_remaining(self.program.generation)
-                        print(f"{i}. Defend against {warning.source.name} (ETA: {etas} gens, Defense: {warning.get_defense_percentage()}%)")
-                    
-                    threat_choice = input("\nSelect threat to defend against (or 0 to cancel): ")
-                    try:
-                        threat_idx = int(threat_choice) - 1
-                        if 0 <= threat_idx < len(self.program.pending_attack_warnings):
-                            warning = self.program.pending_attack_warnings[threat_idx]
-                            
-                            print(f"\nDefensive options for {warning.source.name}:")
-                            print("1. 🛡️ Emergency Defense Protocol (ALL AP, 50% reduction)")
-                            print("2. 🚀 Evacuate Critical Infrastructure (1 AP, 30% reduction)")
-                            print("3. 📡 Attempt Diplomatic Contact (1 AP, small chance to abort)")
-                            
-                            def_choice = input("\nChoose defensive action (1-3, or 0 to cancel): ")
-                            
-                            if def_choice == '1':
-                                self.program.defend_emergency(threat_idx)
-                            elif def_choice == '2':
-                                self.program.defend_evacuate(threat_idx)
-                            elif def_choice == '3':
-                                self.program.defend_diplomacy(threat_idx)
-                            elif def_choice != '0':
-                                self.program.message = "Invalid defensive action choice."
-                        elif threat_idx != -1:
-                            self.program.message = "Invalid threat selection."
-                    except ValueError:
-                        self.program.message = "Invalid input."
-                    continue
-                
-                # Track next menu number after defenses
-                if self.program.pending_attack_warnings:
-                    dynamic_option = 8
-                
-                # AI Advisor option
-                if self.program.ai_advisor_unlocked and choice_num == dynamic_option:
-                    self.program.consult_advisor()
-                    continue
-                
-                # Increment if AI Advisor was shown
-                if self.program.ai_advisor_unlocked:
-                    dynamic_option += 1
-                
-                # Swan Song option
-                undiscovered_count = len(undiscovered_swan_songs)
-                if undiscovered_count > 0 and choice_num == dynamic_option:
-                    # Swan Song discovery interface
-                    print("\n🕊️ === SWAN SONG DISCOVERY === 🕊️")
-                    print("\nExtinct civilizations with undiscovered transmissions:")
-                    for i, name in enumerate(undiscovered_swan_songs, 1):
-                        system = self.program.star_systems[name]
-                        print(f"{i}. {name} ({system.distance:.1f} LY) - Knowledge: {int(system.knowledge)}%")
-                        if system.knowledge < 30:
-                            print(f"   ⚠️ Need 30%+ knowledge to detect artifacts (currently {int(system.knowledge)}%)")
-                    
-                    swan_choice = input("\nSelect system to scan (or 0 to cancel): ")
-                    try:
-                        swan_idx = int(swan_choice) - 1
-                        if 0 <= swan_idx < len(undiscovered_swan_songs):
-                            system_name = undiscovered_swan_songs[swan_idx]
-                            self.program.listen_for_swan_song(system_name)
-                        elif swan_idx != -1:
-                            self.program.message = "Invalid selection."
-                    except ValueError:
-                        self.program.message = "Invalid input."
-                    continue
-                
-                # Invalid choice fallthrough
-                self.program.message = f"Invalid choice. Please enter a number from 1 to {menu_max}."
-
-            
-            else:
-                # Calculate correct max choice
-                max_choice = 6
-                if self.program.pending_attack_warnings:
-                    max_choice = 7
-                if self.program.ai_advisor_unlocked:
-                    max_choice += 1
-                    
-                # Genesis Project Menus
-                if self.program.genesis.unlocked:
-                    # Calculate dynamic option number for Genesis
-                    genesis_option = 7
-                    if self.program.pending_attack_warnings: genesis_option += 1
-                    if self.program.ai_advisor_unlocked: genesis_option += 1
-                    if undiscovered_swan_songs: genesis_option += 1
-                    
-                    if choice_num == genesis_option:
-                        print("\n🌱 === GENESIS PROJECT === 🌱")
-                        print(f"Cost to seed world: {self.program.genesis.seed_cost_rp} RP, {self.program.genesis.seed_cost_funding}% Funding")
-                        print("Sterile worlds available for seeding:")
-                        
-                        sterile_worlds = []
-                        for name, system in self.program.star_systems.items():
-                            if not system.has_civilization and not system.is_seeded:
-                                sterile_worlds.append(system)
-                        
-                        for i, system in enumerate(sterile_worlds, 1):
-                            print(f"{i}. {system.name} ({system.distance:.1f} LY)")
-                            
-                        seed_choice = input("\nSelect system to seed (or 0 to cancel): ")
-                        try:
-                            seed_idx = int(seed_choice) - 1
-                            if 0 <= seed_idx < len(sterile_worlds):
-                                system = sterile_worlds[seed_idx]
-                                success, msg = self.program.genesis.seed_world(self.program, system)
-                                self.program.message = msg
-                            elif seed_idx != -1:
-                                self.program.message = "Invalid selection."
-                        except ValueError:
-                            self.program.message = "Invalid input."
-                        continue
-
-                # Philosophical Event option
-                if self.program.pending_philosophical_event:
-                    # Calculate dynamic option number for Philosophical Event
-                    philo_option = 7
-                    if self.program.pending_attack_warnings: philo_option += 1
-                    if self.program.ai_advisor_unlocked: philo_option += 1
-                    if undiscovered_swan_songs: philo_option += 1
-                    if self.program.genesis.unlocked: philo_option += 1
-
-                    if choice_num == philo_option:
-                        event = self.program.pending_philosophical_event
-                        print(f"\n🤔 === PHILOSOPHICAL EVENT: {event.name} === 🤔")
-
-                        # Display choices
-                        for i, choice in enumerate(event.choices, 1):
-                            print(f"{i}. {choice['name']}")
-                            print(f"   {choice['description']}")
-                            print()
-
-                        # Get player choice
-                        philo_choice = input("Choose your response (1-3, or 0 to postpone): ")
-                        try:
-                            choice_idx = int(philo_choice) - 1
-                            if choice_idx >= 0 and choice_idx < len(event.choices):
-                                self.program.handle_philosophical_event_choice(choice_idx)
-                            elif choice_idx == -1:
-                                self.program.message = "Philosophical event postponed. You will be prompted again next generation."
-                            else:
-                                self.program.message = "Invalid choice."
-                        except ValueError:
-                            self.program.message = "Invalid input."
-                        continue
-
-                if self.program.ai_advisor_unlocked:
-                    max_choice += 1
-                if undiscovered_swan_songs:
-                    max_choice += 1
-                
-                # Genesis Project option
-                if self.program.genesis.unlocked:
-                    max_choice += 1
-
-                # Philosophical Event option
-                if self.program.pending_philosophical_event:
-                    max_choice += 1
-                    
-                self.program.message = f"Invalid choice. Please enter a number from 1 to {max_choice}."
-        
-        # Final display after game ends
-        self.display_game()
-        
-        if self.program.victory:
-            print("\nCONGRATULATIONS!")
-            print("Earth has successfully established contact with multiple alien civilizations.")
-            print("A new era of interstellar cooperation and knowledge exchange has begun.")
-            logging.info("GAME OVER: VICTORY - Contact established with 3+ civilizations.")
-        else:
-            print("\nTHE PROGRAM HAS ENDED")
-            print("Despite your efforts, Earth's interstellar contact program has been discontinued.")
-            print(f"You reached Generation {self.program.generation} and achieved a Knowledge Base of {int(self.program.knowledge_base)}%.")
-            logging.info(f"GAME OVER: Defeat/Discontinued. Gen {self.program.generation}, Knowledge {int(self.program.knowledge_base)}%")
-        
-        print("\nThank you for playing Legacy of Stars!")
-
-if __name__ == "__main__":
-    # Create timestamped log file for this session
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"game_{timestamp}.log"
-    
-    logging.basicConfig(
-        filename=log_filename,
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    
-    logging.info("="*50)
-    logging.info(f"LEGACY OF STARS - Session Started")
-    logging.info(f"Log file: {log_filename}")
-    logging.info("="*50)
-    
-    print(f"\nLogging to: {log_filename}\n")
-    
-    game = GameInterface()
-    # Present WOW! Signal opening scenario
-    game.program.wow_signal.present_opening_scenario()
-    
-    game.play()
