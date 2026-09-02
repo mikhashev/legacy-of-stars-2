@@ -1,81 +1,82 @@
-# Legacy of Stars — план веб-версии (Three.js + шейдеры)
+# Legacy of Stars — Web Version Plan (Three.js + shaders)
 
-**Дата:** 2026-09-03
-**Основание:** раздел «Путь к веб-версии» плана v1.0; движок v1.1 стабилен, 186 тестов зелёные
-**Статус:** утверждён, решения владельца в §9
+**Date:** 2026-09-03
+**Basis:** the "Path to a web version" section of the v1.0 plan; the v1.1 engine is stable, 186 tests green
+**Status:** approved, owner decisions in §9
 
 ---
 
-## 0. Резюме и рекомендация
+## 0. Summary and recommendation
 
-Веб-версия — та же игра в браузере: 3D-карта звёзд вокруг Земли, HUD вместо текстового меню,
-анимации световых сфер и флотов по событиям движка, сохранения в браузере, статический сайт
-на GitHub Pages.
+The web version is the same game in a browser: a 3D star map around Earth, a HUD instead of the
+text menu, animations of light spheres and fleets driven by engine events, browser-based saves,
+a static site on GitHub Pages.
 
-**Рекомендация:** вариант **A — Pyodide + Three.js**. Python-движок исполняется в браузере
-через WebAssembly в Web Worker, фронтенд на TypeScript (Vite, Three.js, Preact для HUD)
-общается с ним только JSON-сообщениями. Один код движка и один набор тестов; сервер не нужен.
+**Recommendation:** option **A — Pyodide + Three.js**. The Python engine runs in the browser via
+WebAssembly in a Web Worker, the frontend is TypeScript (Vite, Three.js, Preact for the HUD) and
+talks to it only through JSON messages. One engine codebase and one test suite; no server needed.
 
-Шесть фаз, W0–W5, порядок такой, что играбельная веб-версия (пока без 3D) появляется после W2,
-а 3D и шейдеры добавляются поверх. Оценка — 14–19 рабочих дней чистого времени.
+Six phases, W0–W5, ordered so that a playable web version (without 3D yet) appears after W2, with
+3D and shaders layered on top. Estimate: 14–19 net working days.
 
-| Фаза | Что | Оценка |
+| Phase | What | Estimate |
 |---|---|---|
-| W0 | Фасад движка `GameSession.perform()`, контракт JSON, тесты | 1 день |
-| W1 | Pyodide в Web Worker, сборка `engine.zip`, экран загрузки | 1–2 дня |
-| W2 | Играбельный веб-UI без 3D: HUD, действия, диалоги, журнал, сохранения | 3–4 дня |
-| W3 | 3D-карта звёзд: координаты, спектральные цвета, выбор кликом, туман | 3–4 дня |
-| W4 | Шейдеры и анимации событий: сферы сообщений, флоты, фронт утечки, фон | 3–5 дней |
-| W5 | Полировка и релиз: адаптивность, клавиши, финальный экран, GitHub Pages | 2 дня |
+| W0 | Engine facade `GameSession.perform()`, JSON contract, tests | 1 day |
+| W1 | Pyodide in a Web Worker, `engine.zip` build, loading screen | 1–2 days |
+| W2 | Playable web UI without 3D: HUD, actions, dialogs, log, saves | 3–4 days |
+| W3 | 3D star map: coordinates, spectral colors, click selection, fog | 3–4 days |
+| W4 | Shaders and event animations: message spheres, fleets, leakage front, background | 3–5 days |
+| W5 | Polish and release: responsiveness, hotkeys, final screen, GitHub Pages | 2 days |
 
 ---
 
-## 1. Рамки
+## 1. Scope
 
-**Входит:** полный игровой цикл v1.1 (открытие Wow!, все действия, доктрины, философские
-события, оборона, лебединые песни, ковчеги, победы, финальный отчёт); 3D-карта; анимации по
-событиям; сохранения в localStorage плюс экспорт/импорт JSON-файла; английский текст игры.
+**In scope:** the full v1.1 game loop (the Wow! discovery, all actions, doctrines, philosophical
+events, defense, swan songs, arks, victories, the final report); the 3D map; event-driven
+animations; saves in localStorage plus JSON file export/import; the game's English text.
 
-**Не входит:** LLM в браузере (офлайн-режим и так основной; см. §7 про возможный мост позже),
-мультиплеер, новый нарратив, локализация, мобильная оптимизация сверх «не ломается на планшете».
+**Out of scope:** an in-browser LLM (offline mode is the primary mode anyway; see §7 on a
+possible bridge later), multiplayer, new narrative content, localization, mobile optimization
+beyond "doesn't break on a tablet."
 
 ---
 
-## 2. Выбор платформы
+## 2. Platform choice
 
-| Вариант | Как | Плюсы | Минусы |
+| Option | How | Pros | Cons |
 |---|---|---|---|
-| **A. Pyodide + Three.js** | движок на Python исполняется в браузере (WebAssembly), фронтенд вызывает его через JSON-мост в Web Worker | один код и одни тесты; статический сайт; правки правил делаются один раз | ~7–10 МБ первой загрузки (кэшируется), старт 2–4 с; `urllib` не работает — LLM недоступен |
-| B. Python-сервер + Three.js | движок за HTTP/WebSocket API, браузер — клиент | LLM работает; тонкий API | нужен запущенный сервер; «просто открыть ссылку» не получится |
-| C. Переписать движок на TypeScript | нативная веб-игра | мгновенный старт, один язык | ~5 тыс. строк логики и ~190 тестов переписать и держать в синхроне; Python становится легаси |
+| **A. Pyodide + Three.js** | the Python engine runs in the browser (WebAssembly), the frontend calls it over a JSON bridge in a Web Worker | one codebase and one test suite; static site; rule changes are made once | ~7–10 MB initial load (cached), 2–4 s startup; `urllib` doesn't work — LLM unavailable |
+| B. Python server + Three.js | the engine sits behind an HTTP/WebSocket API, the browser is a client | LLM works; a thin API | needs a running server; "just open the link" doesn't work |
+| C. Rewrite the engine in TypeScript | a native web game | instant start, one language | ~5,000 lines of logic and ~190 tests to rewrite and keep in sync; Python becomes legacy |
 
-**Почему A.** Движок уже удовлетворяет всему, что нужно A: без I/O в игровой логике,
-`view_state()`, `available_actions()`, `drain_events()`, `to_dict()/from_dict()`, координаты
-звёзд. Единственные обращения к диску — чтение `data/*.json` при старте, они работают в
-виртуальной ФС Pyodide. Вариант C остаётся запасным: контракт JSON из W0 одинаков для A и C,
-поэтому переписывание на TS позже не потребует менять фронтенд.
+**Why A.** The engine already satisfies everything A needs: no I/O in the game logic,
+`view_state()`, `available_actions()`, `drain_events()`, `to_dict()/from_dict()`, star
+coordinates. The only disk access is reading `data/*.json` at startup, which works fine on
+Pyodide's virtual filesystem. Option C stays as a fallback: the JSON contract from W0 is the
+same for A and C, so rewriting in TS later wouldn't require changing the frontend.
 
 ---
 
-## 3. Архитектура
+## 3. Architecture
 
 ```
 browser
 ├── main thread: Vite + TypeScript
-│   ├── ui/        Preact-компоненты HUD (статус, действия, диалоги, журнал, досье, техдерево)
-│   ├── scene/     Three.js: карта звёзд, камера, сферы/траектории, шейдеры
-│   ├── bridge.ts  postMessage-клиент к воркеру: newGame / load / perform / state / save
-│   └── store.ts   последнее view_state + очередь событий → UI и сцена
+│   ├── ui/        Preact components for the HUD (status, actions, dialogs, log, dossier, tech tree)
+│   ├── scene/     Three.js: star map, camera, spheres/trajectories, shaders
+│   ├── bridge.ts  postMessage client to the worker: newGame / load / perform / state / save
+│   └── store.ts   the latest view_state plus event queue → UI and scene
 └── worker: Pyodide
-    ├── engine.zip (src/ + data/), распакован в /engine
-    └── src/web_api.py: GameSession — единственная точка входа для JS
+    ├── engine.zip (src/ + data/), unpacked into /engine
+    └── src/web_api.py: GameSession — the single entry point for JS
 ```
 
-**Правила моста.** Через границу Python↔JS ходят только строки JSON (без прокси-объектов
-Pyodide: они текут по памяти и ломают сериализацию). Воркер держит один `GameSession`.
-Главный поток никогда не блокируется: каждый вызов — `Promise`.
+**Bridge rules.** Only JSON strings cross the Python↔JS boundary (no Pyodide proxy objects: they
+leak memory and break serialization). The worker holds a single `GameSession`. The main thread is
+never blocked: every call is a `Promise`.
 
-**Контракт (W0)** — `src/web_api.py`:
+**Contract (W0)** — `src/web_api.py`:
 
 ```python
 class GameSession:
@@ -88,144 +89,148 @@ class GameSession:
         #     "needs": null | {"kind": "doctrine", "tech_id": ..., "options": [...]}}
 ```
 
-`perform` покрывает всё, что сейчас делает консольный диспетчер `GameInterface._act_*`:
-`send_message`, `focus_research`, `public_outreach`, `research_tech` (с продолжением
-`choose_doctrine`), `advance_generation`, `defend` (три вида), `consult_advisor`,
-`listen_swan_song`, `genesis_seed`, `respond_event`, плюс два действия открытия
-`wow_reply` / `wow_silent` и `compose_director_message`. Параметры — те же, что в
+`perform` covers everything the console dispatcher `GameInterface._act_*` currently does:
+`send_message`, `focus_research`, `public_outreach`, `research_tech` (with the `choose_doctrine`
+follow-up), `advance_generation`, `defend` (three kinds), `consult_advisor`,
+`listen_swan_song`, `genesis_seed`, `respond_event`, plus the two discovery actions
+`wow_reply` / `wow_silent` and `compose_director_message`. The parameters are the same as in
 `ActionSpec.needs`: `system`, `text`, `tech`, `threat`, `defense`, `choice`.
 
 ---
 
-## 4. Фазы
+## 4. Phases
 
-### W0 — Фасад движка и контракт (Python, без фронтенда)
+### W0 — Engine facade and contract (Python, no frontend)
 
-- Новый `src/web_api.py` с `GameSession` (выше). Внутри — только вызовы существующих методов
-  `ContactProgram`; никакой новой логики правил.
-- `ContactProgram` получает необязательный `data_dir` (сейчас путь вычисляется от `__file__`;
-  в Pyodide это работает, но явный параметр упрощает тесты и сборку).
-- Документ контракта `docs/web_contract.md`: схема `view_state` (уже есть в коде, описать поля),
-  все `kind` событий и их `data`, ответ `perform`. Это спецификация для фронтенда и для
-  варианта C, если он когда-нибудь понадобится.
-- Тесты `tests/test_web_api.py`: каждое действие через `perform`, доктрина через `needs`,
-  цикл new → save → load → state, полная партия через фасад 60 поколений без исключений,
-  и «санитарный» тест: JSON-ответы сериализуются `json.dumps` без `default=` (никаких
-  объектов движка наружу).
-- Проверка: `python -m unittest discover -s tests -t .`.
+- A new `src/web_api.py` with `GameSession` (above). Inside it, only calls to existing
+  `ContactProgram` methods; no new rules logic.
+- `ContactProgram` gets an optional `data_dir` (currently the path is computed from `__file__`;
+  this works fine on Pyodide, but an explicit parameter simplifies tests and the build).
+- A contract document `docs/web_contract.md`: the `view_state` schema (already present in code,
+  describe the fields), all event `kind`s and their `data`, the `perform` response. This is the
+  spec for the frontend, and for option C if it's ever needed.
+- Tests `tests/test_web_api.py`: every action via `perform`, a doctrine via `needs`, the
+  new → save → load → state cycle, a full 60-generation game through the facade with no
+  exceptions, and a "sanity" test: JSON responses serialize with `json.dumps` and no `default=`
+  (no engine objects leaking out).
+- Verification: `python -m unittest discover -s tests -t .`.
 
-### W1 — Pyodide в воркере
+### W1 — Pyodide in a worker
 
-- Каталог `web/` в этом же репозитории: `package.json`, Vite, TypeScript, Three.js, Preact.
-- `scripts/build_web_engine.py` собирает `web/public/engine.zip` из `src/` и `data/`
-  (без `legacy/`, тестов и `__pycache__`).
-- `web/src/worker.ts`: загрузка Pyodide (актуальная версия, Python 3.12) с CDN или из
-  `node_modules`, `unpackArchive`, `import web_api`, обработчик сообщений
+- A `web/` directory in this same repository: `package.json`, Vite, TypeScript, Three.js, Preact.
+- `scripts/build_web_engine.py` builds `web/public/engine.zip` from `src/` and `data/`
+  (excluding `legacy/`, tests, and `__pycache__`).
+- `web/src/worker.ts`: load Pyodide (a current version, Python 3.12) from a CDN or from
+  `node_modules`, `unpackArchive`, `import web_api`, a message handler
   `{id, method, args}` → `{id, result | error}`.
-- `bridge.ts` с типами, сгенерированными вручную из `docs/web_contract.md`
+- `bridge.ts` with types hand-generated from `docs/web_contract.md`
   (`ViewState`, `GameEvent`, `PerformResult`).
-- Экран загрузки с прогрессом; замер времени старта и размера в отчёте фазы.
-- Дымовая страница: новая игра, список действий, 10 раз `advance_generation`, вывод JSON.
-- Проверка: `npm run build` без ошибок, страница работает в Chrome и Firefox.
+- A loading screen with progress; measure startup time and size for the phase report.
+- A smoke-test page: new game, list of actions, `advance_generation` ten times, print the JSON.
+- Verification: `npm run build` with no errors, the page works in Chrome and Firefox.
 
-### W2 — Играбельный веб-UI без 3D
+### W2 — Playable web UI without 3D
 
-Цель фазы: в браузере можно сыграть партию до победы или поражения, паритет с консолью.
+Phase goal: a full game can be played in the browser to victory or defeat, at parity with the
+console version.
 
-- HUD-панели из `view_state`: статус программы (AP, funding, support, RP, tech level,
-  integration, риски, фронт утечки), директор, счётчики побед (contacts, Fermi evidence).
-- Панель действий из `available_actions()`; для `needs` — диалоги: выбор системы (список с
-  расстоянием и типом), текст сообщения, выбор технологии (по тирам, с `year_context` и
-  причиной блокировки), угроза + вид обороны, вариант ответа на событие, вариант доктрины.
-- Журнал событий: лента `events` с иконками по `kind`; крупные (`wow`, `victory`, `game_over`,
-  `attack_warning`, `philosophical_event`) — модальными окнами.
-- Сцена открытия Wow! 1977: тот же текст, что в `run_opening_scenario`, кнопки ответить/молчать,
-  ввод своего сообщения или черновик директора.
-- Досье системы: сообщения, ответы, ожидаемые прибытия.
-- Сохранения: автосейв после каждого поколения в localStorage, ручные слоты, экспорт/импорт
-  JSON-файла (совместим с `saves/*.json` консольной версии).
-- Финальный отчёт и очки: `build_summary` возвращает текст — показывать как есть, позже
-  разложить по панелям.
-- Проверка: ручная партия до 40 поколений с событием, доктриной, обороной, сохранением и
-  загрузкой; тот же сценарий, что в плане v1.0 §«Итоговая проверка».
+- HUD panels from `view_state`: program status (AP, funding, support, RP, tech level,
+  integration, risks, leakage front), the director, contact/evidence counters (contacts, Fermi
+  evidence).
+- An actions panel from `available_actions()`; for `needs` — dialogs: pick a system (list with
+  distance and type), message text, pick a technology (by tier, with `year_context` and the
+  reason it's locked), threat + defense type, an event response choice, a doctrine choice.
+- An event log: a feed of `events` with icons by `kind`; the big ones (`wow`, `victory`,
+  `game_over`, `attack_warning`, `philosophical_event`) show as modal dialogs.
+- The Wow! 1977 opening scene: the same text as `run_opening_scenario`, reply/stay-silent
+  buttons, a custom message input or the director's draft.
+- A system dossier: messages, replies, expected arrivals.
+- Saves: autosave after every generation to localStorage, manual slots, JSON file
+  export/import (compatible with the console version's `saves/*.json`).
+- Final report and score: `build_summary` returns text — show it as is for now, break it out
+  into panels later.
+- Verification: a manual playthrough to 40 generations with an event, a doctrine, defense, a
+  save and a load; the same scenario as the "Final check" section of the v1.0 plan.
 
-### W3 — 3D-карта звёзд
+### W3 — 3D star map
 
-- Координаты: `ra`, `dec` (градусы J2000) и `distance` (св. лет) → декартовы:
-  `x = d·cos(dec)·cos(ra)`, `y = d·sin(dec)`, `z = d·cos(dec)·sin(ra)` (ось y — северный полюс).
-  Радиальное сжатие для читаемости: `r' = k·ln(1 + d/d0)`, чтобы 4 и 51 св. лет помещались в
-  один кадр; источник Wow! на 1800 св. лет — маркер на краю сцены в правильном направлении
-  (RA 293.7°, Dec −27°) с подписью расстояния.
-- Звёзды — спрайты/точки с цветом по спектральному классу (O синий … M красный, D белый,
-  III — крупнее), подписи через CSS2DRenderer, Земля в центре.
-- Неоткрытые звёзды каталога не рисуются; известные без знаний — тусклые; с цивилизацией
-  (по `description`) — цветной ореол; вымершие — серый; посеянные — зелёная метка.
-- Клик по звезде = выбор системы для следующего действия и открытие досье.
-- Камера: OrbitControls, фокус на выбранной звезде, кнопка «домой».
-- Проверка: все 53 звезды каталога в верных направлениях (сравнить Сириус, Вегу, Проксиму с
-  планетарием), 60 fps на интегрированной графике.
+- Coordinates: `ra`, `dec` (J2000 degrees) and `distance` (ly) → Cartesian:
+  `x = d·cos(dec)·cos(ra)`, `y = d·sin(dec)`, `z = d·cos(dec)·sin(ra)` (y axis = north pole).
+  Radial compression for readability: `r' = k·ln(1 + d/d0)`, so that 4 and 51 ly both fit in
+  one frame; the Wow! source at 1800 ly is a marker at the edge of the scene in the correct
+  direction (RA 293.7°, Dec −27°) with a distance label.
+- Stars are sprites/points colored by spectral class (O blue … M red, D white, III larger),
+  labels via CSS2DRenderer, Earth at the center.
+- Undiscovered catalog stars aren't drawn; known but unstudied ones are dim; those with a
+  civilization (per `description`) get a colored halo; extinct ones are gray; seeded ones get a
+  green marker.
+- Clicking a star selects the system for the next action and opens the dossier.
+- Camera: OrbitControls, focus on the selected star, a "home" button.
+- Verification: all 53 catalog stars in the correct directions (compare Sirius, Vega, Proxima
+  against a planetarium), 60 fps on integrated graphics.
 
-### W4 — Шейдеры и анимации по событиям
+### W4 — Shaders and event animations
 
-| Событие / состояние | Визуализация |
+| Event / state | Visualization |
 |---|---|
-| `messages_sent[].generation`, `arrival_gen` | Расходящаяся световая сфера от Земли радиусом `c × прошедшие годы`; гаснет при прибытии |
-| `next_response_gen` | Сфера от звезды к Земле |
-| `threats[]` (`eta`, `arrival_gen`, `attack_type`) | Траектория звезда→Земля с точкой флота по доле пройденного пути (0.1c / 0.175c / 0.12c), пульсация при `eta ≤ 2` |
-| `status.broadcast_radius` | Полупрозрачная сфера фронта утечки, растёт на 25 св. лет за поколение |
-| `system_discovered` | Вспышка и проявление звезды из тумана |
-| `response_received` | Импульс на звезде, вспышка у Земли |
-| `attack_resolved`, `info_attack` | Красная вспышка Земли |
-| `genesis` | След ковчега звезда←Земля, затем зелёное свечение колонии |
-| `wow` | Луч в направлении Стрельца |
-| Фон | Шейдер звёздного поля и туманности; «тёмный лес» — туман, скрывающий ещё не открытые направления |
+| `messages_sent[].generation`, `arrival_gen` | An expanding light sphere from Earth with radius `c × elapsed years`; fades on arrival |
+| `next_response_gen` | A sphere from the star toward Earth |
+| `threats[]` (`eta`, `arrival_gen`, `attack_type`) | A star→Earth trajectory with a fleet marker at the fraction of the distance covered (0.1c / 0.175c / 0.12c), pulsing when `eta ≤ 2` |
+| `status.broadcast_radius` | A translucent sphere for the leakage front, growing by 25 ly per generation |
+| `system_discovered` | A flash and the star emerging from the fog |
+| `response_received` | A pulse at the star, a flash at Earth |
+| `attack_resolved`, `info_attack` | A red flash at Earth |
+| `genesis` | An ark trail star←Earth, then a green glow at the colony |
+| `wow` | A beam toward Sagittarius |
+| Background | A starfield and nebula shader; "dark forest" is a fog hiding directions not yet discovered |
 
-Все анимации выводятся из `view_state` и `events`, движок не меняется. Переход поколения —
-одна анимация в 1–2 с, все сферы и флоты продвигаются на 25 лет.
+All animations are derived from `view_state` and `events`; the engine doesn't change. A
+generation advance is a single 1–2 s animation, all spheres and fleets move forward by 25 years.
 
-### W5 — Полировка и релиз
+### W5 — Polish and release
 
-- Адаптивная раскладка (панели складываются на узком экране), клавиши как в консоли (1–6, v, s, h).
-- Экран помощи из `HELP_TEXT`, достижения, статистика.
-- GitHub Actions: сборка `engine.zip` + `vite build` + деплой на GitHub Pages; кэш Pyodide
-  через service worker, чтобы второй запуск был мгновенным.
-- README: ссылка «играть в браузере», раздел про веб-сборку.
-- Бюджеты: первая загрузка ≤ 12 МБ, старт ≤ 4 с на обычном ноутбуке, 60 fps в сцене.
-
----
-
-## 5. Что нужно поменять в движке (минимум)
-
-- `src/web_api.py` — новый фасад (W0).
-- `ContactProgram(data_dir=...)` — необязательный параметр (W0).
-- Ничего в правилах. Консольный `GameInterface` продолжает работать; тесты движка не трогаются.
-- Опционально: `build_summary` разбить на структуру `summary_dict()` для панелей (W5).
+- Responsive layout (panels stack on narrow screens), hotkeys matching the console (1–6, v, s, h).
+- A help screen from `HELP_TEXT`, achievements, statistics.
+- GitHub Actions: build `engine.zip` + `vite build` + deploy to GitHub Pages; cache Pyodide via
+  a service worker so the second run is instant.
+- README: a "play in browser" link, a section on the web build.
+- Budgets: first load ≤ 12 MB, startup ≤ 4 s on a typical laptop, 60 fps in the scene.
 
 ---
 
-## 6. Риски и как их закрыть
+## 5. What needs to change in the engine (minimum)
 
-| Риск | Мера |
+- `src/web_api.py` — the new facade (W0).
+- `ContactProgram(data_dir=...)` — an optional parameter (W0).
+- Nothing in the rules. The console `GameInterface` keeps working; the engine's tests aren't
+  touched.
+- Optional: split `build_summary` into a `summary_dict()` structure for panels (W5).
+
+---
+
+## 6. Risks and mitigations
+
+| Risk | Mitigation |
 |---|---|
-| Размер и время загрузки Pyodide | Замер в W1; service worker и кэш; экран загрузки с прогрессом; если >4 с на ноутбуке — рассматривать вариант C |
-| Утечки памяти через прокси Pyodide | Только JSON-строки через границу, правило в `bridge.ts` и тесте W0 |
-| Расхождение фронтенда и движка после правок правил | Единственный источник — `docs/web_contract.md` + тест W0, что `view_state` соответствует схеме |
-| Пути к `data/` в виртуальной ФС | `data_dir` параметр + сборочный скрипт кладёт `data/` рядом с `src/` |
-| Читаемость карты (4 против 51 св. лет) | Логарифмическое сжатие радиуса, подписи расстояний, режим «истинный масштаб» кнопкой |
-| Производительность шейдеров на слабых GPU | Всё в одном `ShaderMaterial` на сферы, ≤ 100 объектов, деградация: отключить фон-туманность |
+| Pyodide size and load time | Measure in W1; service worker and caching; a loading screen with progress; if >4 s on a laptop — consider option C |
+| Memory leaks via Pyodide proxies | Only JSON strings cross the boundary, enforced in `bridge.ts` and the W0 test |
+| Frontend and engine drifting apart after rule changes | A single source of truth — `docs/web_contract.md` + a W0 test that `view_state` matches the schema |
+| Paths to `data/` on the virtual filesystem | `data_dir` parameter + the build script places `data/` next to `src/` |
+| Map readability (4 vs. 51 ly) | Logarithmic radius compression, distance labels, a "true scale" toggle button |
+| Shader performance on weak GPUs | Everything in one `ShaderMaterial` for the spheres, ≤ 100 objects, degrade by disabling the background nebula |
 
 ---
 
-## 7. LLM в браузере (позже, не в этом плане)
+## 7. LLM in the browser (later, not part of this plan)
 
-`AIManager` вызывает `urllib`, который в Pyodide не работает. Если захочется LLM в вебе:
-провайдер `js_fetch`, где Python через `pyodide.ffi` вызывает JS `fetch` к локальному
-Ollama/LM Studio с CORS. Движок это допускает (`_ai_text` уже изолирован), объём небольшой,
-но это отдельная задача после W5.
+`AIManager` calls `urllib`, which doesn't work on Pyodide. If an LLM in the web version is
+wanted later: a `js_fetch` provider, where Python calls the JS `fetch` via `pyodide.ffi` to a
+local Ollama/LM Studio with CORS. The engine allows for this (`_ai_text` is already isolated),
+the amount of work is small, but it's a separate task after W5.
 
 ---
 
-## 8. Проверка по фазам
+## 8. Verification by phase
 
 ```bash
 python -m unittest discover -s tests -t . -v        # W0: + tests/test_web_api.py
@@ -233,16 +238,17 @@ python scripts/build_web_engine.py                  # W1: web/public/engine.zip
 cd web && npm run build && npm run preview          # W1–W5
 ```
 
-Ручные сценарии: W1 дымовая страница; W2 партия 40 поколений с сохранением/загрузкой;
-W3 сверка направлений звёзд; W4 сообщение к Проксиме (сфера доходит за 1 поколение) и флот от
-LA-системы (точка движется по траектории до ETA); W5 деплой и запуск с чистого профиля.
+Manual scenarios: W1 the smoke-test page; W2 a 40-generation game with save/load; W3 checking
+star directions; W4 a message to Proxima (the sphere arrives in 1 generation) and a fleet from
+an LA system (the marker moves along the trajectory to ETA); W5 deploy and launch from a clean
+profile.
 
 ---
 
-## 9. Решения владельца (приняты 2026-09-03)
+## 9. Owner decisions (made 2026-09-03)
 
-1. **Платформа:** A — Pyodide + Three.js.
+1. **Platform:** A — Pyodide + Three.js.
 2. **HUD:** Preact.
-3. **Код:** каталог `web/` в этом репозитории.
-4. **Порядок:** играбельный UI без 3D (W2) до карты (W3).
-5. **Хостинг:** GitHub Pages.
+3. **Code:** a `web/` directory in this repository.
+4. **Order:** playable UI without 3D (W2) before the map (W3).
+5. **Hosting:** GitHub Pages.

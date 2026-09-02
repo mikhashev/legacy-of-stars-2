@@ -1,134 +1,140 @@
-# Legacy of Stars — аудит научной достоверности
+# Legacy of Stars — Scientific Accuracy Audit
 
-**Дата:** 2026-09-02
-**Проверено:** `src/*.py`, `data/star_catalog.json`, `data/tech_tree.json`, `data/templates/*.json`, `README.md`, `docs/*.md`
-**Статус файла:** открытый, в репозитории
+**Date:** 2026-09-02
+**Reviewed:** `src/*.py`, `data/star_catalog.json`, `data/tech_tree.json`, `data/templates/*.json`, `README.md`, `docs/*.md`
+**File status:** open, in the repository
 
-Собственный стандарт проекта задан в `docs/design_notes.md` §8 «Scientific Realism Standards»:
-без FTL, связь ограничена *c*, реальные спектральные классы и обитаемые зоны, эволюция по
-естественному отбору. Ниже — где игра и документы этому стандарту соответствуют, а где нет.
+The project's own standard is set in `docs/design_notes.md` §8 "Scientific Realism Standards":
+no FTL, communication limited to *c*, real spectral classes and habitable zones, evolution by
+natural selection. Below is where the game and the documents meet this standard, and where they don't.
 
 ---
 
-## 1. Итог
+## 1. Summary
 
-| Область | Оценка | Комментарий |
+| Area | Assessment | Comment |
 |---|---|---|
-| Каталог звёзд (расстояния, спектры, RA/Dec) | ✅ точно | Все 53 записи совпадают со справочными данными в пределах округления |
-| История SETI в дереве технологий (даты, проекты) | ✅ точно | Ozma 1960, Дрейк 1961, Аресибо 1963, Voyager 1977, SETI@home 1999, Kepler 2009, Breakthrough Listen 2015, SKA 2020-е |
-| Факты о сигнале Wow! | ✅ в основном точно | 1420 МГц, 72 с, 6EQUJ5, Стрелец, Big Ear; одна неточность (см. 3.7) |
-| Скорость света для сообщений | ✅ точно | 2·d / 25 лет, округление вверх |
-| Скорость флотов 0.1c / 0.175c / 0.12c | ✅ правдоподобно | Daedalus 0.12c и Starshot 0.15–0.2c — реальные проектные цифры |
-| Wow!-сюжет (Gen 144) | ❌ противоречит собственной физике | Флот летит со скоростью света; источник берётся из звёзд ≤ 51 св. лет вместо ~1800 |
-| Годы в дереве технологий | ❌ арифметическая ошибка | Все `year_context` сдвинуты на +23 года относительно формулы игры |
-| Проект «Генезис» | ❌ грубое нарушение биологии | Микробы → разум за 625 лет вместо ~3–4 млрд лет |
-| Обитаемость / спектральные классы | ⚠️ не моделируется | Цивилизации с равной вероятностью у белого карлика, гиганта и G-звезды |
-| Пассивная утечка радиосигналов | ⚠️ модель перевёрнута | Радиус растёт с техникой, а не со временем; Земля реально становится тише |
-| Вымершие цивилизации и «лебединые песни» | ⚠️ нарушение причинности | Вымерли 500–5000 лет назад на расстоянии 4–50 св. лет, но сигнал ловим сейчас |
-| «Faster-than-light» в описании стадии INTERSTELLAR | ❌ прямое нарушение правила «no FTL» | Одна строка текста |
+| Star catalog (distances, spectra, RA/Dec) | ✅ accurate | All 53 entries match reference data within rounding |
+| SETI history in the tech tree (dates, projects) | ✅ accurate | Ozma 1960, Drake 1961, Arecibo 1963, Voyager 1977, SETI@home 1999, Kepler 2009, Breakthrough Listen 2015, SKA 2020s |
+| Facts about the Wow! signal | ✅ mostly accurate | 1420 MHz, 72 s, 6EQUJ5, Sagittarius, Big Ear; one inaccuracy (see 3.7) |
+| Speed of light for messages | ✅ accurate | 2·d / 25 years, rounded up |
+| Fleet speeds 0.1c / 0.175c / 0.12c | ✅ plausible | Daedalus 0.12c and Starshot 0.15–0.2c are real project figures |
+| Wow! storyline (Gen 144) | ❌ contradicts the game's own physics | Fleet travels at the speed of light; the source is picked from stars ≤ 51 ly instead of ~1800 |
+| Years in the tech tree | ❌ arithmetic error | All `year_context` values are offset by +23 years relative to the game's formula |
+| The "Genesis" project | ❌ gross violation of biology | Microbes → intelligence in 625 years instead of ~3–4 billion years |
+| Habitability / spectral classes | ⚠️ not modeled | Civilizations arise with equal probability at a white dwarf, a giant, and a G star |
+| Passive radio leakage | ⚠️ model is inverted | Radius grows with tech level rather than time; Earth is actually getting quieter |
+| Extinct civilizations and "swan songs" | ⚠️ causality violation | Went extinct 500–5000 years ago at a distance of 4–50 ly, but we catch the signal now |
+| "Faster-than-light" in the INTERSTELLAR stage description | ❌ direct violation of the "no FTL" rule | One line of text |
 
-Общий вывод: физика связи и полётов в движке аккуратная, астрономический каталог хороший,
-хронология SETI верная. Основные проблемы — три: (1) сюжет Wow! написан под старую модель
-«флот на скорости света» и не согласован с 0.1c; (2) `year_context` в дереве технологий
-считает год от 2000, а игра — от 1977; (3) Генезис нарушает эволюционные масштабы времени на
-шесть порядков. Остальное — умеренные упрощения, характерные для стратегии.
+Overall conclusion: the engine's communication and travel physics are careful, the astronomical
+catalog is good, and the SETI chronology is correct. There are three main problems: (1) the Wow!
+storyline was written for the old "fleet at light speed" model and is not consistent with 0.1c;
+(2) `year_context` in the tech tree counts the year from 2000, while the game counts from 1977;
+(3) Genesis violates evolutionary timescales by six orders of magnitude. Everything else consists
+of moderate simplifications typical of a strategy game.
 
 ---
 
-## 2. Что подтверждено как точное
+## 2. What is confirmed as accurate
 
-### 2.1 Каталог звёзд (`data/star_catalog.json`)
+### 2.1 Star catalog (`data/star_catalog.json`)
 
-Проверены все 53 записи. Расстояния, спектральные классы и координаты J2000 совпадают со
-справочными значениями (RECONS, Gaia DR3, SIMBAD) в пределах 0.1 св. года и 0.05°.
-Примеры: Proxima 4.24 св. лет M5.5V, Tau Ceti 11.91 G8.5V, TRAPPIST-1 40.7 M8V, Van Maanen DZ8.
+All 53 entries were checked. Distances, spectral classes, and J2000 coordinates match
+reference values (RECONS, Gaia DR3, SIMBAD) within 0.1 ly and 0.05°.
+Examples: Proxima 4.24 ly M5.5V, Tau Ceti 11.91 G8.5V, TRAPPIST-1 40.7 M8V, Van Maanen DZ8.
 
-Замечания к каталогу (не ошибки, а неполнота и следствия):
+Notes on the catalog (not errors, but incompleteness and its consequences):
 
-- Комментарий «Real stars within ~51 light-years» читается как «все звёзды в этом радиусе».
-  На деле это выборка: в 20 св. годах пропущены, например, 40 Eridani (16.3), 70 Ophiuchi (16.6),
-  36 Ophiuchi, AD Leonis, Groombridge 1618, Gliese 412, а также ближайшие коричневые карлики
-  Luhman 16 (6.5) и WISE 0855 (7.4). Для игры это нормально, но комментарий стоит переформулировать
-  в «a selection of real stars».
-- Proxima Centauri и Alpha Centauri — одна гравитационно связанная тройная система, в игре
-  это две независимые системы, каждая со своим броском на цивилизацию.
-- Для 82 G. Eridani чаще указывают G8V, для Gliese 832 — M1.5V, для Epsilon Indi — K4V/K5V.
-  Расхождения в полподкласса, несущественно.
+- The comment "Real stars within ~51 light-years" reads as "all stars within this radius."
+  In fact it is a selection: within 20 ly it omits, for example, 40 Eridani (16.3), 70 Ophiuchi (16.6),
+  36 Ophiuchi, AD Leonis, Groombridge 1618, Gliese 412, as well as the nearest brown dwarfs
+  Luhman 16 (6.5) and WISE 0855 (7.4). That's fine for the game, but the comment should be
+  reworded to "a selection of real stars."
+- Proxima Centauri and Alpha Centauri are one gravitationally bound triple system; in the game
+  they are two independent systems, each with its own civilization roll.
+- For 82 G. Eridani, G8V is more commonly cited; for Gliese 832, M1.5V; for Epsilon Indi,
+  K4V/K5V. The discrepancies are half a subclass, immaterial.
 
-### 2.2 Хронология SETI в дереве технологий
+### 2.2 SETI chronology in the tech tree
 
-Все реальные даты верны: Project Ozma (1960), уравнение Дрейка (1961), Аресибо (1963, 305 м),
-Voyager Golden Record (1977), SETI@home (май 1999), Kepler (март 2009), Breakthrough Listen
-(июль 2015, $100 млн), SKA (строительство с декабря 2022), Breakthrough Starshot (15–20% c,
-граммовые зонды), Project Daedalus (BIS, 1973–78, D/He-3, 12% c), IKAROS (2010),
+All real dates are correct: Project Ozma (1960), the Drake equation (1961), Arecibo (1963, 305 m),
+the Voyager Golden Record (1977), SETI@home (May 1999), Kepler (March 2009), Breakthrough Listen
+(July 2015, $100 million), SKA (construction from December 2022), Breakthrough Starshot (15–20% c,
+gram-scale probes), Project Daedalus (BIS, 1973–78, D/He-3, 12% c), IKAROS (2010),
 LightSail-2 (2019).
 
-### 2.3 Физика связи и полётов в движке
+### 2.3 Communication and travel physics in the engine
 
-- `StarSystem.get_round_trip_time` (`src/legacy_of_stars_v3.py:230`): 2·d лет / 25, округление
-  вверх. README «12 св. лет — ответ через поколение» согласуется.
-- `attack_arrival_generation` (`:711`): d (сигнал туда со скоростью света) + d/0.1 (флот назад)
-  = 11·d лет. Физически корректно для «ответного» флота.
-- LBA-ловушка: дружественный ответ приходит через 2d лет, флот позже — согласовано.
-- Замедление времени при 0.1c (γ = 1.005) и 0.175c (γ = 1.016) пренебрежимо; правильно,
-  что не моделируется.
-- Стандартная генерация 25 лет — общепринятая демографическая величина.
+- `StarSystem.get_round_trip_time` (`src/legacy_of_stars_v3.py:230`): 2·d years / 25, rounded
+  up. The README's "12 ly — a reply within a generation" is consistent with this.
+- `attack_arrival_generation` (`:711`): d (signal there at the speed of light) + d/0.1 (fleet back)
+  = 11·d years. Physically correct for a "retaliatory" fleet.
+- The LBA trap: a friendly reply arrives after 2d years, the fleet later — consistent.
+- Time dilation at 0.1c (γ = 1.005) and 0.175c (γ = 1.016) is negligible; correctly not modeled.
+- The standard 25-year generation is a conventional demographic figure.
 
-### 2.4 Сигнал Wow!
+### 2.4 The Wow! signal
 
-Дата 15 августа 1977, 23:16 EDT, Big Ear (Ohio State University), 1420 МГц (линия водорода),
-72 секунды, запись 6EQUJ5 (пик «U» ≈ 30σ над фоном), направление — созвездие Стрельца
-у Chi Sagittarii, сигнал не повторился — всё верно. Оценка ~1800 св. лет с пометкой
-«disputed» — честно: это расстояние до звезды-кандидата 2MASS 19281982-2640123
-(Caballero, 2020–22), а не измеренное расстояние до источника.
+Date August 15, 1977, 23:16 EDT, Big Ear (Ohio State University), 1420 MHz (hydrogen line),
+72 seconds, the recording 6EQUJ5 (peak "U" ≈ 30σ above background), direction — the constellation
+Sagittarius near Chi Sagittarii, the signal was never repeated — all correct. The ~1800 ly
+estimate flagged as "disputed" is honest: this is the distance to the candidate star
+2MASS 19281982-2640123 (Caballero, 2020–22), not a measured distance to the source.
 
-Население Земли «4 billion» в 1977 — верно (≈4.2 млрд). Содержимое Аресибского послания 1974
-(числа, атомные номера, ДНК, человек, население, Солнечная система) — верно.
+Earth's population of "4 billion" in 1977 is correct (≈4.2 billion). The contents of the 1974
+Arecibo message (numbers, atomic numbers, DNA, a human figure, population, the Solar System)
+are correct.
 
-### 2.5 Теоретическая рамка
+### 2.5 Theoretical framework
 
-Стратегии L/LB/LR/LA/LBA, «SETI-парадокс» (Зайцев, 2006), правило 75/25 через survivorship
-bias, число Данбара (~150) в событии «Biology-Technology Gap», панспермия, гипотеза Великого
-фильтра — всё корректно передано как гипотезы. «Тёмный лес» подан как теория Лю Цысиня
-(2008); стоило бы упомянуть нехудожественного предшественника — David Brin, «The Great
-Silence» (1983).
+The L/LB/LR/LA/LBA strategies, the "SETI paradox" (Zaitsev, 2006), the 75/25 rule via
+survivorship bias, Dunbar's number (~150) in the "Biology-Technology Gap" event, panspermia,
+the Great Filter hypothesis — all correctly presented as hypotheses. "Dark Forest" is presented
+as Liu Cixin's theory (2008); it would be worth mentioning the non-fiction predecessor —
+David Brin, "The Great Silence" (1983).
 
 ---
 
-## 3. Расхождения
+## 3. Discrepancies
 
-Отсортировано по серьёзности. «Внутреннее» — противоречие правилам самой игры,
-«научное» — расхождение с известной наукой.
+Sorted by severity. "Internal" means a contradiction with the game's own rules,
+"scientific" means a discrepancy with established science.
 
-### 3.1 ❌ Сюжет Wow! противоречит модели 0.1c (внутреннее + научное)
+### 3.1 ❌ The Wow! storyline contradicts the 0.1c model (internal + scientific)
 
-Где: `src/wow_signal_event.py:214-215, 232`, `src/game_interface.py:121, 147-148`,
+Where: `src/wow_signal_event.py:214-215, 232`, `src/game_interface.py:121, 147-148`,
 `docs/development_roadmap.md:75, 92`, `docs/phase_2a_complete.md:26, 234`.
 
-1. **Флот со скоростью света.** Текст враждебного исхода: «72 generations for our message to
-   reach them. 72 generations for their weapons to reach us». Это 1800 св. лет за 1800 лет —
-   ровно *c*. При принятой в игре скорости 0.1c флот шёл бы 18 000 лет (720 поколений), прибытие
-   в поколение ~792. Код (`:232`) планирует атаку на текущее поколение 144.
-2. **Источник берётся из соседей.** `_assign_wow_civilization` (`:67`) выбирает случайную живую
-   цивилизацию из известных систем, все они ≤ 51 св. лет. Ответ от Tau Ceti пришёл бы через
-   24 года, а не через 3600. Сюжетно источник — в Стрельце на ~1800 св. лет.
-3. **Год 3577.** В UI (`game_interface.py:121`) и двух документах указан «Gen 144 (Year 3577)».
-   144 поколения × 25 лет = 3600 лет → ~5577. Ниже в том же экране (`:148`) печатается уже
-   5577. Формула движка для Gen 144 даёт 5552, потому что событие срабатывает в начале
-   поколения; 3600 лет ровно — это начало Gen 145 (мелкое «off-by-one»).
+1. **A fleet at the speed of light.** The hostile-outcome text reads: "72 generations for our
+   message to reach them. 72 generations for their weapons to reach us." That's 1800 ly in 1800
+   years — exactly *c*. At the game's adopted speed of 0.1c, a fleet would take 18,000 years
+   (720 generations), arriving around generation ~792. The code (`:232`) schedules the attack for
+   the current generation, 144.
+2. **The source is picked from neighbors.** `_assign_wow_civilization` (`:67`) picks a random
+   living civilization from the known systems, all of which are ≤ 51 ly away. A reply from Tau
+   Ceti would arrive in 24 years, not 3600. Per the story, the source is in Sagittarius at
+   ~1800 ly.
+3. **The year 3577.** The UI (`game_interface.py:121`) and two documents state "Gen 144
+   (Year 3577)." 144 generations × 25 years = 3600 years → ~5577. Further down on the same
+   screen (`:148`), 5577 is already printed. The engine's formula for Gen 144 gives 5552,
+   because the event fires at the start of the generation; exactly 3600 years is the start of
+   Gen 145 (a minor off-by-one).
 
-Рекомендация: добавить в каталог отдельную запись «Wow! source (Chi Sagittarii region), ~1800 LY»
-с флагом, не подпадающим под обычную выдачу; при враждебном исходе в Gen 144 приходит не флот,
-а *ответный сигнал* (информационная атака или объявление), а флот, если он вообще нужен,
-планировать на 0.1c с честным ETA. Заменить 3577 на 5577 везде.
+Recommendation: add a dedicated "Wow! source (Chi Sagittarii region), ~1800 LY" entry to the
+catalog, flagged so it doesn't fall under the regular draw; in the hostile outcome at Gen 144,
+what arrives is not a fleet but a *response signal* (an information attack or an announcement),
+and if a fleet is needed at all, schedule it at 0.1c with an honest ETA. Replace 3577 with 5577
+everywhere.
 
-### 3.2 ❌ `year_context` в дереве технологий сдвинут на +23 года (внутреннее)
+### 3.2 ❌ `year_context` in the tech tree is offset by +23 years (internal)
 
-Где: `data/tech_tree.json`, все записи с `min_generation ≥ 3`; `src/legacy_of_stars_v3.py:844`.
+Where: `data/tech_tree.json`, all entries with `min_generation ≥ 3`; `src/legacy_of_stars_v3.py:844`.
 
-Год поколения N в игре = 1977 + (N−1)·25. Строки `year_context` посчитаны как 2000 + (N−1)·25:
+The year of generation N in the game = 1977 + (N−1)·25. The `year_context` strings were
+computed as 2000 + (N−1)·25:
 
-| Технология | min_gen | Год по движку | В `year_context` |
+| Technology | min_gen | Year per engine | In `year_context` |
 |---|---|---|---|
 | Quantum Communication Detection | 4 | 2052 | 2075 |
 | Orbital Defense Grid | 5 | 2077 | 2100 |
@@ -138,200 +144,208 @@ Silence» (1983).
 | Solar Sail / Directional Transmission | 3 | 2027 | 2050 |
 | AI Pattern Recognition / Planetary Remediation | 3 | 2027 | 2025 |
 
-Игрок видит в описании один год, а в сообщении «Unlocks in Generation N (Year …)» — другой.
-Рекомендация: генерировать `year_context` из `min_generation` в коде, а из JSON строку убрать.
+The player sees one year in the description, and a different one in the "Unlocks in Generation
+N (Year …)" message. Recommendation: generate `year_context` from `min_generation` in code, and
+remove the string from the JSON.
 
-### 3.3 ❌ Проект «Генезис»: эволюционные масштабы (научное)
+### 3.3 ❌ The "Genesis" project: evolutionary timescales (scientific)
 
-Где: `src/genesis_project.py:17-19`, `data/tech_tree.json` (genesis_bioprogramming).
+Where: `src/genesis_project.py:17-19`, `data/tech_tree.json` (genesis_bioprogramming).
 
-Посеянные микробы дают сложную жизнь через 10 поколений (250 лет), разум через 25 (625 лет),
-космонавтику через 40 (1000 лет). На Земле путь от прокариот до многоклеточных занял ~2.5–3 млрд
-лет, от кембрия до технологической цивилизации ~500 млн лет. «Designed to evolve toward
-intelligence» не сжимает естественный отбор на шесть порядков: отбор ограничен временем
-поколений организмов и числом мутаций, а не намерением конструктора.
+Seeded microbes yield complex life after 10 generations (250 years), intelligence after 25
+(625 years), spaceflight after 40 (1000 years). On Earth, the path from prokaryotes to
+multicellular life took ~2.5–3 billion years, and from the Cambrian to a technological
+civilization ~500 million years. "Designed to evolve toward intelligence" cannot compress
+natural selection by six orders of magnitude: selection is limited by organisms' generation
+times and mutation counts, not by a designer's intent.
 
-Сопутствующие проблемы:
-- Доставка «laser-sail probes»: зонды Starshot — пролётные, без торможения; мягко доставить
-  биоконтейнер на 0.175c нельзя. Время полёта (20 св. лет ≈ 114 лет ≈ 5 поколений) не
-  учитывается — посев мгновенный.
-- Сеять можно любую систему без цивилизации, включая белые карлики и гиганты.
+Related problems:
+- Delivery via "laser-sail probes": Starshot probes are flyby-only, with no braking; a
+  biocontainer cannot be softly delivered at 0.175c. Flight time (20 ly ≈ 114 years ≈ 5
+  generations) is not accounted for — seeding is instantaneous.
+- Any system without a civilization can be seeded, including white dwarfs and giants.
 
-Рекомендация без потери механики: переименовать в «embryo/ark seeding» — доставка не микробов,
-а готовых инженерных организмов/эмбрионов с ИИ-опекунами (embryo space colonization,
-Crowl et al. 2012). Тогда «культура с нуля до космонавтики за ~1000 лет» становится
-защитимой, а строки о «геноме, спетом обратно» остаются. Добавить время полёта к seed_gen.
+Recommendation without losing the mechanic: rename it "embryo/ark seeding" — delivering not
+microbes but ready-made engineered organisms/embryos with AI custodians (embryo space
+colonization, Crowl et al. 2012). Then "a culture going from scratch to spaceflight in ~1000
+years" becomes defensible, and the lines about "genome sung back" can stay. Add flight time to
+seed_gen.
 
-### 3.4 ❌ «Faster-than-light communication» в описании стадии (внутреннее)
+### 3.4 ❌ "Faster-than-light communication" in the stage description (internal)
 
-Где: `src/legacy_of_stars_v3.py:272`.
+Where: `src/legacy_of_stars_v3.py:272`.
 
-Описание INTERSTELLAR при knowledge ≥ 80: «Advanced interstellar civilization with
-faster-than-light communication». Прямо противоречит `design_notes.md` §8 и комментарию
-`FLEET_SPEED_C` (`:701`, «no FTL in this universe»). Заменить на «with interstellar probes /
-multi-system presence».
+The INTERSTELLAR description at knowledge ≥ 80: "Advanced interstellar civilization with
+faster-than-light communication." This directly contradicts `design_notes.md` §8 and the comment
+on `FLEET_SPEED_C` (`:701`, "no FTL in this universe"). Replace with "with interstellar probes /
+multi-system presence."
 
-### 3.5 ⚠️ Обитаемость не зависит от типа звезды (научное, нарушает §8 design_notes)
+### 3.5 ⚠️ Habitability does not depend on star type (scientific, violates design_notes §8)
 
-Где: `src/legacy_of_stars_v3.py:96` (`has_civilization = random() < 0.15` для всех).
+Where: `src/legacy_of_stars_v3.py:96` (`has_civilization = random() < 0.15` for all).
 
-Каталог содержит спектральные классы, но они нигде не используются. В результате
-цивилизация с той же вероятностью 15% возникает:
-- у белого карлика Van Maanen (DZ8; звезда прошла стадию красного гиганта, планеты в бывшей
-  обитаемой зоне уничтожены);
-- у гигантов Pollux (K0III), Arcturus (K1.5III), Capella (G8III) — сошли с главной
-  последовательности, обитаемые зоны сместились;
-- у A-звёзд Sirius, Vega, Altair, Fomalhaut, Castor — возраст 0.2–0.5 млрд лет, время жизни
-  ~1 млрд, по земной аналогии слишком мало для сложной жизни.
+The catalog contains spectral classes, but they are never used. As a result, a civilization
+arises with the same 15% probability at:
 
-Это 9 из 53 систем. Рекомендация: весовой коэффициент по спектральному классу
-(G/K ×1.0, M ×0.6, F ×0.5, A ×0.1, III/D ×0). Описание §8 «realistic habitable zones» тогда
-станет правдой хотя бы на уровне звезды.
+- the white dwarf Van Maanen (DZ8; the star went through a red-giant phase, planets in the
+  former habitable zone were destroyed);
+- the giants Pollux (K0III), Arcturus (K1.5III), Capella (G8III) — off the main sequence,
+  habitable zones have shifted;
+- the A stars Sirius, Vega, Altair, Fomalhaut, Castor — ages 0.2–0.5 billion years, lifetime
+  ~1 billion, by the Earth analogy too little time for complex life.
 
-### 3.6 ⚠️ Модель пассивной утечки (научное)
+That's 9 of 53 systems. Recommendation: a weighting factor by spectral class
+(G/K ×1.0, M ×0.6, F ×0.5, A ×0.1, III/D ×0). The §8 description "realistic habitable zones"
+would then become true at least at the level of the star.
 
-Где: `src/passive_leakage.py:32, 56-73, 191`, `src/legacy_of_stars_v3.py:1369-1397`.
+### 3.6 ⚠️ Passive-leakage model (scientific)
 
-1. **Радиус растёт с техникой, а должен — со временем.** Фронт первых мощных передач (1930-е)
-   расширяется на 1 св. год в год независимо от tech tier: в 1977 он был ~45 св. лет,
-   в 2027 — ~95, к Gen 6 (2102) — ~170. Игра держит 25 св. лет до Tier 2 и потолок 100.
-2. **Направление тренда обратное.** С 1990-х Земля становится радиотише: цифровое ТВ,
-   кабель, направленные спутниковые лучи, снижение мощности. Самые заметные для дальнего
-   наблюдателя источники — военные РЛС раннего предупреждения и планетарные радары
-   (Аресибо/Goldstone), а не «distributed computing, SETI arrays» (Tier 2 → 50 LY).
-3. **Обнаружимость не зависит от расстояния.** Закон обратных квадратов проигнорирован:
-   `calculate_detection_probability` принимает `distance` и не использует (это признано
-   в docstring). Реальная обнаружимость широкополосной утечки ТВ — единицы св. лет даже для
-   Аресибо-класса приёмника; узкополосные радары — десятки–сотни.
-4. **Информационная атака мгновенна** (`:1092`, «instant, delivered by signal»). Сигнал
-   от системы на 50 св. лет идёт 50 лет = 2 поколения; после обнаружения нужен ещё
-   и обратный путь. Сейчас атака применяется в том же поколении, что и бросок обнаружения.
-5. Округление `int(travel_years / 25)` (`:191`) занижает ETA лазерных зондов
-   (10 св. лет → 57 лет → 2 поколения вместо 3).
-6. «Dark Forest Protocol: complete electromagnetic silence» физически недостижим (тепловое
-   излучение, городской свет, атмосферные техносигнатуры вроде CFC/NO₂). Как игровая
-   абстракция допустимо, но описание лучше сделать «near-total».
+Where: `src/passive_leakage.py:32, 56-73, 191`, `src/legacy_of_stars_v3.py:1369-1397`.
 
-Рекомендация: радиус = 1 св. год × (год − 1935), tech снижает *множитель* обнаружимости;
-информационную атаку планировать через ⌈d/25⌉ поколений; использовать `distance` с падением
-вероятности ~1/d².
+1. **The radius grows with tech level, but should grow with time.** The wavefront of the first
+   powerful transmissions (1930s) expands by 1 ly per year regardless of tech tier: in 1977 it
+   was ~45 ly, in 2027 ~95, by Gen 6 (2102) ~170. The game holds it at 25 ly up to Tier 2 with a
+   cap of 100.
+2. **The trend runs the wrong way.** Since the 1990s Earth has been getting radio-quieter:
+   digital TV, cable, directional satellite beams, lower transmit power. The sources most
+   noticeable to a distant observer are military early-warning radars and planetary radars
+   (Arecibo/Goldstone), not "distributed computing, SETI arrays" (Tier 2 → 50 LY).
+3. **Detectability does not depend on distance.** The inverse-square law is ignored:
+   `calculate_detection_probability` takes `distance` and doesn't use it (this is acknowledged in
+   the docstring). Realistic detectability of broadband TV leakage is a handful of ly even for an
+   Arecibo-class receiver; narrowband radars, tens to hundreds.
+4. **The information attack is instantaneous** (`:1092`, "instant, delivered by signal"). A
+   signal from a system 50 ly away takes 50 years = 2 generations; after detection, there's also
+   a return trip needed. Currently the attack is applied in the same generation as the detection
+   roll.
+5. Rounding via `int(travel_years / 25)` (`:191`) underestimates laser-probe ETA
+   (10 ly → 57 years → 2 generations instead of 3).
+6. "Dark Forest Protocol: complete electromagnetic silence" is physically unattainable
+   (thermal radiation, city lights, atmospheric technosignatures such as CFCs/NO₂). Acceptable
+   as a game abstraction, but the description is better phrased as "near-total."
 
-### 3.7 ⚠️ Вымершие цивилизации: причинность (научное + нарратив)
+Recommendation: radius = 1 ly × (year − 1935), tech lowers the detectability *multiplier*;
+schedule the information attack ⌈d/25⌉ generations out; use `distance` with probability falling
+off as ~1/d².
 
-Где: `src/legacy_of_stars_v3.py:115` (`extinct_years_ago = randint(500, 5000)`),
+### 3.7 ⚠️ Extinct civilizations: causality (scientific + narrative)
+
+Where: `src/legacy_of_stars_v3.py:115` (`extinct_years_ago = randint(500, 5000)`),
 `data/templates/swan_songs.json`.
 
-Система на расстоянии d св. лет видна такой, какой была d лет назад. Если цивилизация
-на Tau Ceti (12 св. лет) погибла 3000 лет назад, её последняя *живая* передача прошла мимо
-Земли 2988 лет назад. Часть шаблонов это учитывает («repeated for {extinct_years_ago} years by
-machines that outlived their makers» — маяк), но категория «plea» («Third day of the fall…
-last of the power») — одноразовая живая передача, которую сейчас поймать нельзя.
+A system at distance d ly is seen as it was d years ago. If a civilization at Tau Ceti (12 ly)
+died 3000 years ago, its last *living* transmission passed Earth 2988 years ago. Some templates
+account for this ("repeated for {extinct_years_ago} years by machines that outlived their
+makers" — a beacon), but the "plea" category ("Third day of the fall… last of the power") is a
+one-time live transmission that cannot be caught now.
 
-Рекомендация: либо привязать `extinct_years_ago` к расстоянию для категорий plea/warning
-(вымерли «d ± несколько десятков» лет назад по нашему времени приёма), либо во всех
-категориях явно оформить сигнал как автоматический повторяющийся маяк.
+Recommendation: either tie `extinct_years_ago` to distance for the plea/warning categories
+(extinct "d ± a few dozen" years ago as measured by our reception time), or explicitly frame the
+signal in all categories as an automated, repeating beacon.
 
-### 3.8 ⚠️ «Каталогизация» ярчайших звёзд неба как новых открытий (нарратив)
+### 3.8 ⚠️ "Cataloguing" the sky's brightest stars as new discoveries (narrative)
 
-Где: `src/legacy_of_stars_v3.py:1677, 1682-1694`.
+Where: `src/legacy_of_stars_v3.py:1677, 1682-1694`.
 
-Механика открытий берёт звёзды в порядке расстояния, поэтому Сириус (ярчайшая звезда неба),
-Процион, Вега, Альтаир, Арктур появляются в XXI–XXIV веках с текстом «NEW STAR SYSTEM
-CATALOGUED». Из каталога реально новыми после 1977 являются только TRAPPIST-1 (1999),
-Teegarden's Star (2003), GJ 1061 (близость установлена в 1990-е), частично DX Cancri, GJ 1002.
-Рекомендация: переформулировать событие в «added to the SETI target list / surveyed» —
-механика не меняется, текст становится честным.
+The discovery mechanic takes stars in order of distance, so Sirius (the sky's brightest star),
+Procyon, Vega, Altair, and Arcturus appear in the 21st–24th centuries with the text "NEW STAR
+SYSTEM CATALOGUED." Of the catalog, only TRAPPIST-1 (1999), Teegarden's Star (2003), GJ 1061
+(proximity established in the 1990s), and partly DX Cancri and GJ 1002 are genuinely new after
+1977. Recommendation: reword the event as "added to the SETI target list / surveyed" — the
+mechanic stays the same, the text becomes honest.
 
-### 3.9 ⚠️ Отдельные технологии
+### 3.9 ⚠️ Individual technologies
 
-| Технология | Проблема | Тип |
+| Technology | Problem | Type |
 |---|---|---|
-| Quantum Communication Detection («detect quantum-encrypted signals») | Квантовая связь не даёт «класса сигналов», который можно поймать со стороны; запутанность не переносит информацию (no-communication theorem). | научное |
-| Relativistic Communication («near-light-speed laser probes, faster message delivery») | Зонд на 0.2c *медленнее* радиосигнала на *c*. Ускорить доставку сообщения нельзя. Флаг `message_delivery_speed = 0.175` в коде не используется — хорошо, но описание и `docs/passive_leakage_implementation.md:62` («reduces round-trip by 83%») ошибочны. | научное + doc |
-| Gravitational Wave *Communication* | Генерация ГВ для связи требует перемещения звёздных масс; как *детектор* активности Type II — допустимая спекуляция. Переименовать в «Detection». | научное |
-| Bio-Engineering Foundation («CRISPR techniques», Gen 7 → 2127) | CRISPR-Cas9 редактирование — 2012 год. Анахронизм на 115 лет. | хронология |
-| Atmospheric Scrubbing (Gen 6 → 2102) | Прямой захват CO₂ промышленно работает с 2017 (Climeworks). | хронология |
-| Stellar Engineering (Gen 10 → 2202) | Манипуляция звездой через 225 лет после 1977 — крайне оптимистично даже для спекуляции; Kardashev II по любой экстраполяции — тысячелетия. | хронология |
-| Genetic Pacification («remove aggressive tribal instincts from genome») | Агрессия полигенна и в значительной мере средовая; «гена племенного инстинкта» нет. Как спекуляция допустимо, но формулировка упрощает до неверного. | научное |
-| Neutrino Telescope Networks | IceCube работает с 2010; нейтринный SETI — реальное предложение (Learned et al. 2008). Корректно. | ✅ |
-| Dyson Sphere Detection | G-HAT (2015), Project Hephaistos (2024). Корректно. | ✅ |
+| Quantum Communication Detection ("detect quantum-encrypted signals") | Quantum communication does not produce a "class of signal" that can be intercepted from outside; entanglement does not carry information (no-communication theorem). | scientific |
+| Relativistic Communication ("near-light-speed laser probes, faster message delivery") | A probe at 0.2c is *slower* than a radio signal at *c*. Message delivery cannot be sped up. The `message_delivery_speed = 0.175` flag is unused in the code — good, but the description and `docs/passive_leakage_implementation.md:62` ("reduces round-trip by 83%") are wrong. | scientific + doc |
+| Gravitational Wave *Communication* | Generating gravitational waves for communication requires moving stellar masses; as a *detector* of Type II activity it's acceptable speculation. Rename to "Detection." | scientific |
+| Bio-Engineering Foundation ("CRISPR techniques", Gen 7 → 2127) | CRISPR-Cas9 editing dates to 2012. A 115-year anachronism. | chronology |
+| Atmospheric Scrubbing (Gen 6 → 2102) | Direct air capture of CO₂ has operated industrially since 2017 (Climeworks). | chronology |
+| Stellar Engineering (Gen 10 → 2202) | Manipulating a star 225 years after 1977 is extremely optimistic even for speculation; Kardashev II is millennia away by any extrapolation. | chronology |
+| Genetic Pacification ("remove aggressive tribal instincts from genome") | Aggression is polygenic and substantially environmental; there is no "tribal instinct gene." Acceptable as speculation, but the phrasing oversimplifies to the point of being wrong. | scientific |
+| Neutrino Telescope Networks | IceCube has operated since 2010; neutrino SETI is a real proposal (Learned et al. 2008). Correct. | ✅ |
+| Dyson Sphere Detection | G-HAT (2015), Project Hephaistos (2024). Correct. | ✅ |
 
-### 3.10 ⚠️ Мелкие неточности в фактах
+### 3.10 ⚠️ Minor factual inaccuracies
 
-- `src/game_interface.py:107`: «Dr. Jerry Ehman reviews automated radio telescope data» в ночь
-  15 августа. Эман увидел распечатку через несколько дней (обычно указывают 18 августа).
-  Формулировка «reviews» в сцене той же ночи неточна.
-- `docs/development_roadmap.md:151`: «2MASS 19281982-2640123 ruled out» — звезда не
-  «исключена», а остаётся неподтверждённым кандидатом. Более поздняя гипотеза
-  (Méndez et al., 2024, Arecibo Wow! project) — естественное происхождение: вспышка
-  водородного облака, вызванная магнетаром.
-- `docs/passive_leakage_implementation.md:353`: «Breakthrough Starshot (NASA/ESA)» — проект
-  Breakthrough Initiatives (Юрий Мильнер, 2016), не NASA/ESA. `:355`: LightSail-2 —
-  Planetary Society, не NASA.
-- Событие «Mirror Civilization»: «even nuclear detonations» видны на 18–30 св. лет —
-  гамма-вспышки ядерных взрывов на межзвёздных расстояниях не регистрируются;
-  промышленное загрязнение и радио — да.
-- `src/swan_song_messages.py:148`: бонус «civ_age > 100000» недостижим: максимум возраста
-  в генераторе — ровно 100 000 (`uniform(10, 1000) × 100`). Идея достижения «Ancient Voices:
-  500 000+ years» тоже недостижима при текущем генераторе.
-- Ответ LB «digital_ascended»: «parsed in 0.4 seconds and was debated for forty years» —
-  но ответ приходит ровно через световое время туда-обратно; 40 лет дебатов сдвинули бы его
-  почти на два поколения. Чисто нарративная мелочь.
+- `src/game_interface.py:107`: "Dr. Jerry Ehman reviews automated radio telescope data" on the
+  night of August 15. Ehman actually saw the printout a few days later (usually cited as August
+  18). The wording "reviews" in a same-night scene is inaccurate.
+- `docs/development_roadmap.md:151`: "2MASS 19281982-2640123 ruled out" — the star is not
+  "ruled out," it remains an unconfirmed candidate. A later hypothesis (Méndez et al., 2024,
+  Arecibo Wow! project) proposes a natural origin: a hydrogen cloud brightened by a magnetar
+  flare.
+- `docs/passive_leakage_implementation.md:353`: "Breakthrough Starshot (NASA/ESA)" — the
+  project belongs to Breakthrough Initiatives (Yuri Milner, 2016), not NASA/ESA. `:355`:
+  LightSail-2 is Planetary Society, not NASA.
+- The "Mirror Civilization" event: "even nuclear detonations" visible at 18–30 ly — gamma
+  flashes from nuclear explosions are not detectable at interstellar distances; industrial
+  pollution and radio are.
+- `src/swan_song_messages.py:148`: the "civ_age > 100000" bonus is unreachable: the maximum
+  age in the generator is exactly 100,000 (`uniform(10, 1000) × 100`). The "Ancient Voices:
+  500,000+ years" achievement idea is likewise unreachable with the current generator.
+- The LB reply "digital_ascended": "parsed in 0.4 seconds and was debated for forty years" —
+  but the reply arrives exactly after the round-trip light time; 40 years of debate would push it
+  by almost two generations. A purely narrative nitpick.
 
 ---
 
-## 4. Расхождения между документами и кодом
+## 4. Discrepancies between documents and code
 
-Документы в `docs/` — история разработки; часть из них описывает уже не существующие модели.
-Опасны те места, где документ формулирует «научную» модель, противоречащую текущему коду.
+The documents in `docs/` are a development history; some of them describe models that no
+longer exist. The dangerous spots are where a document states a "scientific" model that
+contradicts the current code.
 
-| Документ | Утверждение | Код сейчас |
+| Document | Claim | Current code |
 |---|---|---|
-| `attack_warning_implementation.md:165, 211` | «Travel time = round-trip light-speed delay», `arrival = gen + ceil(2d/25)` | Флот 0.1c: 11·d лет (`:711`). Документ описывает флот на скорости света. |
-| `passive_leakage_implementation.md:62, 266` | Лазерные паруса сокращают round-trip сообщений на 83% | `message_delivery_speed` не используется; парус даёт +10% к шансу ответа. |
-| `passive_leakage_implementation.md:284-293` | «NEW: attacks at 0.175c», «50 LY: 4 gens → 11 gens» | Ответные флоты 0.1c; 0.175c только для зондов после утечки. |
-| `tech_tree_redesign.md` | 27 технологий, 5 ярусов; Breakthrough Listen Gen 3+ | 44 технологии, 6 ярусов (0–5); Breakthrough Listen Gen 2 в JSON. |
-| `development_roadmap.md:44` | «Extinct civilizations (15% chance)» | 15% — шанс цивилизации вообще; из них 25% вымершие (`:96, :113`). |
-| `development_roadmap.md:1199` | «41 technologies across 5 tiers» | 44 / 6. README говорит 44 / 6 — верно. |
-| `cosmic_game_theory_analysis.md:475-476` | Событие «Ancient Observer» дарит «Quantum Entanglement Communication — instant, no light-speed delay» | Не реализовано. **Не реализовывать в таком виде**: нарушает no-communication theorem и §8 design_notes. |
-| `cosmic_game_theory_analysis.md:457-464` | `age_to_kardashev`: 1000 лет → Type I, 10 000 → Type II | Не реализовано; Type II (10²⁶ Вт) за 10 000 лет — далеко за пределами любой экстраполяции. Оставить как doc-only. |
-| `development_roadmap.md:75, 92`, `phase_2a_complete.md:26, 234` | Gen 144 = Year 3577 | Формула даёт 5552; UI печатает и 3577, и 5577. |
+| `attack_warning_implementation.md:165, 211` | "Travel time = round-trip light-speed delay", `arrival = gen + ceil(2d/25)` | Fleet at 0.1c: 11·d years (`:711`). The document describes a fleet at the speed of light. |
+| `passive_leakage_implementation.md:62, 266` | Laser sails cut the message round trip by 83% | `message_delivery_speed` is unused; the sail gives +10% to the reply chance. |
+| `passive_leakage_implementation.md:284-293` | "NEW: attacks at 0.175c", "50 LY: 4 gens → 11 gens" | Retaliatory fleets are at 0.1c; 0.175c applies only to probes after a leak. |
+| `tech_tree_redesign.md` | 27 technologies, 5 tiers; Breakthrough Listen Gen 3+ | 44 technologies, 6 tiers (0–5); Breakthrough Listen Gen 2 in the JSON. |
+| `development_roadmap.md:44` | "Extinct civilizations (15% chance)" | 15% is the chance of a civilization at all; of those, 25% are extinct (`:96, :113`). |
+| `development_roadmap.md:1199` | "41 technologies across 5 tiers" | 44 / 6. The README says 44 / 6 — correct. |
+| `cosmic_game_theory_analysis.md:475-476` | The "Ancient Observer" event grants "Quantum Entanglement Communication — instant, no light-speed delay" | Not implemented. **Do not implement it this way**: it violates the no-communication theorem and design_notes §8. |
+| `cosmic_game_theory_analysis.md:457-464` | `age_to_kardashev`: 1000 years → Type I, 10,000 → Type II | Not implemented; Type II (10²⁶ W) in 10,000 years is far beyond any extrapolation. Leave as doc-only. |
+| `development_roadmap.md:75, 92`, `phase_2a_complete.md:26, 234` | Gen 144 = Year 3577 | The formula gives 5552; the UI prints both 3577 and 5577. |
 
 ---
 
-## 5. Что править в первую очередь
+## 5. What to fix first
 
-Порядок — по соотношению «серьёзность / трудоёмкость».
+Order is by the ratio of "severity / effort."
 
-1. **Одна строка:** убрать «faster-than-light communication» (`legacy_of_stars_v3.py:272`).
-2. **Одна строка:** «Year 3577» → «Year 5577» в `game_interface.py:121` и двух документах.
-3. **Дерево технологий:** генерировать год из `min_generation`, удалить ручные `year_context`.
-   Заодно: CRISPR → Gen 2–3; переименовать Gravitational Wave *Communication* → *Detection*;
-   переписать описания Quantum Communication Detection и Relativistic Communication.
-4. **Wow!:** отдельная запись источника на ~1800 св. лет; враждебный исход в Gen 144 — сигнал,
-   а не флот; текст «72 generations for their weapons» убрать.
-5. **Обитаемость:** весовой коэффициент `has_civilization` по спектральному классу; запрет
-   посева Генезиса у D/III-звёзд.
-6. **Генезис:** переформулировать в embryo/ark seeding, добавить время полёта.
-7. **Утечка:** радиус от времени, обнаружимость ~1/d², задержка информационной атаки.
-8. **Вымершие:** привязать `extinct_years_ago` к расстоянию или сделать все сигналы маяками.
-9. **Текст открытий:** «catalogued» → «added to target list».
-10. **Документы:** пометить `attack_warning_implementation.md` и
-    `passive_leakage_implementation.md` как устаревшие (модель до 0.1c) либо обновить формулы.
+1. **One line:** remove "faster-than-light communication" (`legacy_of_stars_v3.py:272`).
+2. **One line:** "Year 3577" → "Year 5577" in `game_interface.py:121` and two documents.
+3. **Tech tree:** generate the year from `min_generation`, remove manual `year_context`
+   values. While at it: CRISPR → Gen 2–3; rename Gravitational Wave *Communication* →
+   *Detection*; rewrite the descriptions of Quantum Communication Detection and Relativistic
+   Communication.
+4. **Wow!:** a dedicated source entry at ~1800 ly; the hostile outcome at Gen 144 is a signal,
+   not a fleet; remove the text "72 generations for their weapons."
+5. **Habitability:** a weighting factor for `has_civilization` by spectral class; forbid
+   Genesis seeding at D/III stars.
+6. **Genesis:** reframe as embryo/ark seeding, add flight time.
+7. **Leakage:** radius based on time, detectability ~1/d², a delay for the information attack.
+8. **Extinct civilizations:** tie `extinct_years_ago` to distance, or make all signals beacons.
+9. **Discovery text:** "catalogued" → "added to target list."
+10. **Documents:** mark `attack_warning_implementation.md` and
+    `passive_leakage_implementation.md` as outdated (pre-0.1c model), or update the formulas.
 
-Пункты 1–3 не меняют баланс. Пункты 4–8 меняют геймплей и требуют прогона
+Items 1–3 do not change the balance. Items 4–8 change the gameplay and require running
 `LOS_SLOW=1 python -m unittest tests.test_balance -v`.
 
 ---
 
-## 6. Источники для проверки
+## 6. Sources for verification
 
-- RECONS «The 100 nearest star systems»; Gaia DR3; SIMBAD — каталог звёзд.
-- Ehman, J. «The Big Ear Wow! Signal: What We Know and Don't Know About It After 20 Years» (1997).
-- Caballero, A. «An approximation to determine the source of the WOW! Signal» (2020/2022) — кандидат 2MASS 19281982-2640123.
-- Méndez, A. et al., Arecibo Wow! project (2024) — гипотеза естественного происхождения.
-- Breakthrough Initiatives, Starshot (2016); Bond, A. & Martin, A. «Project Daedalus» (JBIS, 1978).
-- Sullivan, W. T. et al. «Eavesdropping: The Radio Signature of the Earth» (Science, 1978) — обнаружимость утечки.
-- Brin, D. «The Great Silence» (QJRAS, 1983); Zaitsev, A. «The SETI Paradox» (2006).
-- Crowl, A. et al. «Embryo Space Colonization to Overcome the Interstellar Time Distance Bottleneck» (JBIS, 2012).
-- Learned, J. et al. «Galactic Neutrino Communication» (2008); Wright, J. et al., G-HAT (2015); Suazo, M. et al., Project Hephaistos (2024).
+- RECONS "The 100 nearest star systems"; Gaia DR3; SIMBAD — the star catalog.
+- Ehman, J. "The Big Ear Wow! Signal: What We Know and Don't Know About It After 20 Years" (1997).
+- Caballero, A. "An approximation to determine the source of the WOW! Signal" (2020/2022) — candidate 2MASS 19281982-2640123.
+- Méndez, A. et al., Arecibo Wow! project (2024) — the natural-origin hypothesis.
+- Breakthrough Initiatives, Starshot (2016); Bond, A. & Martin, A. "Project Daedalus" (JBIS, 1978).
+- Sullivan, W. T. et al. "Eavesdropping: The Radio Signature of the Earth" (Science, 1978) — detectability of the leakage.
+- Brin, D. "The Great Silence" (QJRAS, 1983); Zaitsev, A. "The SETI Paradox" (2006).
+- Crowl, A. et al. "Embryo Space Colonization to Overcome the Interstellar Time Distance Bottleneck" (JBIS, 2012).
+- Learned, J. et al. "Galactic Neutrino Communication" (2008); Wright, J. et al., G-HAT (2015); Suazo, M. et al., Project Hephaistos (2024).
