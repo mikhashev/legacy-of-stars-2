@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
+from src.legacy_of_stars_v3 import ContactProgram, START_YEAR, Technology  # noqa: E402
 
 TECH_TREE = ROOT / "data" / "tech_tree.json"
 ENGINE_SOURCE = (ROOT / "src" / "legacy_of_stars_v3.py").read_text(encoding="utf-8")
@@ -60,7 +60,26 @@ class TechTreeDataTest(unittest.TestCase):
         self.assertEqual(self.by_id["seti_at_home"]["min_generation"], 1)        # launched 1999
         self.assertEqual(self.by_id["breakthrough_listen"]["min_generation"], 2)  # launched 2015
         for tech_id, year in (("arecibo_telescope", "1963"), ("drake_equation", "1961")):
-            self.assertIn(year, self.by_id[tech_id]["year_context"] + self.by_id[tech_id]["description"])
+            self.assertIn(year, self.by_id[tech_id].get("history", "") + self.by_id[tech_id]["description"])
+
+    def test_prerequisites_never_unlock_later_than_the_tech_they_gate(self):
+        for tech in self.techs:
+            for prereq in tech["prerequisites"]:
+                self.assertLessEqual(
+                    self.by_id[prereq]["min_generation"], tech["min_generation"],
+                    f"{tech['id']} (Gen {tech['min_generation']}) depends on {prereq} "
+                    f"(Gen {self.by_id[prereq]['min_generation']})"
+                )
+
+    def test_year_context_matches_the_engine_formula(self):
+        for tech_data in self.techs:
+            tech = Technology(tech_data)
+            min_gen = tech_data["min_generation"]
+            if min_gen <= 1:
+                self.assertIn("Available from start", tech.year_context, tech_data["id"])
+            else:
+                expected_year = START_YEAR + (min_gen - 1) * 25
+                self.assertIn(f"Year {expected_year}", tech.year_context, tech_data["id"])
 
     def test_doctrine_options_are_complete(self):
         for tech in self.techs:

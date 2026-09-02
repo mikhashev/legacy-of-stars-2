@@ -23,6 +23,38 @@ from .genesis_project import GenesisProject
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CATALOG_PATH = DATA_DIR / "star_catalog.json"
 
+START_YEAR = 1977  # WOW! Signal era; base year for Technology.year_context calculations
+
+# Chance that a star with a perfectly habitable spectral class (G/K main sequence) hosts a
+# civilization. Calibrated so the full 53-star catalog still averages ~8 civilizations, as the
+# flat 0.15 model did: the mean habitability weight of the catalog is 30.8 / 53 = 0.581, and
+# 0.26 x 30.8 = 8.0.
+BASE_CIV_CHANCE = 0.26
+
+# Habitability by spectral class. Longer-lived, more stable stars get a higher weight; evolved
+# stars (giants, white dwarfs) burned their old habitable zone and get none.
+_HABITABILITY_BY_CLASS = {"G": 1.0, "K": 1.0, "M": 0.6, "F": 0.6, "A": 0.1,
+                          "O": 0.0, "B": 0.0,               # live a few million years
+                          "L": 0.0, "T": 0.0, "Y": 0.0}     # brown dwarfs
+_UNKNOWN_CLASS_WEIGHT = 0.5  # a type we cannot parse: neither ruled out nor favoured
+
+
+def habitability_weight(spectral_type: Optional[str]) -> float:
+    """Relative chance that a star of this spectral type hosts life (1.0 = G/K main sequence)."""
+    if not spectral_type:
+        return 1.0
+    core = str(spectral_type).split("(")[0].strip().upper()
+    if not core:
+        return 1.0
+    if core.startswith("D"):
+        return 0.0  # white dwarf: the former habitable zone was swallowed by the red giant phase
+    # Luminosity class: check III before IV before V, and treat "IV-V" as main sequence.
+    if "III" in core:
+        return 0.0  # giant: post-main-sequence, the old habitable zone is gone
+    if "IV-V" not in core and "IV" in core:
+        return 0.5  # subgiant: leaving the main sequence, planets still possible
+    return _HABITABILITY_BY_CLASS.get(core[0], _UNKNOWN_CLASS_WEIGHT)
+
 
 def load_star_catalog(path: Path = CATALOG_PATH) -> List[Dict[str, Any]]:
     """Real nearby stars (name, distance in LY, spectral type, RA/Dec), nearest first."""
@@ -71,7 +103,13 @@ class Technology:
         self.category = data["category"]
         self.tier = data.get("tier", 0)
         self.min_generation = data.get("min_generation", 1)
-        self.year_context = data.get("year_context", "")
+        if self.min_generation <= 1:
+            year_line = "Available from start"
+        else:
+            unlock_year = START_YEAR + (self.min_generation - 1) * 25
+            year_line = f"Unlocks Gen {self.min_generation}+ (Year {unlock_year})"
+        history = data.get("history", "")
+        self.year_context = f"{year_line}. {history}" if history else year_line
         self.special = data.get("special", None)
         self.passive_rp = data.get("passive_rp", 0)  # New: Passive research points per turn
         self.is_legacy = False  # Flag for pre-1977 legacy knowledge
@@ -92,75 +130,15 @@ class StarSystem:
         self.ra = ra    # J2000 right ascension, degrees (for star maps)
         self.dec = dec  # J2000 declination, degrees
         # The Fermi paradox made concrete: most stars are silent. With ~50 catalogued stars this
-        # yields a handful of civilizations per game, a quarter of them already extinct.
-        self.has_civilization = random.random() < 0.15
+        # yields a handful of civilizations per game, a quarter of them already extinct. The
+        # spectral class weights the roll: a red giant or white dwarf never hosts anyone.
+        self.has_civilization = random.random() < BASE_CIV_CHANCE * habitability_weight(spectral_type)
 
         if self.has_civilization:
-            # === PHASE 1: Statistical Realism ===
-            human_age = 100
-            
-            if random.random() < 0.75:
-                civ_age = human_age * random.uniform(1.5, 50)
-            else:
-                civ_age = human_age * random.uniform(0.1, 0.9)
-            
-            if random.random() < 0.10:
-                civ_age = human_age * random.uniform(10, 1000)
-            
-            self.civilization_age = civ_age
-            self.civilization_stage = self._age_to_stage(civ_age)
-            
-            self.is_extinct = random.random() < 0.25
-            if self.is_extinct:
-                self.extinct_years_ago = random.randint(500, 5000)
-                self.has_swan_song = random.random() < 0.8
-                self.civilization_stage = None
-            
-            if not self.is_extinct:
-                strategy_weights = {"L": 10, "LB": 30, "LR": 40, "LA": 15, "LBA": 5}
-                self.true_strategy = random.choices(list(strategy_weights.keys()), weights=list(strategy_weights.values()))[0]
-                
-                if self.civilization_age > human_age * 2:
-                    self.deception_level = random.uniform(0.3, 1.0)
-                else:
-                    self.deception_level = random.uniform(0, 0.5)
-            else:
-                self.true_strategy = None
-                self.deception_level = 0
-            
-            # === PHASE 3A.2: Civilization Type (How they solved Dual DNA problem) ===
-            if not self.is_extinct:
-                # Living civilizations - successfully solved the integration crisis
-                civ_type_weights = {
-                    "biological_pure": 20,      # Stayed biological, cautious
-                    "digital_ascended": 15,     # Uploaded consciousness
-                    "hybrid_integrated": 10     # Successfully merged
-                }
-                self.civilization_type = random.choices(
-                    list(civ_type_weights.keys()),
-                    weights=list(civ_type_weights.values())
-                )[0]
-            else:
-                # Extinct civilizations - 70% failed the transition
-                if random.random() < 0.7:
-                    self.civilization_type = "failed_transition"
-                else:
-                    # Some died for other reasons (war, asteroid, etc.)
-                    self.civilization_type = random.choice([
-                        "biological_pure", "digital_ascended", "hybrid_integrated"
-                    ])
-            
-            self.civilization_attitude = random.uniform(0.2, 0.8)
+            self._roll_civilization()
         else:
-            self.civilization_age = 0
-            self.civilization_stage = None
-            self.civilization_attitude = 0
-            self.is_extinct = False
-            self.has_swan_song = False
-            self.true_strategy = None
-            self.deception_level = 0
-            self.civilization_type = None  # No civilization, no type
-            
+            self._clear_civilization()
+
         self.knowledge = 0
         self.messages_sent = []
         self.pending_responses = []
@@ -169,7 +147,80 @@ class StarSystem:
         self.is_seeded = False           # Genesis Project marker
         self.has_detected_earth = False  # hostile civ already found us (no double attacks)
         self.is_wow_source = False
-    
+
+    def _roll_civilization(self) -> None:
+        """Roll the hidden profile of a civilization living in this system."""
+        distance = self.distance
+        # === PHASE 1: Statistical Realism ===
+        human_age = 100
+
+        if random.random() < 0.75:
+            civ_age = human_age * random.uniform(1.5, 50)
+        else:
+            civ_age = human_age * random.uniform(0.1, 0.9)
+        
+        if random.random() < 0.10:
+            civ_age = human_age * random.uniform(10, 1000)
+        
+        self.civilization_age = civ_age
+        self.civilization_stage = self._age_to_stage(civ_age)
+        
+        self.is_extinct = random.random() < 0.25
+        if self.is_extinct:
+            # We can't know about a death whose light hasn't reached us yet: the system is
+            # `distance` light-years away, so its last living signal is at least that old.
+            self.extinct_years_ago = random.randint(min(max(50, int(distance)), 5000), 5000)
+            self.has_swan_song = random.random() < 0.8
+            self.civilization_stage = None
+        
+        if not self.is_extinct:
+            strategy_weights = {"L": 10, "LB": 30, "LR": 40, "LA": 15, "LBA": 5}
+            self.true_strategy = random.choices(list(strategy_weights.keys()), weights=list(strategy_weights.values()))[0]
+            
+            if self.civilization_age > human_age * 2:
+                self.deception_level = random.uniform(0.3, 1.0)
+            else:
+                self.deception_level = random.uniform(0, 0.5)
+        else:
+            self.true_strategy = None
+            self.deception_level = 0
+        
+        # === PHASE 3A.2: Civilization Type (How they solved Dual DNA problem) ===
+        if not self.is_extinct:
+            # Living civilizations - successfully solved the integration crisis
+            civ_type_weights = {
+                "biological_pure": 20,      # Stayed biological, cautious
+                "digital_ascended": 15,     # Uploaded consciousness
+                "hybrid_integrated": 10     # Successfully merged
+            }
+            self.civilization_type = random.choices(
+                list(civ_type_weights.keys()),
+                weights=list(civ_type_weights.values())
+            )[0]
+        else:
+            # Extinct civilizations - 70% failed the transition
+            if random.random() < 0.7:
+                self.civilization_type = "failed_transition"
+            else:
+                # Some died for other reasons (war, asteroid, etc.)
+                self.civilization_type = random.choice([
+                    "biological_pure", "digital_ascended", "hybrid_integrated"
+                ])
+        
+        self.civilization_attitude = random.uniform(0.2, 0.8)
+
+    def _clear_civilization(self) -> None:
+        """Reset the civilization fields to the 'nobody lives here' defaults."""
+        self.civilization_age = 0
+        self.civilization_stage = None
+        self.civilization_attitude = 0
+        self.is_extinct = False
+        self.extinct_years_ago = None
+        self.has_swan_song = False
+        self.true_strategy = None
+        self.deception_level = 0
+        self.civilization_type = None  # No civilization, no type
+
     _SCALAR_FIELDS = ("name", "distance", "spectral_type", "ra", "dec", "has_civilization", "civilization_age",
                       "is_extinct", "has_swan_song", "true_strategy", "deception_level", "civilization_type",
                       "civilization_attitude", "knowledge", "is_seeded", "has_detected_earth", "is_wow_source")
@@ -244,10 +295,10 @@ class StarSystem:
             if self.knowledge < 20:
                 return "Faint signals detected. System appears lifeless."
             elif self.knowledge < 60:
-                return f"EXTINCT CIVILIZATION detected. Dead for ~{self.extinct_years_ago} years."
+                return f"EXTINCT CIVILIZATION detected. Silent for ~{self.extinct_years_ago} years (as seen from Earth)."
             else:
                 swan_info = " Data archives may exist." if self.has_swan_song else " No archives detected."
-                return f"EXTINCT: Civilization collapsed {self.extinct_years_ago} years ago.{swan_info}"
+                return f"EXTINCT: Civilization went silent {self.extinct_years_ago} years ago; automated transmissions continue.{swan_info}"
             
         if self.knowledge < 20:
             return "Possible artificial signals detected."
@@ -269,7 +320,7 @@ class StarSystem:
                 CivilizationStage.EARLY_RADIO: "Early radio-capable civilization, similar to Earth's 20th century.",
                 CivilizationStage.DIGITAL: "Digital-era civilization with global communication networks.",
                 CivilizationStage.INTERPLANETARY: "Interplanetary civilization spanning multiple worlds in their system.",
-                CivilizationStage.INTERSTELLAR: "Advanced interstellar civilization with faster-than-light communication.",
+                CivilizationStage.INTERSTELLAR: "Advanced interstellar civilization with probes and settlements in several star systems.",
                 CivilizationStage.POST_BIOLOGICAL: "Post-biological intelligence transcending physical limitations."
             }
             return stage_descriptions[self.civilization_stage]
@@ -386,8 +437,10 @@ class ContactProgram:
         self.pending_attack_warnings: List[AttackWarning] = []
         self.swan_song_manager = SwanSongManager(self.ai, self.content)
         self.leakage_system = PassiveLeakageSystem()
-        self.broadcast_radius = 0.0  # recalculated each generation
+        self.broadcast_radius = 0.0  # leakage front, recalculated each generation
         self.leakage_multiplier = 1.0  # 1.0 = full leakage, 0.0 = complete silence
+        # Information attacks in flight: [system_name, arrival_generation]
+        self.pending_info_attacks: List[List] = []
         self.integration = IntegrationProgress()
         self.philosophical_events = PhilosophicalEvents()
         self.pending_philosophical_event = None  # event waiting for the player's choice
@@ -419,7 +472,7 @@ class ContactProgram:
         self.stats: Dict[str, int] = {
             "messages_sent": 0, "responses_received": 0, "attacks_scheduled": 0, "attacks_survived": 0,
             "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 0,
-            "events_resolved": 0, "techs_researched": 0, "worlds_seeded": 0,
+            "events_resolved": 0, "techs_researched": 0, "worlds_seeded": 0, "passive_detections": 0,
         }
         self.achievements: List[str] = []
 
@@ -480,6 +533,7 @@ class ContactProgram:
             },
             "active_doctrines": list(self.active_doctrines),
             "pending_attack_warnings": [warning.to_dict() for warning in self.pending_attack_warnings],
+            "pending_info_attacks": [[name, arrival] for name, arrival in self.pending_info_attacks],
             "wow_signal": self.wow_signal.to_dict(),
             "swan_songs": self.swan_song_manager.to_dict(),
             "integration": self.integration.to_dict(),
@@ -529,6 +583,9 @@ class ContactProgram:
             warning = AttackWarning.from_dict(entry, program.star_systems)
             if warning is not None:
                 program.pending_attack_warnings.append(warning)
+
+        program.pending_info_attacks = [[entry[0], int(entry[1])]
+                                        for entry in data.get("pending_info_attacks", [])]
 
         program.wow_signal = WOWSignalEvent.from_dict(data.get("wow_signal", {}), program)
         program.swan_song_manager = SwanSongManager.from_dict(data.get("swan_songs", {}), program.ai, program.content)
@@ -1238,6 +1295,11 @@ YOUR CHOICE:
         # Responses arriving this generation
         self._deliver_responses()
 
+        # Information attacks whose signal reaches Earth this generation
+        self._deliver_pending_info_attacks()
+        if self.game_over:
+            return
+
         # Passive electromagnetic leakage: hostile civilizations may notice Earth
         self._process_passive_leakage()
         if self.game_over:
@@ -1246,6 +1308,8 @@ YOUR CHOICE:
         # WOW! Signal: Generation 144
         if self.wow_signal.check_gen144_event():
             self.wow_signal.trigger_gen144_event()
+            if self.game_over:
+                return
 
         # Incoming attacks
         self._resolve_attacks()
@@ -1367,34 +1431,56 @@ or seek the answer to the ultimate question.
                 logging.info(f"Response received from {name} (reply #{replies})")
 
     def _process_passive_leakage(self) -> None:
-        """Hostile civilizations within our broadcast radius may detect Earth's electromagnetic leakage."""
-        self.broadcast_radius = self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies)
+        """Hostile civilizations inside our leakage front may detect Earth's electromagnetic leakage."""
+        year = self.start_year + (self.generation - 1) * 25
+        self.broadcast_radius = self.leakage_system.leakage_front(year)
         for system_name, system in list(self.star_systems.items()):
             if not system.has_civilization or system.is_extinct:
                 continue
             if system.true_strategy not in ("LA", "LBA"):
                 continue
+            if system.is_wow_source:
+                continue  # the WOW! source has its own scripted answer in Generation 144
             if system.distance > self.broadcast_radius or system.has_detected_earth:
                 continue
             detection_chance = self.leakage_system.calculate_detection_probability(
-                system.distance, self.broadcast_radius, self.leakage_multiplier)
+                system.distance, year, self.leakage_multiplier)
             if random.random() >= detection_chance:
                 continue
 
             system.has_detected_earth = True
+            self.stats["passive_detections"] += 1
             logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via leakage")
             attack_type = self.leakage_system.determine_attack_type(system, system.distance)
             leak_note = " They found us through our own electromagnetic leakage."
+            # The front check above means our leakage has already reached them; what remains is
+            # the one-way trip of whatever they send back.
             if attack_type == "information":
-                self.process_information_attack(system_name)
-                if self.game_over:
-                    return
+                arrival = self.generation + max(1, math.ceil(system.distance / 25))
+                self.pending_info_attacks.append([system_name, arrival])
+                logging.info(f"LEAKAGE INFO ATTACK IN FLIGHT: {system_name} -> arrival Gen {arrival}")
             elif attack_type == "laser_sail":
                 travel = self.leakage_system.calculate_travel_time(system.distance, "laser_sail")
                 self._schedule_attack(system, self.generation + travel, "laser_sail_probe", note=leak_note)
             else:
                 travel = self.leakage_system.calculate_travel_time(system.distance, "fusion")
                 self._schedule_attack(system, self.generation + travel, "fusion_strike", note=leak_note)
+
+    def _deliver_pending_info_attacks(self) -> None:
+        """Information attacks in flight land when their signal finally reaches Earth."""
+        for entry in list(self.pending_info_attacks):
+            system_name, arrival_gen = entry[0], entry[1]
+            if arrival_gen > self.generation:
+                continue
+            self.pending_info_attacks.remove(entry)
+            source = self.star_systems.get(system_name)
+            if source is None or source.true_strategy not in ("LA", "LBA"):
+                logging.info(f"Information attack from {system_name} discarded: source no longer hostile")
+                continue
+            logging.critical(f"INFORMATION ATTACK ARRIVES: {system_name} (due Gen {arrival_gen})")
+            self.process_information_attack(system_name)
+            if self.game_over:
+                return
 
     def _resolve_attacks(self) -> None:
         """Fleets that arrive this generation strike Earth."""
@@ -1509,7 +1595,18 @@ You have answered one of humanity's greatest questions.
     # ------------------------------------------------------------------ special encounters
     def _spawn_mirror_system(self) -> StarSystem:
         """A newly resolved technosignature at exactly our level (the Mirror Civilization event)."""
-        entry = self._next_catalog_entry()
+        # A mirror of ourselves cannot live around a red giant or a white dwarf: take the nearest
+        # habitable star still undiscovered and leave the others for normal discovery.
+        entry = None
+        for name in list(self.undiscovered):
+            candidate = self._catalog_entry(name)
+            if candidate is None or name in self.star_systems:
+                self.undiscovered.remove(name)
+                continue
+            if habitability_weight(candidate.get("spectral_type")) > 0:
+                self.undiscovered.remove(name)
+                entry = candidate
+                break
         if entry is None:
             n = 1
             while f"Technosignature TS-{n}" in self.star_systems:
@@ -1613,7 +1710,7 @@ You have answered one of humanity's greatest questions.
                 "tech_level": self.tech_level,
                 "self_destruct_risk": round(self.self_destruct_risk, 4),
                 "ecological_risk": round(self.ecological_risk, 4),
-                "broadcast_radius": self.leakage_system.calculate_broadcast_radius(self.tech_level, self.technologies),
+                "broadcast_radius": self.leakage_system.leakage_front(year),
                 "leakage_multiplier": self.leakage_multiplier,
                 "integration_level": integration["level"],
                 "integration_status": integration["status"],
@@ -1674,7 +1771,7 @@ You have answered one of humanity's greatest questions.
         if announce:
             kind = system.spectral_type or "unknown type"
             self.emit("system_discovered",
-                      f"🔭 NEW STAR SYSTEM CATALOGUED: {system.name} ({system.distance:.1f} LY, {kind}). "
+                      f"🔭 ADDED TO SETI TARGET LIST: {system.name} ({system.distance:.1f} LY, {kind}). "
                       "Focus Research to learn whether anyone lives there.",
                       system=system.name, distance=system.distance)
         return system
@@ -1730,7 +1827,7 @@ You have answered one of humanity's greatest questions.
             actions.append(ActionSpec("listen_swan_song",
                                       f"Listen for Swan Song ({len(undiscovered)} undiscovered)", "1 AP", ("system",)))
         if self.genesis.unlocked:
-            actions.append(ActionSpec("genesis_seed", "Genesis Project (Seed Life)",
+            actions.append(ActionSpec("genesis_seed", "Genesis Ark Program (Launch Ark)",
                                       f"1 AP + {self.genesis.seed_cost_rp} RP", ("system",)))
         if self.pending_philosophical_event is not None:
             actions.append(ActionSpec("respond_event",
@@ -1769,7 +1866,16 @@ You have answered one of humanity's greatest questions.
         logging.info(f"Message Sent to {system_name} (Dir. Skill: {diplomacy_skill:.2f}, Quality Multiplier: {quality_multiplier:.2f})")
         
         self.action_points -= 1
-        
+
+        # The WOW! source is 1,800 light-years away: whatever is there answers, if at all, in the
+        # scripted response window, and nothing we learn before then reveals its nature.
+        if system.is_wow_source and self.wow_signal.outcome is None:
+            self.message = (f"Message sent toward {system_name} (1,800 LY). It arrives in 72 generations; "
+                            f"any answer comes with the response window in Generation "
+                            f"{self.wow_signal.wow_response_gen}.")
+            logging.info("Message to the WOW! source queued behind the Generation 144 window")
+            return
+
         # Extinct civilizations
         if system.has_civilization and system.is_extinct:
             self.message = f"Message sent to {system_name}. No response detected."

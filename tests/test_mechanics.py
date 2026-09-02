@@ -137,9 +137,10 @@ class ResponseEvidenceTest(unittest.TestCase):
 
 
 class GenesisTest(unittest.TestCase):
-    CHAIN = ("seti_at_home", "ai_pattern_recognition", "arecibo_telescope", "deep_space_network", "optical_seti",
-             "breakthrough_listen", "solar_sail_technology", "laser_sail_propulsion", "kepler_database",
-             "technosignature_catalog", "bio_engineering", "synthetic_biology", "genesis_bioprogramming")
+    CHAIN = ("signal_processing_basic", "seti_at_home", "ai_pattern_recognition", "bio_engineering",
+             "drake_equation", "kepler_database", "technosignature_catalog", "synthetic_biology",
+             "quantum_communication", "neutrino_telescope", "gravitational_wave_comm",
+             "relativistic_communication", "fusion_propulsion", "genesis_bioprogramming")
 
     def _unlocked_program(self):
         p = make_program(seed=3)
@@ -169,8 +170,8 @@ class GenesisTest(unittest.TestCase):
         p.research_points, p.funding, p.action_points = 1000, 80, 2
         p.genesis.seed_world(p, target)
         world = p.genesis.seeded_worlds[target.name]
-        world.evolution_stage = 2
-        world.seed_gen = p.generation - 40
+        world.evolution_stage = 3
+        world.arrival_gen = p.generation - 40
         with mock.patch(GENESIS_RANDOM, return_value=0.9):
             p.genesis.advance_generation(p)
         self.assertTrue(target.has_civilization)
@@ -186,8 +187,8 @@ class GenesisTest(unittest.TestCase):
         p.research_points, p.funding, p.action_points = 1000, 80, 2
         p.genesis.seed_world(p, target)
         world = p.genesis.seeded_worlds[target.name]
-        world.evolution_stage = 2
-        world.seed_gen = p.generation - 40
+        world.evolution_stage = 3
+        world.arrival_gen = p.generation - 40
         with mock.patch(GENESIS_RANDOM, return_value=0.1):
             p.genesis.advance_generation(p)
         self.assertEqual(target.true_strategy, "LA")

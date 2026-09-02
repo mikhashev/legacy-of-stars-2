@@ -14,7 +14,8 @@ from typing import Callable, Dict, List, Optional
 
 from . import save_manager
 from .console import QuitGame, read_input
-from .legacy_of_stars_v3 import ContactProgram
+from .genesis_project import ark_arrival_generation
+from .legacy_of_stars_v3 import ContactProgram, habitability_weight
 from .summary import build_summary
 from .ui_text import HELP_TEXT
 
@@ -104,12 +105,12 @@ class GameInterface:
         print("=" * 70)
         print("\nAugust 15, 1977 - 23:16 EDT")
         print("Big Ear Radio Telescope, Ohio State University")
-        print("\nDr. Jerry Ehman reviews automated radio telescope data.")
-        print("A 72-second burst at 1420 MHz catches his eye.")
+        print("\nThe automated receiver records a 72-second burst at 1420 MHz.")
         print("\nSignal intensity: 6EQUJ5 (30x background noise)")
         print("Direction: Sagittarius (Chi Sagittarii region)")
         print("Distance: ~1,800 light-years (disputed estimate)")
-        print("\nHe circles it with red pen and writes: 'Wow!'")
+        print("\nThree days later, reviewing the printout, Dr. Jerry Ehman circles")
+        print("six characters and writes: 'Wow!'")
         print("\nThis signal will never repeat.")
         print("You must decide Earth's response.")
         print("\n" + "=" * 70)
@@ -118,7 +119,7 @@ class GameInterface:
         print("\nDo you authorize a reply transmission?")
         print("\n1. YES - Send Reply")
         print("   • Message travels 72 generations (1,800 LY)")
-        print("   • Response/attack arrives Gen 144 (Year 3577)")
+        print(f"   • Response/attack arrives Gen 144 (Year {self._year(144)})")
         print("   • Immediate: +100 RP, +10% Support")
         print("   • Warning: Unknown consequences")
         print("\n2. NO - Stay Silent")
@@ -144,8 +145,8 @@ class GameInterface:
             print("=" * 70)
             print(f"\nMessage: \"{sent[:100]}{'...' if len(sent) > 100 else ''}\"")
             print("\nTarget: Chi Sagittarii region (~1,800 LY)")
-            print(f"ETA: Generation 72 (Year {1977 + 72 * 25})")
-            print(f"Response ETA: Generation 144 (Year {1977 + 144 * 25})")
+            print(f"ETA: Generation 72 (Year {self._year(72)})")
+            print(f"Response ETA: Generation 144 (Year {self._year(144)})")
             print("\nThe die is cast. Future generations will learn the truth.")
             print("\n+100 Research Points")
             print("+10% Public Support")
@@ -216,7 +217,7 @@ class GameInterface:
         print(f"  Public Support: {int(status['public_support'])}%")
         print(f"  Knowledge Base: {int(status['knowledge_base'])}%")
         print(f"  Research Points: {status['research_points']} (+{int(status['passive_rp'])}/turn)")
-        print(f"  Tech Level: {status['tech_level']}  |  Leakage radius: {status['broadcast_radius']:.0f} LY")
+        print(f"  Tech Level: {status['tech_level']}  |  Leakage front: {status['broadcast_radius']:.0f} LY")
         print(f"  Self-Destruct Risk: {status['self_destruct_risk'] * 100:.1f}%  |  "
               f"Ecological Risk: {status['ecological_risk'] * 100:.1f}%")
         print(f"  Integration: {status['integration_level']:.0%} - {status['integration_status']}")
@@ -376,6 +377,7 @@ class GameInterface:
             marker = f"  [LOCKED: {lock}]" if lock else ""
             print(f"{i}. [T{tech.tier}] {tech.name} ({tech.cost} RP){marker}")
             print(f"   {tech.description}")
+            print(f"   {tech.year_context}")
         idx = self._prompt_index("Enter tech number to research (or 0 to cancel): ", len(techs))
         if idx is None:
             return
@@ -436,7 +438,7 @@ class GameInterface:
         print(f"Signal round trip: {s['round_trip_generations']} generation(s)")
         print(f"Knowledge: {s['knowledge']}%  -  {s['description'] or 'nothing studied yet'}")
         if s["is_seeded"]:
-            print("Genesis Project: this world was seeded with Earth life.")
+            print("Genesis Ark Program: an ark from Earth is on its way to this world, or already landed.")
         print(f"\nAssessment: {self.program.ai_advisor.get_system_risk_assessment(self.program, s['name'])}")
         if s["messages_sent"]:
             print(f"\nMessages sent ({len(s['messages_sent'])}):")
@@ -527,13 +529,17 @@ class GameInterface:
         p = self.program
         print("\n🌱 === GENESIS PROJECT === 🌱")
         print(f"Cost to seed a world: {p.genesis.seed_cost_rp} RP, {p.genesis.seed_cost_funding}% Funding")
-        sterile = [s for s in p.star_systems.values() if not s.has_civilization and not s.is_seeded]
+        sterile = [s for s in p.star_systems.values()
+                   if not s.has_civilization and not s.is_seeded and not s.is_wow_source
+                   and habitability_weight(s.spectral_type) > 0]
         if not sterile:
-            p.message = "No sterile worlds available for seeding."
+            p.message = "No habitable sterile worlds available for an ark."
             return
-        print("Sterile worlds available for seeding:")
+        print("Habitable sterile worlds within reach (arrival at 0.12c):")
         for i, system in enumerate(sterile, 1):
-            print(f"{i}. {system.name} ({system.distance:.1f} LY)")
+            arrival = ark_arrival_generation(p.generation, system.distance)
+            print(f"{i}. {system.name} ({system.distance:.1f} LY, {system.spectral_type or 'unknown'}) "
+                  f"- lands Generation {arrival} (Year {self._year(arrival)})")
         idx = self._prompt_index("\nSelect system to seed (or 0 to cancel): ", len(sterile))
         if idx is None:
             return

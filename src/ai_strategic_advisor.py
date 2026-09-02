@@ -140,8 +140,10 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
             if any(w.get_defense_percentage() == 0 for w in threats):
                 lines.append("  → Deploy Evacuation or the Emergency Defense Protocol before arrival.")
         else:
-            lines.append("  ✓ No hostile fleets detected. Passive leakage still exposes us at "
-                         f"{program.broadcast_radius:.0f} LY.")
+            front = program.leakage_system.leakage_front(
+                program.start_year + (program.generation - 1) * 25)
+            lines.append("  ✓ No hostile fleets detected. Our leakage front has already passed "
+                         f"{front:.0f} LY.")
         lines.append("")
 
         # Resources

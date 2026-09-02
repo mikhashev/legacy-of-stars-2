@@ -215,7 +215,7 @@ threatens the philosophical foundation of your entire program.""",
             "mirror_civilization": {
                 "name": "The Mirror Civilization",
                 "description": """Your detection systems identify an unmistakable technosignature: industrial pollution,
-radio broadcasts, even nuclear detonations - all matching Earth's exact technological
+radio broadcasts - all matching Earth's exact technological
 trajectory. This civilization is AT OUR LEVEL, not ahead or behind. For the first time,
 you've found cosmic equals.
 

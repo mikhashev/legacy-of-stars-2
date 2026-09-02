@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 os.environ.setdefault("LOS_OFFLINE", "1")
 
 from src.legacy_of_stars_v3 import CATALOG_PATH, CivilizationStage, ContactProgram, load_star_catalog  # noqa: E402
+from src.wow_signal_event import WOW_SOURCE_NAME  # noqa: E402
 
 RANDOM = "src.legacy_of_stars_v3.random.random"
 
@@ -115,34 +116,123 @@ class DiscoveryTest(unittest.TestCase):
         self.assertAlmostEqual(catalog["discovery_chance"], 0.25)
 
 
-class LazyWowSourceTest(unittest.TestCase):
-    def test_source_chosen_at_generation_144_from_known_living_civs(self):
-        p = make_program(seed=6)
+class WowSourceSystemTest(unittest.TestCase):
+    """Replying to the WOW! signal puts a real star 1,800 LY away on the target list."""
+
+    @staticmethod
+    def _replied_program(seed=6):
+        p = make_program(seed=seed)
         p.wow_signal.reply("Hello")
-        self.assertIsNone(p.wow_signal.wow_source_system)
-        for system in p.star_systems.values():
-            system.has_civilization = False
-        target = next(iter(p.star_systems.values()))
-        target.has_civilization = True
-        target.is_extinct = False
-        target.true_strategy = "L"
-        target.civilization_stage = CivilizationStage.DIGITAL
-        p.generation = 144
-        self.assertTrue(p.wow_signal.check_gen144_event())
-        p.wow_signal.trigger_gen144_event()
-        self.assertIs(p.wow_signal.wow_source_system, target)
+        p.public_support = 100
+        p.funding = 100
+        return p
+
+    def test_reply_catalogues_the_source_star(self):
+        p = self._replied_program()
+        source = p.wow_signal.wow_source_system
+        self.assertIsNotNone(source)
+        self.assertEqual(source.name, WOW_SOURCE_NAME)
+        self.assertIs(p.star_systems[WOW_SOURCE_NAME], source)
+        self.assertEqual(source.distance, 1800.0)
+        self.assertTrue(source.is_wow_source)
+        self.assertIn("G2V", source.spectral_type)
+        self.assertAlmostEqual(source.ra, 293.7)
+        self.assertAlmostEqual(source.dec, -27.0)
+        # 1,800 LY out and back is exactly the 144 generations of the event.
+        self.assertEqual(source.get_round_trip_time(), 144)
+        # It is not a catalog star, so discovery and mirror contact can never pick it.
+        self.assertNotIn(WOW_SOURCE_NAME, [entry["name"] for entry in p.catalog])
+        self.assertNotIn(WOW_SOURCE_NAME, p.undiscovered)
+        # 1,800 LY is far outside the leakage front (year - 1935), so passive leakage ignores it.
+        year = p.start_year + (p.generation - 1) * 25
+        self.assertGreater(source.distance, p.leakage_system.leakage_front(year))
+        self.assertEqual(p.leakage_system.leakage_front(year), year - 1935)
+
+    def test_the_player_can_message_the_source(self):
+        p = self._replied_program()
+        source = p.wow_signal.wow_source_system
+        p.action_points = 2
+        p.send_message(WOW_SOURCE_NAME, "Still here")
+        self.assertEqual(source.messages_sent[-1][0], "Still here")
+
+    def _resolve_at_144(self, program, strategy):
+        source = program.wow_signal.wow_source_system
+        if strategy is None:
+            source.has_civilization = False
+            source._clear_civilization()
+        else:
+            source.has_civilization = True
+            source.is_extinct = False
+            source.true_strategy = strategy
+            source.civilization_stage = CivilizationStage.DIGITAL
+            source.civilization_type = "biological_pure"
+        program.generation = 144
+        self.assertTrue(program.wow_signal.check_gen144_event())
+        program.wow_signal.trigger_gen144_event()
+        self.assertFalse(program.wow_signal.check_gen144_event())  # resolves once
+
+    def test_hostile_source_answers_with_an_information_attack(self):
+        p = self._replied_program()
+        support, funding, evidence = p.public_support, p.funding, p.fermi_evidence["dark_forest_evidence"]
+        self._resolve_at_144(p, "LA")
+        self.assertEqual(p.wow_signal.outcome, "hostile")
+        self.assertEqual(p.pending_attack_warnings, [])  # no fleet can cross 1,800 LY
+        self.assertEqual(p.stats["info_attacks"], 1)
+        self.assertEqual(p.stats["attacks_scheduled"], 0)
+        self.assertLessEqual(p.public_support, support - 20)
+        self.assertLessEqual(p.funding, funding - 10)
+        self.assertEqual(p.fermi_evidence["dark_forest_evidence"], evidence + 3)  # +1 attack, +2 outcome
+        self.assertIn("The WOW! Reckoning", p.achievements)
+        text = " ".join(e.text for e in p.drain_events() if e.kind == "wow")
+        self.assertIn("eighteen thousand years", text)
+        self.assertNotIn("weapons to reach us", text)
+
+    def test_friendly_source_answers_after_3600_years(self):
+        p = self._replied_program()
+        self._resolve_at_144(p, "LB")
+        self.assertEqual(p.wow_signal.outcome, "friendly")
+        self.assertEqual(p.public_support, 100)
+        self.assertIn("The WOW! Response", p.achievements)
+        self.assertEqual(p.pending_attack_warnings, [])
+
+    def test_natural_source_means_silence(self):
+        p = self._replied_program()
+        self._resolve_at_144(p, None)
         self.assertEqual(p.wow_signal.outcome, "silence")
         self.assertIn("The Long Wait", p.achievements)
-        self.assertFalse(p.wow_signal.check_gen144_event())  # resolves once
 
-    def test_no_known_civilization_means_silence(self):
+    def test_save_round_trip_keeps_the_source(self):
+        p = self._replied_program()
+        source = p.wow_signal.wow_source_system
+        restored = ContactProgram.from_dict(p.to_dict(), offline=True)
+        loaded = restored.wow_signal.wow_source_system
+        self.assertIsNotNone(loaded)
+        self.assertIs(loaded, restored.star_systems[WOW_SOURCE_NAME])
+        self.assertEqual(loaded.distance, 1800.0)
+        self.assertTrue(loaded.is_wow_source)
+        self.assertEqual(loaded.has_civilization, source.has_civilization)
+        self.assertEqual(loaded.true_strategy, source.true_strategy)
+
+    def test_old_save_without_the_source_recreates_it(self):
+        p = self._replied_program()
+        data = p.to_dict()
+        data["star_systems"] = [s for s in data["star_systems"] if s["name"] != WOW_SOURCE_NAME]
+        data["wow_signal"]["wow_source_name"] = None
+        data["wow_signal"]["wow_replied"] = True
+        restored = ContactProgram.from_dict(data, offline=True)
+        loaded = restored.wow_signal.wow_source_system
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded.name, WOW_SOURCE_NAME)
+        self.assertEqual(loaded.distance, 1800.0)
+        self.assertTrue(loaded.is_wow_source)
+        self.assertIn(WOW_SOURCE_NAME, restored.star_systems)
+
+    def test_silent_old_save_does_not_invent_a_source(self):
         p = make_program(seed=6)
-        p.wow_signal.reply("")
-        for system in p.star_systems.values():
-            system.has_civilization = False
-        p.generation = 144
-        p.wow_signal.trigger_gen144_event()
-        self.assertEqual(p.wow_signal.outcome, "silence")
+        p.wow_signal.stay_silent()
+        restored = ContactProgram.from_dict(p.to_dict(), offline=True)
+        self.assertIsNone(restored.wow_signal.wow_source_system)
+        self.assertNotIn(WOW_SOURCE_NAME, restored.star_systems)
 
 
 if __name__ == "__main__":

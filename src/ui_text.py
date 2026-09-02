@@ -39,9 +39,12 @@ WHO IS OUT THERE
   Silence after several messages is a warning sign; so are questions about where you live.
 
 LEAKAGE
-  Earth's own transmissions leak into space. Hostile civilizations within the leakage
-  radius may find you without being contacted. Directional Transmission, Radio Silence
-  Protocol, Civilization Cloaking and the Dark Forest Protocol shrink the leakage.
+  Earth has been broadcasting since the 1930s, and that sphere of leaked signal expands
+  one light-year every year: the leakage front. Nothing shrinks it - technology only
+  changes how loud we are inside it, and the nearest listeners hear us best. Hostile
+  civilizations the front has reached may find you without being contacted. Directional
+  Transmission, Radio Silence Protocol, Civilization Cloaking and the Dark Forest
+  Protocol quieten us.
 
 INTEGRATION (THE GREAT FILTER)
   Humanity's biology and technology are drifting apart. From Generation 31 low

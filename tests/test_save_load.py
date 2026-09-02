@@ -56,6 +56,7 @@ def busy_program(seed=21) -> ContactProgram:
     p.pending_philosophical_event = p.philosophical_events.events["expansion_instinct"]
     p.philosophical_events.events["expansion_instinct"].has_triggered = True
     p.unlock_achievement("Test Pilot")
+    p.pending_info_attacks.append([foe.name, p.generation + 3])  # information attack in flight
     p.wow_signal.reply("We are here")
     p.drain_events()
     p.message = ""
@@ -73,6 +74,8 @@ class RoundTripTest(unittest.TestCase):
         self.assertEqual(len(p2.pending_attack_warnings), 1)
         self.assertIs(p2.pending_attack_warnings[0].source, p2.star_systems[p.pending_attack_warnings[0].source.name])
         self.assertEqual(p2.pending_attack_warnings[0].defensive_actions_taken, ["Evacuation"])
+        self.assertEqual(p2.pending_info_attacks, p.pending_info_attacks)
+        self.assertEqual(len(p2.pending_info_attacks), 1)
         self.assertEqual(p2.pending_philosophical_event.id, "expansion_instinct")
         self.assertEqual(p2.technologies["genetic_pacification"].chosen_doctrine, "Mandatory Global Edit")
         self.assertTrue(p2.genesis.unlocked)
@@ -101,6 +104,7 @@ class RoundTripTest(unittest.TestCase):
         self.assertEqual(p.public_support, 50)
         self.assertIsNotNone(p.current_director)
         self.assertEqual(p.star_systems, {})
+        self.assertEqual(p.pending_info_attacks, [])  # old saves have no information attacks in flight
         p.view_state()  # renders without systems
 
 

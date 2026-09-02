@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 # The harness never talks to an LLM.
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
+from src.legacy_of_stars_v3 import ContactProgram, habitability_weight  # noqa: E402
 
 STRATEGIES = ("balanced", "aggressive", "cautious", "integration", "neglect")
 
@@ -81,7 +81,9 @@ class AutoPlayer:
         if p.genesis.unlocked and len(p.genesis.seeded_worlds) < 2 \
                 and p.research_points > 600 and p.funding > 40:
             sterile = [s for s in p.star_systems.values()
-                       if not s.has_civilization and not getattr(s, "is_seeded", False)]
+                       if not s.has_civilization and not getattr(s, "is_seeded", False)
+                       and not getattr(s, "is_wow_source", False)
+                       and habitability_weight(s.spectral_type) > 0]
             if sterile:
                 target = random.choice(sterile)
                 success, _ = p.genesis.seed_world(p, target)
@@ -196,6 +198,8 @@ class AutoPlayer:
             "contact_names": contacts,
             "swan_songs_found": swan_found,
             "systems_known": len(p.star_systems),
+            "passive_detections": p.stats.get("passive_detections", 0),
+            "info_attacks": p.stats.get("info_attacks", 0),
             "exception": None,
         }
 
@@ -240,20 +244,27 @@ def main(argv=None) -> int:
                 "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
                 "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "systems_known": 0,
+                "passive_detections": 0, "info_attacks": 0,
                 "end_reason": f"EXCEPTION: {exc!r}", "exception": repr(exc),
             }
         results.append(result)
 
     print("\n=== PLAYTEST SUMMARY ===")
-    print(f"{'Run':<4}{'Seed':<6}{'Strat':<11}{'Gen':<5}{'Win':<6}{'Integ':<7}{'Seed':<6}{'Cont':<6}{'Swan':<6}{'Sys':<5}End reason")
-    print("-" * 100)
+    print(f"{'Run':<4}{'Seed':<6}{'Strat':<11}{'Gen':<5}{'Win':<6}{'Integ':<7}{'Seed':<6}{'Cont':<6}"
+          f"{'Swan':<6}{'Sys':<5}{'Leak':<6}{'Info':<6}End reason")
+    print("-" * 110)
     for r in results:
         win = "PHIL" if r["philosophical_victory"] else ("YES" if r["victory"] else "NO")
         print(
             f"{r['run_id']:<4}{r['seed']:<6}{r['strategy']:<11}{r['generations']:<5}{win:<6}"
             f"{r['integration_level']:<7.2f}{r['seeded_worlds']:<6}{r['contacts']:<6}"
-            f"{r['swan_songs_found']:<6}{r['systems_known']:<5}{r['end_reason'][:45]}"
+            f"{r['swan_songs_found']:<6}{r['systems_known']:<5}"
+            f"{r['passive_detections']:<6}{r['info_attacks']:<6}{r['end_reason'][:45]}"
         )
+    total_leak = sum(r["passive_detections"] for r in results)
+    total_info = sum(r["info_attacks"] for r in results)
+    print(f"\nPassive detections: {total_leak} total, {total_leak / max(1, len(results)):.2f} per game. "
+          f"Information attacks: {total_info} total, {total_info / max(1, len(results)):.2f} per game.")
     if failures:
         print(f"\n{failures} run(s) raised exceptions.")
         return 1

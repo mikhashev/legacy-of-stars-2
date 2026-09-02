@@ -12,15 +12,19 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import CivilizationStage, StarSystem  # noqa: E402
+from src.legacy_of_stars_v3 import (  # noqa: E402
+    BASE_CIV_CHANCE, CivilizationStage, StarSystem, habitability_weight, load_star_catalog)
 
 LIVING_TYPES = {"biological_pure", "digital_ascended", "hybrid_integrated"}
 STRATEGIES = {"L", "LB", "LR", "LA", "LBA"}
+CATALOG = load_star_catalog()
 
 
 def sample_systems(count: int, seed: int = 42):
+    """A sky with the same spread of spectral classes as the real catalog."""
     random.seed(seed)
-    return [StarSystem(f"Test-{i}", random.uniform(4, 50)) for i in range(count)]
+    types = [star["spectral_type"] for star in CATALOG]
+    return [StarSystem(f"Test-{i}", random.uniform(4, 50), types[i % len(types)]) for i in range(count)]
 
 
 class CivilizationTypeTest(unittest.TestCase):
@@ -59,7 +63,9 @@ class CivilizationTypeTest(unittest.TestCase):
         for system in self.extinct:
             self.assertIsNone(system.true_strategy)
             self.assertIsNone(system.civilization_stage)
-            self.assertGreaterEqual(system.extinct_years_ago, 500)
+            # Causality: we can't have seen a death whose light hasn't reached us yet.
+            self.assertGreaterEqual(system.extinct_years_ago, max(50, int(system.distance)))
+            self.assertLessEqual(system.extinct_years_ago, 5000)
 
     def test_type_distribution_follows_weights(self):
         counts = {name: 0 for name in LIVING_TYPES}
@@ -71,6 +77,46 @@ class CivilizationTypeTest(unittest.TestCase):
     def test_most_civilizations_are_older_than_humanity(self):
         older = sum(1 for s in self.living if s.civilization_age > 100)
         self.assertGreater(older / len(self.living), 0.6)
+
+
+class HabitabilityWeightTest(unittest.TestCase):
+    CASES = (
+        ("G2V", 1.0), ("K5V", 1.0), ("M5.5V", 0.6), ("F5IV-V", 0.6), ("G8IV", 0.5),
+        ("K0III", 0.0), ("DZ8", 0.0), ("A1V", 0.1), (None, 1.0),
+        ("G2V? (candidate 2MASS 19281982-2640123)", 1.0),
+    )
+
+    def test_weights_by_spectral_class(self):
+        for spectral_type, expected in self.CASES:
+            self.assertAlmostEqual(habitability_weight(spectral_type), expected, msg=spectral_type)
+
+    def test_every_catalog_star_has_a_known_weight(self):
+        for star in CATALOG:
+            self.assertIn(habitability_weight(star["spectral_type"]), (0.0, 0.1, 0.5, 0.6, 1.0), star)
+
+
+class CatalogCivilizationCountTest(unittest.TestCase):
+    """BASE_CIV_CHANCE is calibrated so the whole catalog still averages ~8 civilizations."""
+
+    def test_full_catalog_averages_about_eight_civilizations(self):
+        random.seed(2026)
+        runs = 300
+        total = 0
+        for _ in range(runs):
+            total += sum(1 for star in CATALOG
+                         if StarSystem(star["name"], star["distance"],
+                                       star["spectral_type"]).has_civilization)
+        mean = total / runs
+        self.assertTrue(6.5 <= mean <= 9.5, f"mean civilizations per catalog: {mean}")
+
+    def test_evolved_stars_never_host_anyone(self):
+        random.seed(7)
+        for spectral_type in ("K0III", "G8III", "DZ8"):
+            for _ in range(50):
+                self.assertFalse(StarSystem("X", 10.0, spectral_type).has_civilization)
+
+    def test_base_chance_applies_to_a_perfect_star(self):
+        self.assertAlmostEqual(BASE_CIV_CHANCE * habitability_weight("G2V"), BASE_CIV_CHANCE)
 
 
 class AgeToStageTest(unittest.TestCase):

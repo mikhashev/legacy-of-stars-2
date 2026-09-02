@@ -69,6 +69,18 @@ class TemplateFilesTest(unittest.TestCase):
             for key in ("mirror_friendly", "mirror_hostile", "genesis_greeting", "genesis_hostile"):
                 self.assertIsNone(PLACEHOLDER.search(bank.special(key, FULL_CTX)), key)
 
+    def test_swan_song_plea_and_warning_read_as_automated_relays(self):
+        # A civilization's last *living* transmission can only reach us once, `distance` years
+        # after it was sent. Anything we can still receive after that must be an automated,
+        # repeating beacon - so every one-shot-sounding plea (and the "eleven days" warning)
+        # must read as a relay, not a live broadcast.
+        with open(TEMPLATES_DIR / "swan_songs.json", encoding="utf-8") as f:
+            data = json.load(f)
+        for template in data["plea"]:
+            self.assertTrue("RELAY" in template or "repeat" in template, template)
+        eleven_days_warning = next(t for t in data["warning"] if "eleven days" in t)
+        self.assertTrue("RELAY" in eleven_days_warning or "repeat" in eleven_days_warning)
+
     def test_unknown_placeholder_stays_visible_and_missing_bank_falls_back(self):
         self.assertEqual(ContentBank.fill("{system} says {nothing}", {"system": "X"}), "X says {nothing}")
         bank = ContentBank(templates_dir=Path("no-such-dir"))

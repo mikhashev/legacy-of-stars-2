@@ -9,11 +9,11 @@
     "Symmetry did not produce trust. The mirror civilization decided that a rival at exactly its own level was the one threat it could still afford to eliminate."
   ],
   "genesis_greeting": [
-    "To the world that seeded ours: we know. We found the signatures in our own cells, the deliberate patterns, the story written in the oldest rock. You did not have to tell us. We are telling you: we are grateful, we are curious, and we are coming to meet you - with open hands. Call us children if you like. We prefer to call you family.",
-    "We have decoded the message you left in our genome. Most of it was instructions; the last part was hope. The instructions worked. The hope, too. This transmission is the first of many from the people of {system} to the people of Earth: our parents, our neighbours, our friends."
+    "To the world that sent ours: we know. The ark's archive told us who built it and why, and we have read it every generation since the landing. You did not have to explain yourselves. We are telling you anyway: we are grateful, we are curious, and we are coming to meet you - with open hands. Call us children if you like. We prefer to call you family.",
+    "We have finished reading the archive you packed into the ark. Most of it was instructions; the last file was hope. The instructions worked. The hope, too. This transmission is the first of many from the people of {system} to the people of Earth: our parents, our neighbours, our friends."
   ],
   "genesis_hostile": [
-    "The civilization we seeded on {system} has reached the stars and has looked back at its makers with cold eyes. They regard their engineered origin as a chain, and the chain's other end is here.",
+    "The civilization our ark founded on {system} has reached the stars and has looked back at its makers with cold eyes. They regard the archive that made them as a chain, and the chain's other end is here.",
     "Our children on {system} have grown up. Their first act of independence is to remove the possibility that we could ever shape them again."
   ]
 }

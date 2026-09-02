@@ -1,39 +1,51 @@
 """
-Genesis Project for Legacy of Stars
-Seed sterile worlds with engineered Earth life and watch them evolve over generations.
-Unlocked by the Genesis Bio-Programming technology.
+Genesis Ark Program for Legacy of Stars
+Send arks - frozen embryos, engineered organisms and machine guardians - to sterile worlds
+and watch what grows there over the generations. Unlocked by the Genesis Ark Program technology.
 
 Mechanics:
-- Seeding costs research points, funding and one action point; one seeding per generation.
-- Seeded worlds evolve: microbial -> complex life -> intelligence -> spaceflight.
+- Launching an ark costs research points, funding and one action point; one launch per generation.
+- The ark crosses at fusion speed (0.12c), so it is in transit for decades or centuries.
+- After landing the colony develops: founded -> self-sustaining -> industrial -> spaceflight.
 - A spacefaring creation becomes a real civilization: an ally that greets its makers
   (counts as a contact), or a paranoid rival that launches a fleet at Earth (Dark Forest risk).
 """
 import logging
+import math
 import random
 from typing import Dict, Optional, Tuple
 
-STAGE_NAMES = ["Microbial", "Complex Life", "Intelligence", "Spaceflight"]
-COMPLEX_LIFE_AGE = 10      # generations after seeding
-INTELLIGENCE_AGE = 25
+from .passive_leakage import FUSION_SPEED_C  # Project Daedalus fusion drive: what carries an ark
+
+STAGE_NAMES = ["In transit", "Colony founded", "Self-sustaining", "Industrial", "Spaceflight"]
+SELF_SUSTAINING_AGE = 10   # generations after the ark lands
+INDUSTRIAL_AGE = 25
 SPACEFLIGHT_AGE = 40
 FLEET_SPEED_C = 0.10       # a young civilization's warships, fraction of light speed
+
+
+def ark_arrival_generation(seed_gen: int, distance: float) -> int:
+    """Generation the ark reaches a system `distance` light-years away at 0.12c."""
+    return seed_gen + math.ceil((float(distance) / FUSION_SPEED_C) / 25)
 
 
 class SeededWorld:
     """Represents a world seeded by Earth"""
 
-    def __init__(self, system_name: str, seed_gen: int):
+    def __init__(self, system_name: str, seed_gen: int, arrival_gen: Optional[int] = None):
         self.system_name = system_name
         self.seed_gen = seed_gen
+        # When the ark lands. Every developmental milestone is counted from this generation.
+        self.arrival_gen = seed_gen if arrival_gen is None else arrival_gen
         self.evolution_stage = 0  # index into STAGE_NAMES
         self.is_hostile = False
         self.is_destroyed = False
         self.resolved = False     # reached spaceflight and chose a side
         self.outcome: Optional[str] = None  # "ally" | "hostile"
 
-    def get_age(self, current_gen: int) -> int:
-        return current_gen - self.seed_gen
+    def get_age_since_arrival(self, current_gen: int) -> int:
+        """Generations since the ark landed; negative while it is still in transit."""
+        return current_gen - self.arrival_gen
 
     @property
     def stage_name(self) -> str:
@@ -43,6 +55,7 @@ class SeededWorld:
         return {
             "system_name": self.system_name,
             "seed_gen": self.seed_gen,
+            "arrival_gen": self.arrival_gen,
             "evolution_stage": self.evolution_stage,
             "is_hostile": self.is_hostile,
             "is_destroyed": self.is_destroyed,
@@ -52,8 +65,13 @@ class SeededWorld:
 
     @classmethod
     def from_dict(cls, data: Dict) -> "SeededWorld":
-        world = cls(data["system_name"], data["seed_gen"])
+        world = cls(data["system_name"], data["seed_gen"],
+                    data.get("arrival_gen", data["seed_gen"]))
         world.evolution_stage = data.get("evolution_stage", 0)
+        if "arrival_gen" not in data:
+            # v1.0 save: stages were Microbial/Complex/Intelligence/Spaceflight (0-3) and the
+            # ark was already "there"; shift past the new "In transit" stage 0.
+            world.evolution_stage = min(world.evolution_stage + 1, len(STAGE_NAMES) - 1)
         world.is_hostile = data.get("is_hostile", False)
         world.is_destroyed = data.get("is_destroyed", False)
         world.resolved = data.get("resolved", False)
@@ -76,12 +94,18 @@ class GenesisProject:
     # ------------------------------------------------------------------ actions
     def seed_world(self, game, system) -> Tuple[bool, str]:
         """Attempt to seed a star system. Returns (success, player message)."""
+        from .legacy_of_stars_v3 import habitability_weight  # local import avoids a circular dependency
+
         if not self.unlocked:
             return False, "Genesis Project technology not yet researched."
         if system.name not in game.star_systems:
             return False, "System not found in this galaxy."
         if self.seeds_this_gen >= 1:
             return False, "Can only seed one world per generation."
+        if getattr(system, "is_wow_source", False):
+            return False, "Target is 1,800 light-years away: beyond any ark's range."
+        if habitability_weight(system.spectral_type) <= 0:
+            return False, f"No habitable planet: {system.spectral_type} star."
         if system.has_civilization:
             return False, "Cannot seed a system that already has a civilization."
         if system.name in self.seeded_worlds or getattr(system, "is_seeded", False):
@@ -97,7 +121,8 @@ class GenesisProject:
         game.funding -= self.seed_cost_funding
         game.action_points -= self.seed_cost_ap
 
-        world = SeededWorld(system.name, game.generation)
+        arrival_gen = ark_arrival_generation(game.generation, system.distance)
+        world = SeededWorld(system.name, game.generation, arrival_gen)
         self.seeded_worlds[system.name] = world
         system.is_seeded = True
         self.seeds_this_gen += 1
@@ -105,10 +130,13 @@ class GenesisProject:
         if stats is not None:
             stats["worlds_seeded"] = stats.get("worlds_seeded", 0) + 1
 
-        logging.info(f"GENESIS: Seeded life on {system.name} (Gen {game.generation})")
-        return True, (f"🌱 Life seeded on {system.name}. Engineered microbes are on their way; "
-                      f"complex life in ~{COMPLEX_LIFE_AGE} generations, intelligence in ~{INTELLIGENCE_AGE}, "
-                      f"spaceflight in ~{SPACEFLIGHT_AGE}. What they think of their makers is up to them.")
+        logging.info(f"GENESIS: Ark launched toward {system.name} (Gen {game.generation}, "
+                     f"arrival Gen {arrival_gen})")
+        return True, (f"🚀 Genesis ark launched toward {system.name} ({system.distance:.1f} LY). "
+                      f"At 0.12c it lands in Generation {arrival_gen}; the colony is self-sustaining "
+                      f"~{SELF_SUSTAINING_AGE} generations after that, industrial at ~{INDUSTRIAL_AGE}, "
+                      f"spacefaring at ~{SPACEFLIGHT_AGE} (Generation {arrival_gen + SPACEFLIGHT_AGE}). "
+                      "What they think of their makers is up to them.")
 
     # ------------------------------------------------------------------ per generation
     def advance_generation(self, game) -> None:
@@ -117,20 +145,27 @@ class GenesisProject:
         for world in list(self.seeded_worlds.values()):
             if world.is_destroyed or world.resolved:
                 continue
-            age = world.get_age(game.generation)
-            if world.evolution_stage == 0 and age >= COMPLEX_LIFE_AGE:
+            age = world.get_age_since_arrival(game.generation)
+            if world.evolution_stage == 0 and age >= 0:  # the ark has landed
                 world.evolution_stage = 1
-                logging.info(f"GENESIS: {world.system_name} advanced to Complex Life")
-                game.emit("genesis", f"🌱 GENESIS UPDATE: {world.system_name} has developed complex ecosystems.",
+                logging.info(f"GENESIS: ark landed on {world.system_name}; colony founded")
+                game.emit("genesis", f"🚀 GENESIS UPDATE: The ark has reached {world.system_name}. "
+                                     "The guardians report a landing, a shelter and the first thawed embryos.",
                           system=world.system_name, stage=world.stage_name)
-            elif world.evolution_stage == 1 and age >= INTELLIGENCE_AGE:
+            elif world.evolution_stage == 1 and age >= SELF_SUSTAINING_AGE:
                 world.evolution_stage = 2
-                logging.info(f"GENESIS: {world.system_name} advanced to Intelligence")
-                game.emit("genesis", f"🧠 GENESIS UPDATE: Intelligence detected on {world.system_name}! "
+                logging.info(f"GENESIS: {world.system_name} is self-sustaining")
+                game.emit("genesis", f"🌱 GENESIS UPDATE: The colony on {world.system_name} feeds itself. "
+                                     "The archive is no longer the only thing keeping them alive.",
+                          system=world.system_name, stage=world.stage_name)
+            elif world.evolution_stage == 2 and age >= INDUSTRIAL_AGE:
+                world.evolution_stage = 3
+                logging.info(f"GENESIS: {world.system_name} reached Industrial stage")
+                game.emit("genesis", f"🏭 GENESIS UPDATE: {world.system_name} has an industrial civilization. "
                                      "Their first radio signals are our own genome, sung back to us.",
                           system=world.system_name, stage=world.stage_name)
-            elif world.evolution_stage == 2 and age >= SPACEFLIGHT_AGE:
-                world.evolution_stage = 3
+            elif world.evolution_stage == 3 and age >= SPACEFLIGHT_AGE:
+                world.evolution_stage = 4
                 logging.info(f"GENESIS: {world.system_name} achieved Spaceflight")
                 self._resolve(world, game)
 
@@ -151,7 +186,7 @@ class GenesisProject:
         system.has_civilization = True
         system.is_extinct = False
         system.has_swan_song = False
-        system.civilization_age = world.get_age(game.generation) * 25
+        system.civilization_age = max(1, world.get_age_since_arrival(game.generation)) * 25
         system.civilization_stage = CivilizationStage.INTERPLANETARY
         system.civilization_type = "hybrid_integrated"
         system.deception_level = 0.0
