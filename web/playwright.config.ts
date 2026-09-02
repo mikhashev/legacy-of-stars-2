@@ -9,6 +9,8 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: "./tests",
+  // *.test.ts under tests/unit/ belongs to Vitest (`npm run unit`); Playwright takes the specs.
+  testMatch: "**/*.spec.ts",
   outputDir: "./test-results",
   reporter: [["list"], ["html", { open: "never", outputFolder: "./playwright-report" }]],
   timeout: 180_000,

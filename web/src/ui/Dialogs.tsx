@@ -35,15 +35,28 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
         .map((name) => view.systems.find((s) => s.name === name))
         .filter((s): s is (typeof view.systems)[number] => s !== undefined)
     : view.systems;
+  // W3: the star picked on the map is the default. It is only a default - every eligible
+  // system is still listed below and one click changes it.
+  const preselected = store.state.selectedSystem;
+  const preselectedIsEligible = eligible.some((s) => s.name === preselected);
   return (
     <DialogFrame title={`${spec.label}: choose a system`} onClose={() => store.closeDialog()}>
+      {preselected && preselectedIsEligible && (
+        <button class="primary picker-preselected" onClick={() => store.pickSystem(preselected)}>
+          Continue with {preselected} (selected on the map)
+        </button>
+      )}
       {eligible.length === 0 ? (
         <p class="empty">{isGenesis ? "No habitable sterile worlds within reach" : "No systems to choose from."}</p>
       ) : (
         <ul class="picker-list">
           {eligible.map((s) => (
             <li key={s.name}>
-              <button class="picker-row" onClick={() => store.pickSystem(s.name)}>
+              <button
+                class={s.name === preselected ? "picker-row is-selected" : "picker-row"}
+                aria-current={s.name === preselected ? "true" : undefined}
+                onClick={() => store.pickSystem(s.name)}
+              >
                 <span class="picker-name">{s.name}</span>
                 <span class="picker-meta">
                   {s.distance} LY{s.spectral_type ? `, ${s.spectral_type}` : ""} &middot; {s.knowledge}% known

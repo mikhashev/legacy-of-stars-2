@@ -10,7 +10,9 @@
     "dev": "npm run engine && vite",
     "build": "npm run engine && npm run typecheck && vite build",
     "preview": "vite preview",
-    "test": "playwright test"
+    "unit": "vitest run",
+    "test": "playwright test",
+    "test:all": "npm run unit && npm test"
   },
   "dependencies": {
     "preact": "10.29.8",
@@ -22,6 +24,7 @@
     "@types/three": "0.185.4",
     "pyodide": "314.0.6",
     "typescript": "7.0.2",
-    "vite": "8.2.2"
+    "vite": "8.2.2",
+    "vitest": "4.1.11"
   }
 }

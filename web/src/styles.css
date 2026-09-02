@@ -154,14 +154,22 @@ input[type="text"], input[type="number"], textarea {
 .director-name { font-weight: 600; }
 .director-traits, .director-skills { font-size: 0.8rem; color: var(--text-dim); }
 
+/* W3: the screen is a fixed-height column so the centre panel (the star map) can fill it;
+   the side columns scroll on their own. */
+.main-screen { display: flex; flex-direction: column; height: 100vh; }
+
 .main-layout {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 20rem 1fr 20rem;
+  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr) minmax(15rem, 20rem);
   gap: 1rem;
   padding: 1rem;
-  align-items: start;
+  align-items: stretch;
 }
-.main-column { display: flex; flex-direction: column; gap: 1rem; }
+.main-column { display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
+.main-column-left, .main-column-right { overflow-y: auto; }
+.main-column-center { overflow: hidden; }
 
 .panel {
   background: var(--panel);
@@ -222,7 +230,8 @@ input[type="text"], input[type="number"], textarea {
 .threat-line { font-size: 0.85rem; color: var(--text-dim); }
 .threat-line.warning { color: var(--warning); }
 
-.event-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 70vh; overflow-y: auto; }
+.main-column-right .event-log { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.event-list { display: flex; flex-direction: column; gap: 0.35rem; overflow-y: auto; }
 .event-row { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
 .event-gen { color: var(--text-dim); flex: 0 0 auto; }
 .event-text { flex: 1 1 auto; white-space: pre-wrap; }
@@ -313,7 +322,154 @@ input[type="text"], input[type="number"], textarea {
 }
 
 /* ---------------------------------------------------------------- responsive */
-@media (max-width: 1080px) {
+/* 1024x700 still gets three columns; the side ones just give the map more room. */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr) minmax(13rem, 15rem);
+    gap: 0.6rem;
+    padding: 0.6rem;
+  }
+  .header { padding: 0.6rem 0.9rem; }
+  .panel { padding: 0.7rem 0.8rem; }
+}
+
+@media (max-width: 900px) {
+  .main-screen { height: auto; }
   .main-layout { grid-template-columns: 1fr; }
+  .main-column-left, .main-column-right, .main-column-center { overflow: visible; }
+  .star-map-viewport { height: 60vh; }
   .header-director { text-align: left; }
 }
+
+/* ---------------------------------------------------------------- star map (W3) */
+.star-map {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: 0.6rem 0.7rem 0.7rem;
+}
+.star-map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.star-map-title { border: none; margin: 0; padding: 0; }
+.star-map-buttons { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.star-map-buttons button { padding: 0.25rem 0.55rem; font-size: 0.82rem; }
+
+.star-map-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 14rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #10151f 0%, #05070b 70%);
+}
+.star-map-host { position: absolute; inset: 0; }
+.star-map-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.star-map-labels { overflow: hidden; }
+
+.star-map-error {
+  position: absolute;
+  inset: auto 0.6rem 2.4rem 0.6rem;
+  color: var(--warning);
+  font-size: 0.85rem;
+}
+.star-map-legend {
+  position: absolute;
+  left: 0.6rem;
+  bottom: 0.4rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* CSS2DRenderer labels */
+/* CSS2DRenderer owns `transform` (the anchor comes from CSS2DObject.center) and StarMap's
+   declutter pass owns `top`; everything else about a label is styled here. */
+.star-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 4px;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  user-select: none;
+}
+.star-label:hover, .star-label.is-hovered { color: var(--text); background: rgba(10, 14, 22, 0.55); }
+.star-label.is-selected {
+  color: #fff;
+  background: rgba(42, 95, 143, 0.75);
+  outline: 1px solid var(--accent);
+}
+.star-label[data-mood="inhabited"] .star-label-name { color: var(--warning); }
+.star-label[data-mood="extinct"] .star-label-name { color: var(--text-dim); font-style: italic; }
+.star-label[data-contacted="true"] .star-label-name { color: var(--accent); font-weight: 600; }
+.star-label[data-seeded="true"] .star-label-name { text-decoration: underline dotted var(--good); }
+.star-label-earth { color: var(--accent); font-weight: 600; cursor: default; }
+.star-label-distance { display: none; font-size: 0.68rem; color: var(--text-dim); }
+.star-label:hover .star-label-distance,
+.star-label.is-hovered .star-label-distance,
+.star-label.is-selected .star-label-distance { display: block; }
+
+.star-map-ring-label {
+  position: absolute;
+  padding-left: 0.3rem;
+  font-size: 0.68rem;
+  color: #46536b;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* the selected-system card */
+.map-card {
+  position: absolute;
+  left: 0.6rem;
+  bottom: 1.9rem;
+  width: min(22rem, calc(100% - 1.2rem));
+  background: rgba(18, 21, 29, 0.94);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+}
+.map-card-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.map-card-name { font-weight: 600; flex: 1 1 auto; }
+.map-card-close { border: none; background: transparent; padding: 0 0.3rem; font-size: 1.1rem; line-height: 1; }
+.map-card-meta { color: var(--text-dim); font-size: 0.8rem; }
+.map-card-description { margin: 0.35rem 0; }
+.map-card-reply { font-style: italic; color: var(--text-dim); }
+.map-card-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.map-card-action { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+/* the "List" overlay */
+.star-map-list {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  background: rgba(11, 13, 18, 0.96);
+  padding: 0.5rem;
+}
+.star-map-list .systems-panel { border: none; background: transparent; padding: 0.2rem; }
+.systems-panel-head { display: flex; align-items: flex-start; gap: 0.5rem; }
+.systems-panel-head h2 { flex: 1 1 auto; }
+.systems-close { border: none; background: transparent; font-size: 1.2rem; line-height: 1; padding: 0 0.4rem; }
+.system-row.is-selected { border-color: var(--accent); background: #1b2432; }
+.system-dossier { margin-left: auto; padding: 0.15rem 0.45rem; font-size: 0.75rem; }
+
+.picker-preselected { width: 100%; margin-bottom: 0.4rem; }
+.picker-row.is-selected { border-color: var(--accent); }

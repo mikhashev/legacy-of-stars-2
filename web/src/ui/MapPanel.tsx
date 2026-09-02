@@ -1,0 +1,165 @@
+/**
+ * The Preact wrapper around `scene/StarMap.ts`: it owns the DOM node the renderer lives in,
+ * feeds the map every `ViewState` the store produces, and draws the flat UI that sits on top
+ * of the canvas (toolbar, legend, the selected-system card, the systems list overlay).
+ *
+ * Everything shown here comes from `ViewState.systems[]`; the map never invents a fact the
+ * engine did not state (docs/web_contract.md 6).
+ */
+import { useEffect, useRef, useState } from "preact/hooks";
+import { StarMap } from "../scene/StarMap";
+import { formatDistance } from "../scene/coords";
+import type { Store } from "../store";
+import type { ActionId, ActionSpec, StarSystem, ViewState } from "../types";
+import { SystemsPanel } from "./SystemsPanel";
+
+function excerpt(text: string, max = 120): string {
+  return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+}
+
+/** The action bar's spec for one id, or null when the engine is not offering it now. */
+function specFor(view: ViewState, id: ActionId): ActionSpec | null {
+  return view.actions.find((action) => action.id === id) ?? null;
+}
+
+function CardAction({
+  spec,
+  system,
+  store,
+  label,
+}: {
+  spec: ActionSpec | null;
+  system: string;
+  store: Store;
+  label: string;
+}) {
+  if (!spec) return null;
+  return (
+    <button
+      class="map-card-action"
+      disabled={store.state.busy}
+      onClick={() => store.startActionForSystem(spec, system)}
+      title={spec.cost}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** The compact card for whichever star is selected; the map's answer to a dossier teaser. */
+function SelectedCard({ system, view, store }: { system: StarSystem; view: ViewState; store: Store }) {
+  const lastResponse = system.responses[system.responses.length - 1];
+  return (
+    <section class="map-card" data-system={system.name}>
+      <div class="map-card-head">
+        <span class="map-card-name">{system.name}</span>
+        <button class="map-card-close" aria-label="Clear selection" onClick={() => store.selectSystem(null)}>
+          ×
+        </button>
+      </div>
+      <p class="map-card-meta">
+        {formatDistance(system.distance)} &middot; {system.spectral_type ?? "type unknown"} &middot;{" "}
+        {system.knowledge}% known
+      </p>
+      <p class="map-card-description">{system.description || "Nothing studied yet."}</p>
+      {lastResponse && <p class="map-card-reply">&ldquo;{excerpt(lastResponse)}&rdquo;</p>}
+      {system.next_response_gen !== null && (
+        <p class="map-card-meta">Next reply expected: Generation {system.next_response_gen}</p>
+      )}
+      <div class="map-card-actions">
+        <button class="map-card-action" onClick={() => store.openDossier(system.name)}>
+          Dossier
+        </button>
+        <CardAction spec={specFor(view, "send_message")} system={system.name} store={store} label="Send message" />
+        <CardAction spec={specFor(view, "focus_research")} system={system.name} store={store} label="Focus research" />
+      </div>
+    </section>
+  );
+}
+
+export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<StarMap | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { selectedSystem, mapScale, showSystemList } = store.state;
+
+  // One StarMap for the lifetime of the main screen; it owns the WebGL context.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    try {
+      mapRef.current = new StarMap(host, {
+        onSelect: (name) => store.selectSystem(name),
+      });
+    } catch (cause: unknown) {
+      // No WebGL (a locked-down browser, a headless run without a GPU): the list overlay is
+      // the fallback, and the rest of the HUD is unaffected.
+      setError(cause instanceof Error ? cause.message : String(cause));
+      store.toggleSystemList(true);
+    }
+    return () => {
+      mapRef.current?.dispose();
+      mapRef.current = null;
+    };
+  }, [store]);
+
+  // Every state change the map cares about, in one diffing call.
+  useEffect(() => {
+    mapRef.current?.update({ systems: view.systems, selected: selectedSystem, scale: mapScale });
+  }, [view.systems, selectedSystem, mapScale]);
+
+  const selected = selectedSystem ? view.systems.find((s) => s.name === selectedSystem) : undefined;
+
+  return (
+    <section class="panel star-map" data-scale={mapScale} data-selected={selectedSystem ?? ""}>
+      <div class="star-map-toolbar">
+        <h2 class="star-map-title">Star map</h2>
+        <div class="star-map-buttons">
+          <button onClick={() => mapRef.current?.home()} title="Reset the camera">
+            Home
+          </button>
+          <button
+            disabled={!selected}
+            onClick={() => mapRef.current?.focus(selectedSystem)}
+            title="Fly to the selected star"
+          >
+            Focus
+          </button>
+          <button
+            onClick={() => store.toggleScale()}
+            title={
+              mapScale === "compressed"
+                ? "Radii are compressed logarithmically so 4 LY and 51 LY both fit"
+                : "Radii are proportional to distance"
+            }
+          >
+            Scale: {mapScale === "compressed" ? "compressed" : "true"}
+          </button>
+          <button class={showSystemList ? "primary" : undefined} onClick={() => store.toggleSystemList()}>
+            List
+          </button>
+        </div>
+      </div>
+
+      <div class="star-map-viewport">
+        <div class="star-map-host" ref={hostRef} />
+        {error && (
+          <p class="star-map-error">
+            The 3D map could not start ({error}). Use the List panel instead.
+          </p>
+        )}
+        <p class="star-map-legend">
+          {view.catalog.known} of {view.catalog.total} catalogued &middot; rings at 5 / 10 / 20 / 50 LY &middot;
+          colour = spectral class
+        </p>
+        {selected && <SelectedCard system={selected} view={view} store={store} />}
+        {showSystemList && (
+          <div class="star-map-list">
+            <SystemsPanel view={view} store={store} />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

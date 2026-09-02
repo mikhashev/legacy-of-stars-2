@@ -3,7 +3,7 @@ import type { Store } from "../store";
 import type { ViewState } from "../types";
 import { Header } from "./Header";
 import { StatusPanel } from "./StatusPanel";
-import { SystemsPanel } from "./SystemsPanel";
+import { MapPanel } from "./MapPanel";
 import { ThreatsPanel } from "./ThreatsPanel";
 import { ActionsPanel, assignKeys } from "./ActionsPanel";
 import { EventLog } from "./EventLog";
@@ -43,11 +43,21 @@ function ProgramMessage({ text }: { text: string }) {
 export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
   const state = store.state;
 
+  // Registered once: the handler reads `store.state` when the key is pressed rather than
+  // closing over a snapshot. Re-registering on every state change would leave a stale
+  // listener for the frame between a store update and Preact running effects again - long
+  // enough to swallow the very next keystroke (Escape right after closing a dialog).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (isTyping() || state.dialog || state.modalEvent || state.showHelp || state.summaryResult) return;
-      if (state.pendingDoctrine || state.busy) return;
+      const s = store.state;
+      if (isTyping() || s.dialog || s.modalEvent || s.showHelp || s.summaryResult) return;
       const key = e.key.toLowerCase();
+      if (key === "escape") {
+        // W3: Escape clears the map selection (no dialog is open - the guard above returned).
+        store.selectSystem(null);
+        return;
+      }
+      if (s.pendingDoctrine || s.busy) return;
       if (key === "v") {
         store.openDossierPicker();
         return;
@@ -64,13 +74,13 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
         store.openMenu();
         return;
       }
-      const keyed = assignKeys(view.actions);
+      const keyed = assignKeys(s.view?.actions ?? []);
       const match = keyed.find((k) => k.key === key);
       if (match) store.openAction(match.spec);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [store, state, view]);
+  }, [store]);
 
   return (
     <main class="main-screen">
@@ -79,11 +89,11 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
         <div class="main-column main-column-left">
           <StatusPanel view={view} />
           <ActionsPanel view={view} store={store} />
+          <ThreatsPanel view={view} />
           <ProgramMessage text={state.message} />
         </div>
         <div class="main-column main-column-center">
-          <SystemsPanel view={view} store={store} />
-          <ThreatsPanel view={view} />
+          <MapPanel view={view} store={store} />
         </div>
         <div class="main-column main-column-right">
           <EventLog events={state.events} />

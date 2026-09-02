@@ -11,6 +11,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { EngineBridge } from "./bridge";
 import { withLabel, saveNew, saveToSlot } from "./saves";
+import type { ScaleMode } from "./scene/coords";
 import type {
   ActionId,
   ActionParams,
@@ -58,6 +59,12 @@ export interface UIState {
   wowComposerOpen: boolean;
   showHelp: boolean;
   summaryResult: PerformResult | null;
+  /** The star picked on the map: the default system for the next system-needing action. */
+  selectedSystem: string | null;
+  /** Which radial scale the map draws in; "compressed" is `k * ln(1 + d/d0)`. */
+  mapScale: ScaleMode;
+  /** The systems list, which W3 moved off the main column into an overlay. */
+  showSystemList: boolean;
 }
 
 function describe(error: unknown): string {
@@ -82,6 +89,9 @@ const initialState: UIState = {
   wowComposerOpen: false,
   showHelp: false,
   summaryResult: null,
+  selectedSystem: null,
+  mapScale: "compressed",
+  showSystemList: false,
 };
 
 export class Store {
@@ -155,6 +165,8 @@ export class Store {
       message: "",
       showHelp: false,
       summaryResult: null,
+      selectedSystem: null,
+      showSystemList: false,
     });
   }
 
@@ -199,12 +211,19 @@ export class Store {
     // openMenu all refuse while it is set), so the only way to reach this with a pending
     // doctrine is answering it via choose_doctrine - which never itself returns `needs`.
     // Anything other than a fresh doctrine request clears it; nothing here can be stale.
+    const view = result.state ?? this.state.view;
+    // A selection only survives while the engine still lists that system.
+    const selectedSystem =
+      this.state.selectedSystem && view?.systems.some((s) => s.name === this.state.selectedSystem)
+        ? this.state.selectedSystem
+        : null;
     this.patch({
-      view: result.state ?? this.state.view,
+      view,
       message: result.message,
       events,
       modalQueue,
       pendingDoctrine: result.needs && result.needs.kind === "doctrine" ? result.needs : null,
+      selectedSystem,
     });
     this.popModal();
   }
@@ -296,6 +315,7 @@ export class Store {
   pickSystem(name: string): void {
     const dialog = this.state.dialog;
     if (!dialog || dialog.kind !== "system") return;
+    this.patch({ selectedSystem: name });
     if (dialog.spec.needs.includes("text")) {
       this.patch({ dialog: { kind: "text", spec: dialog.spec, system: name } });
       return;
@@ -340,6 +360,41 @@ export class Store {
     const pending = this.state.pendingDoctrine;
     if (!pending) return;
     await this.perform("choose_doctrine", { tech: pending.tech_id, choice });
+  }
+
+  /* ------------------------------------------------------------ star map */
+
+  /** Click on the map (or on a list row): the map's selection is the UI's current system. */
+  selectSystem(name: string | null): void {
+    if (this.state.selectedSystem === name) return;
+    this.patch({ selectedSystem: name });
+  }
+
+  toggleScale(): void {
+    this.patch({ mapScale: this.state.mapScale === "compressed" ? "true" : "compressed" });
+  }
+
+  toggleSystemList(open?: boolean): void {
+    this.patch({ showSystemList: open ?? !this.state.showSystemList });
+  }
+
+  /**
+   * Runs an action straight at one system, skipping the picker - the same path as choosing
+   * that row in the picker, so `send_message` still stops at its text dialog. Used by the
+   * selected-system card, where the system is already named on screen.
+   */
+  startActionForSystem(spec: ActionSpec, system: string): void {
+    if (this.state.pendingDoctrine) {
+      this.showToast("A doctrine choice is waiting for an answer first.");
+      return;
+    }
+    if (this.state.busy) return;
+    if (spec.needs.includes("text")) {
+      this.patch({ dialog: { kind: "text", spec, system } });
+      return;
+    }
+    this.patch({ dialog: null });
+    void this.performDynamic(spec.id, { system });
   }
 
   openDossier(system: string): void {
