@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import CivilizationStage, ContactProgram  # noqa: E402
+from src.legacy_of_stars_v3 import CivilizationStage, CONTACT_VICTORY_GOAL, ContactProgram  # noqa: E402
 
 RANDOM = "src.legacy_of_stars_v3.random.random"
 GENESIS_RANDOM = "src.genesis_project.random.random"
@@ -126,10 +126,10 @@ class ResponseEvidenceTest(unittest.TestCase):
         self.assertEqual(p.fermi_evidence["dark_forest_evidence"], 1)
         self.assertIn("No response detected", p.message)
 
-    def test_contact_victory_after_three_responders(self):
+    def test_contact_victory_after_goal_responders(self):
         p = make_program(seed=2)
         quiet_galaxy(p)
-        systems = list(p.star_systems.values())[:3]
+        systems = list(p.star_systems.values())[:CONTACT_VICTORY_GOAL]
         for s in systems:
             make_living(s, "LB")
             s.received_messages.append("hi")

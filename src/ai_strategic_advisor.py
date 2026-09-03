@@ -114,7 +114,9 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         if program.funding < 30:
             parts.append("WARNING: Funding critically low!")
         total_evidence = sum(program.fermi_evidence.values())
-        parts.append(f"\nVICTORY PROGRESS: {len(contacted)}/3 contacts, {total_evidence}/15 Fermi evidence")
+        from .legacy_of_stars_v3 import CONTACT_VICTORY_GOAL  # local: avoids a circular import
+        parts.append(f"\nVICTORY PROGRESS: {len(contacted)}/{CONTACT_VICTORY_GOAL} contacts, "
+                     f"{total_evidence}/15 Fermi evidence")
         return "\n".join(parts)
 
     def _format_advice(self, raw_advice: str, program) -> str:
@@ -224,7 +226,8 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         unknown = [n for n, s in program.star_systems.items() if s.knowledge < 20]
         if unknown:
             recs.append(f"Focus Research on unstudied systems ({unknown[0]} first).")
-        if len(contacted) < 3:
+        from .legacy_of_stars_v3 import CONTACT_VICTORY_GOAL  # local: avoids a circular import
+        if len(contacted) < CONTACT_VICTORY_GOAL:
             recs.append("Message civilizations that already responded; each reply is safe evidence of cooperation.")
         if not recs:
             recs.append("Position is stable. Invest research points in detection and defense technologies.")
@@ -233,7 +236,8 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         lines.append("")
 
         total_evidence = sum(program.fermi_evidence.values())
-        lines.append(f"VICTORY PROGRESS: {len(contacted)}/3 contacts | Fermi evidence {total_evidence}/15")
+        lines.append(f"VICTORY PROGRESS: {len(contacted)}/{CONTACT_VICTORY_GOAL} contacts | "
+                     f"Fermi evidence {total_evidence}/15")
         lines.append(f"{'=' * 60}")
         lines.append("AI Advisor analysis complete.")
         lines.append(f"{'=' * 60}")

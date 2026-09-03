@@ -84,7 +84,7 @@ director). Research Points accumulate from funding and from the instruments you 
 - **Legacy.** Reply to the WOW! signal in 1977 and the answer - if any - arrives in Generation 144.
 - **Genesis.** Send arks to sterile worlds and, forty generations after landing, meet what grew.
 
-**Winning:** replies from three living civilizations (contact victory) and/or 15 pieces of Fermi
+**Winning:** replies from five living civilizations (contact victory) and/or 15 pieces of Fermi
 Paradox evidence (philosophical victory). Both let the game continue.
 **Losing:** defunding, self-destruction, or annihilation by a fleet you could not stop.
 

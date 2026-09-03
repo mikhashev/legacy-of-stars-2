@@ -1,8 +1,12 @@
 """
 Static texts for the console interface: the help screen.
 """
+from .legacy_of_stars_v3 import CONTACT_VICTORY_GOAL
 
-HELP_TEXT = """
+_NUMBER_WORDS = {3: "three", 4: "four", 5: "five"}
+_CONTACT_VICTORY_GOAL_WORD = _NUMBER_WORDS.get(CONTACT_VICTORY_GOAL, str(CONTACT_VICTORY_GOAL))
+
+HELP_TEXT = f"""
 ================================================================
 LEGACY OF STARS - HOW TO PLAY
 ================================================================
@@ -58,7 +62,7 @@ INTEGRATION (THE GREAT FILTER)
   Tier 5 requires 40% integration.
 
 VICTORY AND DEFEAT
-  Contact victory: replies from three living civilizations.
+  Contact victory: replies from {_CONTACT_VICTORY_GOAL_WORD} living civilizations.
   Philosophical victory: 15 pieces of Fermi Paradox evidence (swan songs, hostile
   encounters, first replies, integration technologies, resolved philosophical crises,
   Genesis outcomes). Both victories let the game continue.

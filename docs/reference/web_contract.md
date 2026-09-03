@@ -252,7 +252,7 @@ strategies, deception levels) ever appears here.
 | `technologies.available[]` | `{id, name, tier, cost, description, year_context, locked}` | researchable now; `locked` is null or the reason string |
 | `fermi_evidence` | `{extinction_evidence, dark_forest_evidence, cooperation_evidence, great_filter_evidence, total, goal}` | ints; `goal` is 15 |
 | `contacts` | int | living civilizations that answered |
-| `contacts_goal` | int | 3 |
+| `contacts_goal` | int | 5 |
 | `victory` | bool | contact victory reached |
 | `philosophical_victory` | bool | Fermi answer reached |
 | `genesis.unlocked` | bool | the ark programme is available |

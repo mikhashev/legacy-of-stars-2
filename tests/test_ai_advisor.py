@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 os.environ.setdefault("LOS_OFFLINE", "1")
 
 from src.ai_strategic_advisor import AIStrategicAdvisor  # noqa: E402
-from src.legacy_of_stars_v3 import CivilizationStage, ContactProgram  # noqa: E402
+from src.legacy_of_stars_v3 import CivilizationStage, CONTACT_VICTORY_GOAL, ContactProgram  # noqa: E402
 
 RANDOM = "src.legacy_of_stars_v3.random.random"
 
@@ -82,7 +82,7 @@ class BriefingContentTest(unittest.TestCase):
         self.assertIn("ACTIVE THREATS: 1", context)
         self.assertIn(friend.name, context)
         self.assertIn(silent.name, context)
-        self.assertIn("VICTORY PROGRESS: 1/3 contacts", context)
+        self.assertIn(f"VICTORY PROGRESS: 1/{CONTACT_VICTORY_GOAL} contacts", context)
 
         briefing = p.ai_advisor.analyze_game_state(p)
         for section in ("THREAT ASSESSMENT", "RESOURCE STATUS", "SYSTEM NOTES", "INTEGRATION", "RECOMMENDED ACTIONS", "VICTORY PROGRESS"):

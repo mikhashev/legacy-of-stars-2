@@ -283,6 +283,57 @@ attempted within this task's scope - the owner should decide whether the guarant
 cost, per the same "owner's call, not a unilateral time-box decision" principle T5's own report
 applied to its escape hatch.
 
+**Lever 3 - the contact-victory threshold (measured step, per the team's agreed rule).** The
+contact-victory check (`len(contacted) >= 3` in `ContactProgram.advance_generation`) was first
+pulled into a single `CONTACT_VICTORY_GOAL` module constant in `src/legacy_of_stars_v3.py`, used
+by the victory check itself, `view_state()["contacts_goal"]`, the AI advisor's two "VICTORY
+PROGRESS" lines, and the console help text (`src/ui_text.py`, which now renders the goal as a
+number word). The web UI already read `contacts_goal` from `view_state` with no hard-coded `3`
+(`web/src/ui/StatusPanel.tsx`), so it needed no change. `tests/test_mechanics.py`'s victory test
+was renamed and updated to build its living-civilizations sample from the constant rather than a
+literal `3`.
+
+With the refactor in place, `scripts/calibrate_timelines.py --runs 30 --max-gen 60` (seeds
+500-529, same instrument as levers 1-2) was re-run at threshold 4 and, since neglect still ran
+over the band, at threshold 5:
+
+*Threshold 4:*
+
+| Profile | Wins (now) | Wins (baseline) | Δ vs baseline | Reply (median) |
+|---|---|---|---|---|
+| balanced | 86.7 % (26/30) | 66.7 % | +30.0 % | 4.5 |
+| aggressive | 66.7 % (20/30) | 76.7 % | -13.0 % | 4.0 |
+| cautious | 76.7 % (23/30) | 43.3 % | +76.9 % | 10.0 |
+| integration | 76.7 % (23/30) | 73.3 % | +4.6 % | 6.0 |
+| neglect | 33.3 % (10/30) | 26.7 % | +25.0 % | 5.0 |
+
+Neglect at +25.0 % is still above the +20 % ceiling (26.7 % × 1.2 = 32.0 %; 33.3 % misses it by
+one game out of 30), so per the agreed rule the next step was measured too.
+
+*Threshold 5:*
+
+| Profile | Wins (now) | Wins (baseline) | Δ vs baseline | Reply (median) |
+|---|---|---|---|---|
+| balanced | 83.3 % (25/30) | 66.7 % | +25.0 % | 4.5 |
+| aggressive | 66.7 % (20/30) | 76.7 % | -13.0 % | 4.0 |
+| cautious | 73.3 % (22/30) | 43.3 % | +69.2 % | 10.0 |
+| integration | 76.7 % (23/30) | 73.3 % | +4.6 % | 6.0 |
+| neglect | 30.0 % (9/30) | 26.7 % | +12.5 % | 5.0 |
+
+**Decision: `CONTACT_VICTORY_GOAL = 5`.** At threshold 5, neglect (+12.5 %) lands inside the ±20 %
+band for the first time since lever 1; `aggressive` (-13.0 %) stays inside the -20 % floor
+(61.3 % would be the floor's edge; 66.7 % clears it); `balanced`, `cautious` and `integration` sit
+above their baselines with no ceiling constraint per the agreed rule. The first-reply median is
+identical across thresholds 3, 4 and 5 for every profile (4.5 / 4.0 / 10.0 / 6.0 / 5.0) - expected,
+since the threshold only gates when the *victory flag* is set, never whether or when a system
+replies. Threshold 4 was rejected only because neglect missed the band by a single game (33.3 %
+vs. a 32.0 % ceiling); threshold 5 is therefore the smallest threshold that satisfies every leg of
+the rule, and the cap of 5 was not exceeded. `python scripts/make_web_fixtures.py` was re-run so
+the web fixtures reflect `contacts_goal: 5`.
+
+Neither `aggressive` nor `integration` was ever the binding constraint at any threshold tested;
+the deciding profile throughout was `neglect`, exactly as the team's rule anticipated.
+
 **Two dormant bugs surfaced and fixed while implementing lever 2** (both pre-existing, exposed by
 the RNG-stream and civilization-profile shifts the guarantee introduces for some seeds, not
 introduced by either lever): (1) `ContactProgram._log_system_profile`, a debug-only logger, could

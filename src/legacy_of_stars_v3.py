@@ -27,6 +27,8 @@ CATALOG_PATH = DATA_DIR / "star_catalog.json"
 
 START_YEAR = 1977  # WOW! Signal era; base year for Technology.year_context calculations
 
+CONTACT_VICTORY_GOAL = 5  # distinct civilizations that must reply for the contact victory
+
 # Base of the per-system civilization-timeline RNG. `ContactProgram.__init__` sets it from the
 # game seed before any system is generated, so a replayed or reloaded game rolls the same
 # histories; a system's own stream is `random.Random(f"{CIV_SEED_BASE}:{name}")`. It is kept
@@ -2085,7 +2087,7 @@ YOUR CHOICE:
 
         # Contact victory (the game continues afterwards)
         contacted = self.contacted_systems()
-        if len(contacted) >= 3 and not self.victory:
+        if len(contacted) >= CONTACT_VICTORY_GOAL and not self.victory:
             self.victory = True
             names = ", ".join(s.name for s in contacted)
             self.emit("victory", f"""
@@ -2569,7 +2571,7 @@ You have answered one of humanity's greatest questions.
             },
             "fermi_evidence": {**self.fermi_evidence, "total": sum(self.fermi_evidence.values()), "goal": 15},
             "contacts": len(self.contacted_systems()),
-            "contacts_goal": 3,
+            "contacts_goal": CONTACT_VICTORY_GOAL,
             "victory": self.victory,
             "philosophical_victory": self.philosophical_victory,
             "genesis": {"unlocked": self.genesis.unlocked, "summary": self.genesis.get_summary(),
