@@ -12,7 +12,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 // splits it into its own chunk; `scene/coords` is a handful of pure functions with no imports
 // of its own, so it stays static.
 import type { StarMap } from "../scene/StarMap";
-import { formatDistance, observedAsOf } from "../scene/coords";
+import { formatDistance, formatYear, observedAsOf } from "../scene/coords";
+import { lastObservation, messageFateText } from "../messageFate";
 import type { Store } from "../store";
 import type { ActionId, ActionSpec, StarSystem, ViewState } from "../types";
 import { SystemsPanel } from "./SystemsPanel";
@@ -53,6 +54,8 @@ function CardAction({
 /** The compact card for whichever star is selected; the map's answer to a dossier teaser. */
 function SelectedCard({ system, view, store }: { system: StarSystem; view: ViewState; store: Store }) {
   const lastResponse = system.responses[system.responses.length - 1];
+  const lastMessage = system.messages_sent[system.messages_sent.length - 1];
+  const lastChange = lastObservation(system.observations);
   return (
     <section class="map-card" data-system={system.name}>
       <div class="map-card-head">
@@ -66,10 +69,18 @@ function SelectedCard({ system, view, store }: { system: StarSystem; view: ViewS
         {system.knowledge}% known
       </p>
       <p class="map-card-meta map-card-observed">{observedAsOf(system.observed_year, system.distance)}</p>
+      {lastChange && (
+        <p class="map-card-meta map-card-change">last change seen: {formatYear(lastChange.year)}</p>
+      )}
       <p class="map-card-description">{system.description || "Nothing studied yet."}</p>
       {lastResponse && <p class="map-card-reply">&ldquo;{excerpt(lastResponse)}&rdquo;</p>}
       {system.next_response_gen !== null && (
         <p class="map-card-meta">Next reply expected: Generation {system.next_response_gen}</p>
+      )}
+      {lastMessage && (
+        <p class="map-card-meta map-card-fate" data-fate={lastMessage.fate}>
+          {messageFateText(lastMessage)}
+        </p>
       )}
       <div class="map-card-actions">
         <button class="map-card-action" onClick={() => store.openDossier(system.name)}>
@@ -140,6 +151,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
       selected: selectedSystem,
       scale: mapScale,
       reduced: reduceEffects,
+      reachLy: view.catalog.reach_ly,
     });
   }, [ready, view, selectedSystem, mapScale, reduceEffects]);
 
@@ -204,6 +216,11 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
         <p class="star-map-legend">
           {view.catalog.known} of {view.catalog.total} catalogued &middot; rings at 5 / 10 / 20 / 50 / 100 LY &middot;
           cyan = our signal, warm = a reply, red = a fleet
+          {view.catalog.reach_ly !== null && (
+            <> &middot; dashed ring = detection reach ({Math.round(view.catalog.reach_ly)} LY)</>
+          )}
+          . Far answers arrive to descendants, not to whoever sent them: a reply from 100 LY takes 8
+          generations.
         </p>
         {selected && <SelectedCard system={selected} view={view} store={store} />}
         {showSystemList && (

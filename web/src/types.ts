@@ -101,7 +101,11 @@ export type GameEventKind =
   | "genesis"
   | "victory"
   | "wow"
-  | "game_over";
+  | "game_over"
+  | "sky_change";
+
+/** What kind of drift `sky_change` reports (docs/reference/web_contract.md 5). */
+export type SkyChangeKind = "stage_up" | "silence" | "extinction" | "activity";
 
 interface GameEventBase<K extends GameEventKind, D> {
   kind: K;
@@ -135,7 +139,15 @@ export type GameEvent =
   | GameEventBase<"genesis", { system: string; stage?: string; outcome?: "ally" | "hostile" }>
   | GameEventBase<"victory", { contacts?: string[]; explanation?: string }>
   | GameEventBase<"wow", Record<string, never>>
-  | GameEventBase<"game_over", { reason: string }>;
+  | GameEventBase<"game_over", { reason: string }>
+  /**
+   * New light from a studied system (knowledge >= 20) shows it changed: a stage advance, a
+   * fall into silence (an automated beacon still carries), an extinction (nothing followed),
+   * or first activity where the sky was quiet. Emitted at the start of `advance_generation`,
+   * before replies are delivered; never a modal, always a journal line plus a brief flash on
+   * the star (docs/reference/web_contract.md 5).
+   */
+  | GameEventBase<"sky_change", { system: string; observed_year: number; change: SkyChangeKind }>;
 
 /** The plan renders these as a modal; every other kind is a journal line. */
 export const MODAL_EVENT_KINDS: readonly GameEventKind[] = [
@@ -198,6 +210,20 @@ export interface SentMessage {
   fate?: MessageFate;
 }
 
+/**
+ * One dated entry of a system's observation history (`systems[].observations[]`): what the
+ * light arriving in `year` showed, and when it left. Written by Focus Research and by every
+ * generation whose new light changed something for a system at 20%+ knowledge.
+ */
+export interface Observation {
+  /** The in-game year we looked (when this entry was recorded). */
+  year: number;
+  /** The year the light that produced this observation left the system. */
+  observed_year: number;
+  /** One line, e.g. "digital era, cautious" or "Silent for 0 years." */
+  summary: string;
+}
+
 export interface StarSystem {
   /** 1-based position: the console's menu number. */
   index: number;
@@ -218,6 +244,8 @@ export interface StarSystem {
    * `formatYear` writes as "{n} BC".
    */
   observed_year: number;
+  /** The dated history of what this system's light has shown, oldest first (at most 30 kept). */
+  observations: Observation[];
   messages_sent: SentMessage[];
   responses: string[];
   next_response_gen: number | null;

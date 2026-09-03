@@ -35,6 +35,8 @@ const HINTS = {
   fermi_evidence:
     "Evidence toward an answer to the Fermi paradox: extinctions found, hostile encounters survived, peaceful contacts and great-filter discoveries. 15 points is the philosophical victory.",
   achievements: "Milestones this run has unlocked: see Menu for the list.",
+  detection_reach:
+    "Detection technologies extend how far we can catalogue stars. Beyond it, undiscovered stars wait for a deeper tier.",
   active_effects:
     "The permanent modifiers in force right now - the 1977 decision, researched technologies, doctrines and the integration bonus or penalty. The engine writes these lines; each one is a rule it is applying.",
 } as const;
@@ -87,6 +89,10 @@ export function StatusPanel({ view }: { view: ViewState }) {
         </dd>
         <dt title={HINTS.achievements}>Achievements</dt>
         <dd title={HINTS.achievements}>{view.achievements.length}</dd>
+        <dt title={HINTS.detection_reach}>Detection reach</dt>
+        <dd title={HINTS.detection_reach}>
+          {view.catalog.reach_ly === null ? "whole catalogue" : `${Math.round(view.catalog.reach_ly)} LY`}
+        </dd>
       </dl>
       <div class="status-effects" title={HINTS.active_effects}>
         <p class="status-effects-title">Active effects</p>

@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import save_manager
+from src.civ_timeline import CivEvent, CivState, CivTimeline
 from src.legacy_of_stars_v3 import CivilizationStage, ContactProgram, habitability_weight
 
 FIXTURES_DIR = ROOT / "web" / "tests" / "fixtures"
@@ -187,11 +188,84 @@ def make_gameover() -> None:
     raise SystemExit("make_gameover: the program never ended within the seed budget")
 
 
+# --------------------------------------------------------------------------- skychange.json
+def make_skychange() -> None:
+    """T6: a studied civilization dies on its own timeline, and one message already sent to it
+    is dead on arrival - both explained by the same wave of light, which lands on the very
+    next `advance_generation()`.
+
+    Built directly from `CivTimeline`/`CivEvent` (docs/plans/civilization_timelines_plan.md §2,
+    §8) rather than rolled, so the fixture is exact: the system's death is dated so that
+    `died_year + distance` - the year its light reaches Earth - equals the year one generation
+    from now, and a message sent earlier is given a matching `expected_reply_year` and
+    `explanation_year` so both the sky-change event and the message's "explained by the light
+    of ..." text land on that same generation. All other systems are cleared of civilizations so
+    only this one system's history makes news.
+    """
+    program = _new_program(1)  # generation 1, year 1977 (see _new_program)
+    for other in program.star_systems.values():
+        other.has_civilization = False
+        other.is_extinct = False
+        other.has_swan_song = False
+        other.timeline = None
+        other.knowledge = 0
+
+    system = next(iter(program.star_systems.values()))
+    system.distance = 13.0  # round(distance) = 13, chosen so every year below lines up exactly
+    system.has_civilization = True
+    system.is_extinct = False
+    system.has_swan_song = False
+    system.civilization_stage = CivilizationStage.DIGITAL
+    system.civilization_age = 300.0
+    system.civilization_type = "biological_pure"
+    system.civilization_attitude = 0.5
+    system.true_strategy = "LB"
+    system.deception_level = 0.1
+    system.has_detected_earth = False
+    system.knowledge = 30  # studied (>= 20%, the sky-change observation floor)
+
+    died_year = 2014  # observed_year at generation 3 (year 2027) is 2027 - 13 = 2014
+    initial = CivState(alive=True, stage=CivilizationStage.DIGITAL, strategy="LB", attitude=0.5,
+                       civ_type="biological_pure", deception=0.1, died_year=None)
+    system.timeline = CivTimeline(1900, initial,
+                                  [CivEvent(died_year, "extinct", {"has_swan_song": False})])
+    # Bring the "as observed now" fields up to date at year 1977 (light from 1964: still alive).
+    system.refresh_observation(program.current_year)
+
+    # Advance once so the fixture's "current" generation is 2 (year 2002, light from 1989):
+    # still alive as far as Earth can tell - the death's light is exactly one generation away.
+    if program.pending_philosophical_event is not None:
+        program.handle_philosophical_event_choice(0)
+    program.advance_generation()
+    program.drain_events()
+    if program.generation != 2 or program.current_year != 2002:
+        raise SystemExit(f"make_skychange: expected generation 2 / year 2002, got "
+                         f"generation {program.generation} / year {program.current_year}")
+
+    # A message sent in Generation 1, dead on arrival (receipt year 2014 == died_year) and
+    # never revealed as such until the light of that death reaches Earth - which, by
+    # construction, is also 2027: expected_reply_year = send_year + 2*13 = 2027,
+    # explanation_year = died_year + 13 = 2027.
+    system.messages_sent.append({
+        "text": "First contact attempt",
+        "generation": 1,
+        "arrival_gen": 2,
+        "expected_reply_year": 2027,
+        "explanation_year": 2027,
+        "fate": "died_in_flight",
+    })
+    program.stats["messages_sent"] = program.stats.get("messages_sent", 0) + 1
+    program.stats["messages_died_in_flight"] = program.stats.get("messages_died_in_flight", 0) + 1
+
+    _write(program, "skychange.json")
+
+
 def main() -> None:
     make_threat()
     make_reply()
     make_genesis()
     make_gameover()
+    make_skychange()
 
 
 if __name__ == "__main__":

@@ -31,7 +31,9 @@ import {
   Vector3,
 } from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { NO_REPLY_TAG } from "../messageFate";
 import type { GameEvent, GenesisWorld, StarSystem, Threat } from "../types";
+import { MOOD_COLOR } from "./palette";
 import { createBeamMaterial, createMarkerMaterial, createSphereMaterial } from "./shaders";
 import {
   arkProgress,
@@ -71,6 +73,15 @@ const ARK_COLOR = 0x7fe0a0; // green: a Genesis ark and the colony it becomes
 const DISCOVERY_COLOR = 0xdfe7f2; // pale white: a star coming out of the fog
 const VICTORY_COLOR = 0xffd479; // gold
 const WOW_COLOR = 0x8fd4ff; // the 1977 beam towards Sagittarius
+
+/* ------------------------------------------------------------- sky-change flash colours */
+// A `sky_change` flash previews the halo colour the star settles into once `StarMap.applyEntry`
+// re-reads the new description (`palette.moodFor`): brighter/whiter for a stage advance, the
+// same grey a dead system's halo wears for silence/extinction, the same warm tone a living
+// one's halo wears for first activity.
+const STAGE_UP_COLOR = 0xeaf6ff; // brighter, whiter: a civilization has grown up a stage
+const SKY_CHANGE_FADE_COLOR = MOOD_COLOR.extinct; // silence/extinction: fading to grey
+const SKY_CHANGE_ACTIVITY_COLOR = MOOD_COLOR.inhabited; // activity: a warm pulse
 
 /* ---------------------------------------------------------------- host */
 
@@ -170,6 +181,21 @@ interface ArkVisual {
   progress: number;
 }
 
+/**
+ * The map's short "no reply" tag: a message that has just turned up `unanswered` (plan §8)
+ * gets a faded label at its target star for one state update, then it is gone - a passing
+ * notice, not a permanent mark (the dossier and the selected-system card keep the full
+ * three-classes-of-silence text; this is only the map's brief flag that something changed).
+ */
+interface UnansweredTag {
+  key: string;
+  system: string;
+  /** The generation this tag was first noticed at; retired once the state moves past it. */
+  seenAtGeneration: number;
+  label: CSS2DObject;
+  labelEl: HTMLDivElement;
+}
+
 interface Flash {
   kind: string;
   mesh: Mesh;
@@ -242,6 +268,7 @@ export class SceneEffects {
 
   private readonly spheres = new Map<string, SphereVisual>();
   private readonly messageLines = new Map<string, MessageLineVisual>();
+  private readonly unansweredTags = new Map<string, UnansweredTag>();
   private readonly fleets = new Map<string, FleetVisual>();
   private readonly arks = new Map<string, ArkVisual>();
   private flashes: Flash[] = [];
@@ -306,6 +333,7 @@ export class SceneEffects {
     this.state = state;
     this.syncSpheres(state);
     this.syncMessageLines(state);
+    this.syncUnansweredTags(state);
     this.syncFleets(state);
     this.syncArks(state);
     this.host.requestRender();
@@ -484,6 +512,65 @@ export class SceneEffects {
     visual.line.geometry.dispose();
     visual.line.material.dispose();
     visual.pulse.material.dispose();
+  }
+
+  /**
+   * "no reply" tags: one per message that is `unanswered` right now, kept only while the
+   * state's generation is the one where this diff first noticed it. Diffed by
+   * `system|send-generation` (like the routes above) so a message keeps the same tag across
+   * repeated syncs within one generation and loses it the moment the generation moves on.
+   */
+  private syncUnansweredTags(state: EffectsState): void {
+    const seen = new Set<string>();
+    for (const system of state.systems) {
+      for (const message of system.messages_sent) {
+        if (message.fate !== "unanswered") continue;
+        const key = `tag|${system.name}|${message.generation}`;
+        const existing = this.unansweredTags.get(key);
+        if (existing && existing.seenAtGeneration !== state.generation) {
+          // A later generation has arrived: the one-generation window for this notice is over.
+          continue;
+        }
+        seen.add(key);
+        if (!existing) {
+          this.unansweredTags.set(key, this.createUnansweredTag(key, system.name, state.generation));
+        }
+      }
+    }
+    for (const [key, tag] of this.unansweredTags) {
+      if (seen.has(key)) continue;
+      this.destroyUnansweredTag(tag);
+      this.unansweredTags.delete(key);
+    }
+  }
+
+  private createUnansweredTag(key: string, system: string, generation: number): UnansweredTag {
+    const labelEl = document.createElement("div");
+    labelEl.className = "message-label unanswered-tag";
+    labelEl.dataset["system"] = system;
+    labelEl.textContent = NO_REPLY_TAG;
+    const label = new CSS2DObject(labelEl);
+    label.center.set(0.5, 1);
+    label.position.set(0, -2.4, 0);
+    this.root.add(label);
+    return { key, system, seenAtGeneration: generation, label, labelEl };
+  }
+
+  private destroyUnansweredTag(tag: UnansweredTag): void {
+    tag.labelEl.remove();
+    this.root.remove(tag.label);
+  }
+
+  private stepUnansweredTags(): void {
+    for (const tag of this.unansweredTags.values()) {
+      const star = this.host.positionOf(tag.system);
+      if (!star) {
+        tag.label.visible = false;
+        continue;
+      }
+      tag.label.visible = true;
+      tag.label.position.set(star.x, star.y - 2.4, star.z);
+    }
   }
 
   private syncFleets(state: EffectsState): void {
@@ -686,11 +773,39 @@ export class SceneEffects {
         case "victory":
           this.flashAtOrigin(VICTORY_COLOR, 1, 26, 2.6, 0.75, 0);
           break;
+        case "sky_change":
+          this.flashSkyChange(event.data.system, event.data.change);
+          break;
         default:
           break;
       }
     }
     this.host.requestRender();
+  }
+
+  /**
+   * `sky_change`: new light from a studied system shows it changed (plan §8). The star's
+   * *static* halo already follows the new description once the state update after this event
+   * rebuilds it (`StarMap.applyEntry` reads `palette.moodFor`); this is only the brief preview -
+   * a bright pulse for a stage advance, a slow fading ring for silence/extinction, a warm pulse
+   * for activity where the sky was quiet.
+   */
+  private flashSkyChange(system: string, change: string): void {
+    switch (change) {
+      case "stage_up":
+        this.flashAt(system, STAGE_UP_COLOR, 0.6, 10, 1.1, 1.2, 0);
+        break;
+      case "silence":
+      case "extinction":
+        // Slow and dim: a ring fading out to grey, not a burst.
+        this.flashAt(system, SKY_CHANGE_FADE_COLOR, 0.6, 15, 2.6, 0.5, 0);
+        break;
+      case "activity":
+        this.flashAt(system, SKY_CHANGE_ACTIVITY_COLOR, 0.6, 10, 1.3, 0.9, 0);
+        break;
+      default:
+        break;
+    }
   }
 
   /** The `attack_warning` line drawing itself from the source star to Earth. */
@@ -828,6 +943,7 @@ export class SceneEffects {
     for (const visual of this.messageLines.values()) {
       this.stepMessageLine(visual, t, seconds);
     }
+    this.stepUnansweredTags();
     for (const visual of this.fleets.values()) {
       busy = this.stepFleet(visual, t, seconds) || busy;
     }
@@ -1076,6 +1192,11 @@ export class SceneEffects {
     }));
   }
 
+  /** Systems currently wearing the map's brief "no reply" tag (`?debug=1` builds). */
+  debugUnansweredTags(): string[] {
+    return [...this.unansweredTags.values()].map((tag) => tag.system);
+  }
+
   debugLeakageLy(): number {
     return this.leakageLy;
   }
@@ -1095,6 +1216,8 @@ export class SceneEffects {
     this.spheres.clear();
     for (const visual of this.messageLines.values()) this.destroyMessageLine(visual);
     this.messageLines.clear();
+    for (const tag of this.unansweredTags.values()) this.destroyUnansweredTag(tag);
+    this.unansweredTags.clear();
     for (const visual of this.fleets.values()) this.destroyFleet(visual);
     this.fleets.clear();
     for (const visual of this.arks.values()) this.destroyArk(visual);

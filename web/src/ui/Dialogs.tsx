@@ -8,7 +8,8 @@
  */
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { observedAsOf } from "../scene/coords";
+import { formatYear, observedAsOf } from "../scene/coords";
+import { lastObservation } from "../messageFate";
 import type { Store } from "../store";
 import type { ActionSpec, ViewState } from "../types";
 
@@ -85,21 +86,27 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
         <p class="empty">{emptyMessage}</p>
       ) : (
         <ul class="picker-list">
-          {eligible.map((s) => (
-            <li key={s.name}>
-              <button
-                class={s.name === preselected ? "picker-row is-selected" : "picker-row"}
-                aria-current={s.name === preselected ? "true" : undefined}
-                onClick={() => store.pickSystem(s.name)}
-              >
-                <span class="picker-name">{s.name}</span>
-                <span class="picker-meta">
-                  {s.distance} LY{s.spectral_type ? `, ${s.spectral_type}` : ""} &middot; {s.knowledge}% known
-                </span>
-                <span class="picker-meta picker-observed">{observedAsOf(s.observed_year, s.distance)}</span>
-              </button>
-            </li>
-          ))}
+          {eligible.map((s) => {
+            const lastChange = lastObservation(s.observations);
+            return (
+              <li key={s.name}>
+                <button
+                  class={s.name === preselected ? "picker-row is-selected" : "picker-row"}
+                  aria-current={s.name === preselected ? "true" : undefined}
+                  onClick={() => store.pickSystem(s.name)}
+                >
+                  <span class="picker-name">{s.name}</span>
+                  <span class="picker-meta">
+                    {s.distance} LY{s.spectral_type ? `, ${s.spectral_type}` : ""} &middot; {s.knowledge}% known
+                  </span>
+                  <span class="picker-meta picker-observed">{observedAsOf(s.observed_year, s.distance)}</span>
+                  {lastChange && (
+                    <span class="picker-meta picker-change">last change seen: {formatYear(lastChange.year)}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </DialogFrame>

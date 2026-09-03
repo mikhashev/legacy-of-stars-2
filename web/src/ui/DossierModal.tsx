@@ -1,5 +1,6 @@
 import { useEffect } from "preact/hooks";
-import { observedAsOf } from "../scene/coords";
+import { formatYear, observedAsOf } from "../scene/coords";
+import { inFlightHint, messageFateText } from "../messageFate";
 import type { Store } from "../store";
 import type { ViewState } from "../types";
 
@@ -41,15 +42,36 @@ export function DossierModal({ system, view, store }: { system: string; view: Vi
             Genesis Ark Program: an ark from Earth is on its way to this world, or already landed.
           </p>
         )}
+        {s.observations.length > 0 && (
+          <>
+            <h3>Observations ({s.observations.length})</h3>
+            <ul class="dossier-list dossier-observations">
+              {s.observations.map((o, i) => (
+                <li key={i}>
+                  {o.year} &middot; light from {formatYear(o.observed_year)}: {o.summary}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {s.messages_sent.length > 0 && (
           <>
             <h3>Messages sent ({s.messages_sent.length})</h3>
             <ul class="dossier-list">
-              {s.messages_sent.map((m, i) => (
-                <li key={i}>
-                  Gen {m.generation} (arrives Gen {m.arrival_gen}): &ldquo;{m.text}&rdquo;
-                </li>
-              ))}
+              {s.messages_sent.map((m, i) => {
+                const hint = inFlightHint(m, s.distance, s.observed_year);
+                return (
+                  <li key={i}>
+                    <div>
+                      Gen {m.generation} (arrives Gen {m.arrival_gen}): &ldquo;{m.text}&rdquo;
+                    </div>
+                    <div class="dossier-message-fate" data-fate={m.fate}>
+                      {messageFateText(m)}
+                    </div>
+                    {hint && <div class="dossier-message-hint">{hint}</div>}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

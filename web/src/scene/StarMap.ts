@@ -28,6 +28,7 @@ import {
   Float32BufferAttribute,
   Group,
   LineBasicMaterial,
+  LineDashedMaterial,
   LineLoop,
   Mesh,
   MeshBasicMaterial,
@@ -77,6 +78,9 @@ export interface MapViewState {
   scale: ScaleMode;
   /** The MapPanel toolbar's "Reduce effects": no nebula, no flashes. */
   reduced: boolean;
+  /** `ViewState.catalog.reach_ly`: how far the telescopes resolve a new star. `null` hides
+   *  the reach ring (the whole catalogue is already in range). */
+  reachLy: number | null;
 }
 
 export interface StarMapOptions {
@@ -112,6 +116,10 @@ export interface MapDebug {
   leakageLy(): number;
   /** Names of the flashes still playing. */
   flashes(): string[];
+  /** Systems currently wearing the map's brief "no reply" tag (plan §8). */
+  unansweredTags(): string[];
+  /** The detection reach ring's current radius in LY, or null while hidden (plan §8). */
+  reachLy(): number | null;
   /** Objects in the animated layer, for the performance budget. */
   objectCount(): number;
   /** Rolling mean frame time in milliseconds while the map was rendering. */
@@ -275,6 +283,12 @@ export class StarMap {
     ly: number;
   }[] = [];
 
+  /** The dashed "detection reach" ring (plan §8): `catalog.reach_ly`, hidden when null. */
+  private reachRing!: LineLoop<BufferGeometry, LineDashedMaterial>;
+  private reachLabel!: CSS2DObject;
+  private reachLabelEl!: HTMLDivElement;
+  private reachLy: number | null = null;
+
   private scale: ScaleMode = "compressed";
   /** The generation of the last `ViewState` applied (scene time glides towards it). */
   private stateGeneration = 1;
@@ -369,6 +383,7 @@ export class StarMap {
 
     this.buildEarth();
     this.buildRings();
+    this.buildReachRing();
     this.applyRingScale();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -402,6 +417,8 @@ export class StarMap {
       arks: () => this.effects.debugArks(),
       leakageLy: () => this.effects.debugLeakageLy(),
       flashes: () => this.effects.debugFlashes(),
+      unansweredTags: () => this.effects.debugUnansweredTags(),
+      reachLy: () => (this.reachRing.visible ? this.reachLy : null),
       objectCount: () => this.effects.objectCount(),
       frameMs: () => this.frameMs,
       reduced: () => this.reduced,
@@ -482,6 +499,55 @@ export class StarMap {
       // Labels sit on the +x side of each ring, just outside it.
       ring.label.position.set(r, 0, 0);
     }
+    this.applyReach(this.reachLy);
+  }
+
+  /**
+   * The detection reach ring (plan §8): a dashed circle at `catalog.reach_ly`, so far stars
+   * still in the fog read as "not yet in reach" rather than "not there". One unit circle,
+   * shared geometry with the orientation rings; `LineDashedMaterial` needs its own
+   * `computeLineDistances()` call once, which the plain rings' `LineBasicMaterial` does not.
+   */
+  private buildReachRing(): void {
+    const points: number[] = [];
+    const segments = 128;
+    for (let i = 0; i < segments; i += 1) {
+      const a = (i / segments) * Math.PI * 2;
+      points.push(Math.cos(a), 0, Math.sin(a));
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
+    const loop = new LineLoop<BufferGeometry, LineDashedMaterial>(
+      geometry,
+      new LineDashedMaterial({ color: 0x5fb0ff, transparent: true, opacity: 0.55, dashSize: 1.4, gapSize: 1.1 }),
+    );
+    loop.name = "reach-ring";
+    loop.computeLineDistances();
+    loop.visible = false;
+
+    const el = document.createElement("div");
+    el.className = "star-map-ring-label star-map-reach-label";
+    const label = new CSS2DObject(el);
+    label.center.set(0, 0.5);
+
+    this.ringsGroup.add(loop, label);
+    this.reachRing = loop;
+    this.reachLabel = label;
+    this.reachLabelEl = el;
+  }
+
+  /** Applies (or hides) the detection reach ring for the current `catalog.reach_ly`. */
+  private applyReach(ly: number | null): void {
+    this.reachLy = ly;
+    if (ly === null) {
+      this.reachRing.visible = false;
+      return;
+    }
+    const r = radiusFor(ly, this.scale);
+    this.reachRing.scale.setScalar(r);
+    this.reachRing.visible = true;
+    this.reachLabelEl.textContent = `detection reach ${Math.round(ly)} LY`;
+    this.reachLabel.position.set(r, 0, 0);
   }
 
   /* ------------------------------------------------------------ public API */
@@ -515,6 +581,7 @@ export class StarMap {
 
     this.setReduced(view.reduced);
     this.setGeneration(view.generation);
+    this.applyReach(view.reachLy);
     // The star groups are in place, so the animated layer can resolve every position it needs.
     this.effects.applyState({
       generation: view.generation,
@@ -654,6 +721,10 @@ export class StarMap {
     // All rings share one geometry.
     this.ringLoops[0]?.loop.geometry.dispose();
     this.ringLoops.length = 0;
+
+    this.reachRing.geometry.dispose();
+    this.reachRing.material.dispose();
+    this.reachLabelEl.remove();
 
     // Sprites share one module-level geometry inside three.js, so only the mesh's is ours.
     this.earthGlobe.geometry.dispose();

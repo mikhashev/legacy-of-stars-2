@@ -363,6 +363,7 @@ input[type="text"], input[type="number"], textarea {
 .picker-row { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
 .picker-name { font-weight: 600; }
 .picker-meta { font-size: 0.8rem; color: var(--text-dim); }
+.picker-change { font-style: italic; }
 .tech-locked { font-size: 0.75rem; color: var(--warning); }
 /* Display only: the engine still decides, so the row stays clickable (Dialogs.tsx TechDialog). */
 .tech-unaffordable { font-size: 0.75rem; color: var(--text-dim); }
@@ -377,6 +378,13 @@ input[type="text"], input[type="number"], textarea {
 .dossier-list { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
 .dossier-threat { color: var(--danger); font-size: 0.85rem; }
 .dossier-seeded { color: var(--good); }
+/* T6: the observation history and the three classes of silence on a sent message. */
+.dossier-observations li { font-size: 0.85rem; color: var(--text-dim); }
+.dossier-message-fate { font-size: 0.85rem; margin-top: 0.1rem; }
+.dossier-message-fate[data-fate="replied"] { color: var(--good); }
+.dossier-message-fate[data-fate="nobody"] { color: var(--text-dim); }
+.dossier-message-fate[data-fate="unanswered"] { color: var(--warning); }
+.dossier-message-hint { font-size: 0.8rem; color: var(--text-dim); font-style: italic; }
 
 .menu-section { margin-bottom: 1.2rem; }
 .menu-save-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
@@ -602,6 +610,11 @@ kbd {
   user-select: none;
 }
 .message-label[data-kind="reply"] { color: #ffe9c4; }
+/* T6: the brief "no reply" tag a star wears for one generation once a message goes unanswered. */
+.message-label.unanswered-tag { color: var(--text-dim); font-style: italic; opacity: 0.85; }
+
+/* T6: the dashed detection-reach ring (StarMap.buildReachRing). */
+.star-map-reach-label { color: #5fb0ff; }
 
 /* the selected-system card */
 .map-card {
@@ -623,6 +636,10 @@ kbd {
 .map-card-reply { font-style: italic; color: var(--text-dim); }
 .map-card-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; }
 .map-card-action { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+/* T6: the last sky change seen, and the three classes of silence for the last message sent. */
+.map-card-change { font-style: italic; }
+.map-card-fate[data-fate="unanswered"] { color: var(--warning); }
+.map-card-fate[data-fate="replied"] { color: var(--good); }
 
 /* the "List" overlay */
 .star-map-list {

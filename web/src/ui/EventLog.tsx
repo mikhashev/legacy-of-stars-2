@@ -18,6 +18,7 @@ const KIND_ICON: Record<GameEventKind, string> = {
   victory: "\u{1F389}",
   wow: "\u{1F4E1}",
   game_over: "⏹️",
+  sky_change: "\u{1F52D}", // telescope: new light from a studied system
 };
 
 /** The event journal: every `GameEvent` from every `perform()` call, newest first. */

@@ -346,6 +346,43 @@ and line comes from the engine.
   free, needing neither the AI Strategic Advisor technology nor the manual consultation. It
   arrives as a big-kind modal ("Got it") and stays in the journal under a clipboard icon.
 
+## Timelines (T6)
+
+Every civilization now has a history (`docs/plans/civilization_timelines_plan.md`), and the web
+front-end says so in the three places a player actually looks.
+
+- **The three classes of silence.** `src/messageFate.ts` turns a sent message's `fate` and
+  `explanation_year` (`docs/reference/web_contract.md` §6) into one plain line - "reply, if
+  any, arrives around {year}" (`in_flight`), "nobody there to answer (known at once)"
+  (`nobody`), "no reply by {year}: they chose silence, or they are no longer there - watch the
+  sky" (`unanswered`), or "answered" (`replied`) - with "Explained by the light of {year}."
+  appended once that year has actually come. The same helper renders it in the dossier
+  (`DossierModal`), the map's selected-system card and the system picker, so the wording never
+  drifts between them. Unit-tested in `tests/unit/messageFate.test.ts`.
+- **Observations.** The dossier's new "Observations" list shows the dated history
+  (`systems[].observations[]`): the year we looked, the year the light left, one line. An
+  in-flight message adds "our message reaches them in {receipt_year}; they will have {n} more
+  years of history than we have seen" (`n = expected_reply_year - observed_year`, stated
+  plainly - nobody, least of all the player, knows what those years actually held).
+- **Sky-change events.** `sky_change` gets a telescope icon in the journal and, deliberately,
+  no modal (`docs/reference/web_contract.md` §5). On the map it is a brief flash on the star -
+  brighter/whiter for a stage advance, a slow fade to grey for silence/extinction, a warm pulse
+  for first activity (`scene/effects.ts` `flashSkyChange`) - layered over the halo's *static*
+  colour, which already follows the new description once `StarMap.applyEntry` re-reads it
+  (`scene/palette.ts` `moodFor` needed no changes: "EXTINCT ..." already matches). A message
+  that just turned up `unanswered` gets a small faded "no reply" tag at its star for one
+  generation, then it is gone.
+- **Detection reach.** The map draws a dashed ring at `catalog.reach_ly`, labelled "detection
+  reach {N} LY", hidden when the whole catalogue is already in range; the status panel gets a
+  matching "Detection reach" row, and the map legend spells out why the delay is a feature: "a
+  reply from 100 LY takes 8 generations."
+- **Fixture and test.** `scripts/make_web_fixtures.py` builds `skychange.json` from
+  `CivTimeline`/`CivEvent` directly: a studied, nearby civilization whose death (and a message
+  already sent to it) are both explained by the same wave of light, dated to land on the very
+  next `advance_generation()`. `tests/timelines.spec.ts` loads it, advances one generation, and
+  checks the sky genuinely changed on screen - the event, the halo, the "no reply" tag, the
+  dossier's observation and the fully-explained message.
+
 ## What's covered vs. intentionally missing
 
 Covered: the full action set (`send_message`, `focus_research`, `public_outreach`,
