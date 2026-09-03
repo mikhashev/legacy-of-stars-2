@@ -10,40 +10,49 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /**
+ * Resolves one currently-blocking dialog/modal if one is up right now: a doctrine choice, a
+ * philosophical-event dialog (offered now or deferred), or a plain "big event" modal. Returns
+ * whether it did anything, so a caller can loop until the way forward is clear.
+ */
+async function resolveBlockingDialog(page: Page): Promise<boolean> {
+  const doctrine = page.locator(".doctrine-modal .picker-row").first();
+  if (await doctrine.isVisible().catch(() => false)) {
+    await doctrine.click();
+    await page.waitForTimeout(200);
+    return true;
+  }
+  const respondNow = page.getByRole("button", { name: "Respond now" });
+  if (await respondNow.isVisible().catch(() => false)) {
+    await respondNow.click();
+    await page.waitForTimeout(200);
+    return true;
+  }
+  const eventDialogRow = page.locator(".dialog-modal .picker-row").first();
+  if (await eventDialogRow.isVisible().catch(() => false)) {
+    await eventDialogRow.click();
+    await page.waitForTimeout(200);
+    return true;
+  }
+  const modalContinue = page.locator(".event-modal .primary");
+  if (await modalContinue.isVisible().catch(() => false)) {
+    await modalContinue.click();
+    await page.waitForTimeout(200);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Clicks Advance to Next Generation, answering any event/doctrine dialog that appears
- * along the way. Every iteration first resolves whatever is currently blocking (a
- * doctrine choice, a philosophical-event dialog or modal, or a plain "big event" modal)
- * before checking whether the generation already moved on.
+ * along the way. Every iteration first resolves whatever is currently blocking
+ * (`resolveBlockingDialog`) before checking whether the generation already moved on.
  */
 async function advanceOneGeneration(page: Page): Promise<void> {
   const header = page.locator(".header-gen");
   const before = await header.innerText();
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const doctrine = page.locator(".doctrine-modal .picker-row").first();
-    if (await doctrine.isVisible().catch(() => false)) {
-      await doctrine.click();
-      await page.waitForTimeout(200);
-      continue;
-    }
-    const respondNow = page.getByRole("button", { name: "Respond now" });
-    if (await respondNow.isVisible().catch(() => false)) {
-      await respondNow.click();
-      await page.waitForTimeout(200);
-      continue;
-    }
-    const eventDialogRow = page.locator(".dialog-modal .picker-row").first();
-    if (await eventDialogRow.isVisible().catch(() => false)) {
-      await eventDialogRow.click();
-      await page.waitForTimeout(200);
-      continue;
-    }
-    const modalContinue = page.locator(".event-modal .primary");
-    if (await modalContinue.isVisible().catch(() => false)) {
-      await modalContinue.click();
-      await page.waitForTimeout(200);
-      continue;
-    }
+    if (await resolveBlockingDialog(page)) continue;
 
     // Since W5 the Advance button opens the end-of-generation confirmation first.
     const advanceConfirm = page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true });
@@ -55,7 +64,8 @@ async function advanceOneGeneration(page: Page): Promise<void> {
     const after = await header.innerText();
     if (after !== before) return;
 
-    await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+    // Scoped to the actions panel: the generation panel (W6) has its own same-named button.
+    await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
   }
   throw new Error("generation did not advance after answering the dialogs the engine raised");
@@ -131,7 +141,7 @@ test("a full slice: new game, WOW! decision, actions, advance, save, reload, loa
   await expect(logRows).toHaveCount(2);
 
   // The Advance button asks first, listing exactly what the generation was spent on.
-  await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+  await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
   const advanceDialog = page.locator(".dialog-modal");
   await expect(advanceDialog.getByRole("heading", { name: "End of Generation 1" })).toBeVisible();
   await expect(advanceDialog.locator(".advance-log li")).toHaveCount(2);
@@ -153,6 +163,38 @@ test("a full slice: new game, WOW! decision, actions, advance, save, reload, loa
   // of its own, so this checks the old rows are gone rather than that the list is empty.)
   await expect(generationPanel.locator('.generation-log-row[data-action="focus_research"]')).toHaveCount(0);
   await expect(generationPanel.locator('.generation-log-row[data-action="public_outreach"]')).toHaveCount(0);
+
+  // W6 plan editor: two more actions, then the first row's ✕ undoes both - the engine's undo
+  // is strictly a stack, so "undo this row" means undoing it and everything logged after it.
+  const apBeforeGen2 = await page.locator(".generation-ap").innerText();
+  await page.getByRole("button", { name: "Focus Research on Star System" }).click();
+  await page.locator(".picker-list .picker-row").first().click();
+  await expect(page.locator(".dialog-modal")).toHaveCount(0);
+  await page.getByRole("button", { name: "Conduct Public Outreach Campaign" }).click();
+  await expect(logRows).toHaveCount(2);
+
+  const firstRowUndo = logRows.first().locator(".generation-row-undo");
+  await expect(firstRowUndo).toHaveAttribute("title", "Undo this and later actions");
+  await firstRowUndo.click();
+  await expect(generationPanel.locator(".generation-empty")).toBeVisible({ timeout: 15_000 });
+  await expect(logRows).toHaveCount(0);
+  await expect(page.locator(".generation-ap")).toHaveText(apBeforeGen2);
+  await expect(page.locator(".toast")).toContainText("Undid 2 action(s)", { timeout: 10_000 });
+
+  // One action, then advance through the generation panel's own "Advance to next generation"
+  // button (not the numbered action) - it opens the same End-of-Generation confirmation.
+  await page.getByRole("button", { name: "Conduct Public Outreach Campaign" }).click();
+  await expect(logRows).toHaveCount(1);
+  const genBeforePanelAdvance = await page.locator(".header-gen").innerText();
+  await generationPanel.getByRole("button", { name: "Advance to next generation" }).click();
+  await expect(page.locator(".dialog-modal").getByRole("heading", { name: /^End of Generation/ })).toBeVisible();
+  await page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true }).click();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if ((await page.locator(".header-gen").innerText()) !== genBeforePanelAdvance) break;
+    if (await resolveBlockingDialog(page)) continue;
+    await page.waitForTimeout(200);
+  }
+  await expect(page.locator(".header-gen")).not.toHaveText(genBeforePanelAdvance);
   const generationAfterAdvance = await page.locator(".header-gen").innerText();
 
   // Manual save via the menu.

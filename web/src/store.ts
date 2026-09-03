@@ -552,6 +552,30 @@ export class Store {
     if (result.ok) this.showToast(result.message);
   }
 
+  /**
+   * The generation panel's row ✕: undo the action at `index` and every one logged after it.
+   * The engine's undo is strictly a stack - there is no way to lift out one action from the
+   * middle and redo the rest, because redoing would re-roll their random outcomes (an alien
+   * reply, a doctrine result) and turn undo into a re-roll exploit. So "undo this row" means
+   * walking the stack back past it: `log.length - index` steps, awaited one at a time so each
+   * pop applies before the next is requested.
+   */
+  async undoRowAndLater(index: number): Promise<void> {
+    if (this.state.pendingDoctrine || this.state.busy) return;
+    if (!this.state.undo.available) {
+      this.showToast("Nothing to undo.");
+      return;
+    }
+    const steps = (this.state.view?.generation_log.length ?? 0) - index;
+    let done = 0;
+    for (let i = 0; i < steps; i += 1) {
+      const result = await this.perform("undo", {});
+      if (!result.ok) break;
+      done += 1;
+    }
+    if (done > 0) this.showToast(`Undid ${done} action(s)`);
+  }
+
   /** The end-of-generation confirmation (the console's "Advance? (y/n)"). */
   confirmAdvance(): void {
     if (this.state.dialog?.kind !== "advance") return;

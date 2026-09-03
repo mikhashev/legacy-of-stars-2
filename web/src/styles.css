@@ -248,6 +248,15 @@ input[type="text"], input[type="number"], textarea {
 .generation-log-row { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.85rem; }
 .generation-log-summary { flex: 1 1 auto; }
 .generation-log-cost { flex: 0 0 auto; color: var(--text-dim); font-size: 0.78rem; }
+/* The plan-editor ✕ on each row - undoes that action and every one logged after it. */
+.generation-row-undo {
+  flex: 0 0 auto;
+  padding: 0 0.4rem;
+  line-height: 1.6;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.generation-row-undo:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
 .generation-empty { color: var(--text-dim); font-size: 0.85rem; margin: 0; }
 .generation-footer {
   display: flex;
@@ -255,9 +264,12 @@ input[type="text"], input[type="number"], textarea {
   justify-content: space-between;
   gap: 0.5rem;
   margin-top: 0.6rem;
+  flex-wrap: wrap;
 }
+.generation-footer-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .generation-ap { color: var(--accent); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 .generation-undo { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+.generation-advance { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
 
 /* The end-of-generation confirmation (Dialogs.tsx AdvanceDialog). */
 .advance-log { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.2rem 0 0; padding-left: 1.1rem; }
@@ -381,6 +393,12 @@ input[type="text"], input[type="number"], textarea {
 .tech-locked { font-size: 0.75rem; color: var(--warning); }
 /* Display only: the engine still decides, so the row stays clickable (Dialogs.tsx TechDialog). */
 .tech-unaffordable { font-size: 0.75rem; color: var(--text-dim); }
+/* Affordable-now marker: display only, never disables the row (Dialogs.tsx TechDialog). */
+.tech-row.is-affordable { border-left: 3px solid var(--good); padding-left: calc(0.8rem - 3px); }
+.tech-cost-affordable { color: var(--good); font-weight: 600; }
+.tech-affordable-label { font-size: 0.75rem; color: var(--good); font-weight: 600; }
+.dialog-legend { margin: -0.2rem 0 0.6rem; font-size: 0.78rem; color: var(--text-dim); }
+.dialog-legend .legend-affordable { color: var(--good); font-weight: 600; }
 /* The AP/RP line a dialog carries, because the dialog covers the status panel. */
 .dialog-resources { margin: -0.2rem 0 0.6rem; font-size: 0.85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
 .tech-year { font-style: italic; }

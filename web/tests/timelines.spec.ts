@@ -64,7 +64,8 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       continue;
     }
     if ((await header.innerText()) !== before) return;
-    await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+    // Scoped to the actions panel: the generation panel (W6) has its own same-named button.
+    await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
   }
   throw new Error("generation did not advance after answering the dialogs the engine raised");

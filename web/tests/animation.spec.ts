@@ -59,7 +59,8 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       continue;
     }
     if ((await header.innerText()) !== before) return;
-    await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+    // Scoped to the actions panel: the generation panel (W6) has its own same-named button.
+    await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
   }
   throw new Error("generation did not advance after answering the dialogs the engine raised");
@@ -157,7 +158,7 @@ test("scene time animates a message sphere from Earth to Proxima Centauri", asyn
   await page.screenshot({ path: "test-results/message-inflight.png", fullPage: true });
 
   // Advance one generation: nothing is pending yet at Generation 1, so this always applies.
-  await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+  await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
   await page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true }).click();
 
   // Mid-flight: scene time is strictly between the two generations, and Earth is wearing the

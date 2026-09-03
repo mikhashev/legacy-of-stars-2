@@ -8,6 +8,7 @@
  */
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { affordabilityOf } from "../affordability";
 import { formatYear, observedAsOf } from "../scene/coords";
 import { lastObservation } from "../messageFate";
 import type { Store } from "../store";
@@ -152,34 +153,60 @@ export function TechDialog({ view, store }: { view: ViewState; store: Store }) {
       resources={`Research Points: ${rp} (+${view.status.passive_rp.toFixed(1)}/gen)`}
       onClose={() => store.closeDialog()}
     >
+      <p class="dialog-legend">
+        <span class="legend-affordable">green</span> = affordable now
+      </p>
       {tiers.length === 0 ? (
         <p class="empty">No new technologies available to research.</p>
       ) : (
-        tiers.map((tier) => (
-          <div key={tier} class="tech-tier">
-            <h3>Tier {tier}</h3>
-            <ul class="picker-list">
-              {(byTier.get(tier) ?? []).map((tech) => (
-                <li key={tech.id}>
-                  {/* Never disabled: the engine decides what may be researched, and the real
-                      cost moves with the director's science skill and any swan-song discount,
-                      so this hint is an approximation of the listed cost and nothing more. */}
-                  <button class="picker-row tech-row" onClick={() => store.pickTech(tech.id)}>
-                    <span class="picker-name">
-                      {tech.name} ({tech.cost} RP)
-                    </span>
-                    <span class="picker-meta">{tech.description}</span>
-                    {tech.year_context && <span class="picker-meta tech-year">{tech.year_context}</span>}
-                    {tech.cost > rp && (
-                      <span class="tech-unaffordable">needs approx. {tech.cost - rp} more RP</span>
-                    )}
-                    {tech.locked && <span class="tech-locked">LOCKED: {tech.locked}</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))
+        tiers.map((tier) => {
+          // Affordable first, then by cost - the tier grouping stays; only the order within
+          // a tier changes, so scanning a tier surfaces what can be acted on right now first.
+          const sorted = [...(byTier.get(tier) ?? [])].sort((a, b) => {
+            const aAffordable = affordabilityOf(a.cost, rp);
+            const bAffordable = affordabilityOf(b.cost, rp);
+            if (aAffordable !== bAffordable) return aAffordable ? -1 : 1;
+            return a.cost - b.cost;
+          });
+          return (
+            <div key={tier} class="tech-tier">
+              <h3>Tier {tier}</h3>
+              <ul class="picker-list">
+                {sorted.map((tech) => {
+                  const affordable = affordabilityOf(tech.cost, rp);
+                  return (
+                    <li key={tech.id}>
+                      {/* Never disabled: the engine decides what may be researched, and the real
+                          cost moves with the director's science skill and any swan-song discount,
+                          so the affordable marker and the unaffordable hint are both only an
+                          approximation of the listed cost, nothing more. */}
+                      <button
+                        class={affordable ? "picker-row tech-row is-affordable" : "picker-row tech-row"}
+                        onClick={() => store.pickTech(tech.id)}
+                      >
+                        <span class="picker-name">
+                          {tech.name} (
+                          <span class={affordable ? "tech-cost tech-cost-affordable" : "tech-cost"}>
+                            {tech.cost} RP
+                          </span>
+                          )
+                        </span>
+                        <span class="picker-meta">{tech.description}</span>
+                        {tech.year_context && <span class="picker-meta tech-year">{tech.year_context}</span>}
+                        {affordable ? (
+                          <span class="tech-affordable-label">affordable</span>
+                        ) : (
+                          <span class="tech-unaffordable">needs approx. {tech.cost - rp} more RP</span>
+                        )}
+                        {tech.locked && <span class="tech-locked">LOCKED: {tech.locked}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })
       )}
     </DialogFrame>
   );

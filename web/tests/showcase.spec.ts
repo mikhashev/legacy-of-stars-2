@@ -64,7 +64,8 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       continue;
     }
     if ((await header.innerText()) !== before) return;
-    await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+    // Scoped to the actions panel: the generation panel (W6) has its own same-named button.
+    await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
   }
   throw new Error("generation did not advance after answering the dialogs the engine raised");
@@ -138,7 +139,9 @@ test("gameover.json: a finished run opens the final report by itself", async ({ 
   await report.getByRole("button", { name: "Close" }).click();
   await expect(report).toBeHidden();
   await expect(page.locator(".actions-gameover-title")).toHaveText("Game over");
-  await expect(page.getByRole("button", { name: "Advance to Next Generation" })).toHaveCount(0);
+  await expect(page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" })).toHaveCount(
+    0,
+  );
 
   // The numbered hotkeys are dead here; the report button is the way back in.
   await page.keyboard.press("5");

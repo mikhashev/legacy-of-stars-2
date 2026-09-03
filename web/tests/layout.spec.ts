@@ -163,7 +163,8 @@ async function loadSkychangeAndAdvance(page: Page): Promise<void> {
       continue;
     }
     if ((await header.innerText()) !== before) break;
-    await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+    // Scoped to the actions panel: the generation panel (W6) has its own same-named button.
+    await page.locator(".actions-panel").getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
   }
   await expect(header).not.toHaveText(before);
