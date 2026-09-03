@@ -6,7 +6,7 @@
  * hook that reads it.
  *
  * Nothing here invents game rules: every value shown comes from a `ViewState` or a
- * `PerformResult` the engine produced (bridge.ts / docs/web_contract.md).
+ * `PerformResult` the engine produced (bridge.ts / docs/reference/web_contract.md).
  */
 import { useEffect, useState } from "preact/hooks";
 import { EngineBridge } from "./bridge";
@@ -76,7 +76,7 @@ export interface UIState {
   /** W4 "Reduce effects": no nebula, no flashes. Persisted in localStorage. */
   reduceEffects: boolean;
   /**
-   * The session's undo stack after the last `perform()` (web_contract.md 7). The engine owns
+   * The session's undo stack after the last `perform()` (docs/reference/web_contract.md 7). The engine owns
    * it; this is only what the last result said, so the "Undo last" button can be enabled
    * without asking again.
    */
@@ -540,7 +540,7 @@ export class Store {
   /**
    * "Undo last": steps one action back. The engine restores the program *and* the RNG, so
    * redoing the same action gives the same outcome - undo is a way to change your mind, not
-   * a way to re-roll a reply (web_contract.md 7).
+   * a way to re-roll a reply (docs/reference/web_contract.md 7).
    */
   async undoLastAction(): Promise<void> {
     if (this.state.pendingDoctrine || this.state.busy) return;

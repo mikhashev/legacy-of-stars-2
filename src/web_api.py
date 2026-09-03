@@ -1,5 +1,5 @@
 """
-JSON facade over the engine for the web front-end (web_version_plan.md, phase W0).
+JSON facade over the engine for the web front-end (docs/plans/web_version_plan.md, phase W0).
 
 One `GameSession` owns one `ContactProgram`.  Everything that crosses the
 Python/JavaScript boundary is a JSON string built from plain types only, so no

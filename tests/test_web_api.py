@@ -677,7 +677,7 @@ class StartScreenAndViewStateTest(unittest.TestCase):
 
 
 class UndoTest(unittest.TestCase):
-    """The facade's undo stack (web_contract.md 3/7): one step back per undoable action."""
+    """The facade's undo stack (docs/reference/web_contract.md 3/7): one step back per undoable action."""
 
     def test_undo_restores_action_points_messages_and_the_generation_log(self):
         session = new_session(seed=11)

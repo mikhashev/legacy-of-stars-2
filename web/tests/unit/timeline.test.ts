@@ -4,7 +4,7 @@
  * These are the numbers every W4 animation is drawn from, so they are checked against the
  * game's own physics rather than against the implementation: 25 light-years per generation at
  * light speed, and the fraction of c each attack type is labelled with in
- * `docs/web_contract.md` ("fusion strike fleet (0.12c)").
+ * `docs/reference/web_contract.md` ("fusion strike fleet (0.12c)").
  */
 import { describe, expect, it } from "vitest";
 import {

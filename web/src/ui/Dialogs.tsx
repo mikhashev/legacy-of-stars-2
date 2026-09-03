@@ -1,5 +1,5 @@
 /**
- * The parameter dialogs `ActionSpec.needs` drives (web_version_plan.md W2 item 4). One
+ * The parameter dialogs `ActionSpec.needs` drives (docs/plans/web_version_plan.md W2 item 4). One
  * component per `Dialog` kind from store.ts; `MainScreen` picks which one to render.
  *
  * None of these filter on affordability or add rules the engine did not state: the tech

@@ -3,7 +3,7 @@
  *
  * Every value stored under the `los.save.` prefix is exactly the JSON text
  * `EngineBridge.save()` returns (`save_manager.serialize()`), so a save made in the
- * browser loads in the console build and vice versa (web_contract.md 1). The only thing
+ * browser loads in the console build and vice versa (docs/reference/web_contract.md 1). The only thing
  * this module changes client-side is the `label` field, because `GameSession.save()` has
  * no parameter for it.
  *

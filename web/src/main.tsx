@@ -29,7 +29,7 @@ updateTestHooks();
 render(<App store={store} />, root);
 
 /**
- * Offline cache (web_version_plan.md W5): only in a production build (dev's assets are
+ * Offline cache (docs/plans/web_version_plan.md W5): only in a production build (dev's assets are
  * unhashed and change on every save, which the cache-first strategy would fight) and only
  * where the API exists at all. `vite.config.ts`'s `serviceWorker()` plugin writes `sw.js`
  * itself, from the finished `dist/` file list, so there is nothing to generate here.

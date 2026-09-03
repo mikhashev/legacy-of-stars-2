@@ -302,7 +302,7 @@ Write a poignant, authentic final transmission (150-300 words) that:
 ---
 
 **Related Documentation:**
-- `development_roadmap.md` - Overall project plan
+- `../plans/development_roadmap.md` - Overall project plan
 - `phase2a_implementation_notes.md` - Previous phase details
 - `tech_tree.json` - Technology definitions
 

@@ -3,7 +3,7 @@
  * `tests/unit/coords.test.ts` can exercise them directly.
  *
  * The engine hands out `ra`/`dec` in J2000 degrees and `distance` in light-years
- * (docs/web_contract.md 6, `systems[].ra/.dec/.distance`). The plan's W3 conversion puts
+ * (docs/reference/web_contract.md 6, `systems[].ra/.dec/.distance`). The plan's W3 conversion puts
  * the y axis on the north celestial pole:
  *
  *     x = d * cos(dec) * cos(ra)

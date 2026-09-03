@@ -1,6 +1,6 @@
 /**
  * A `.panel` section whose body can be collapsed, remembered per-panel in localStorage
- * (web_version_plan.md W5: "panels collapsible with remembered state"). Most useful once the
+ * (docs/plans/web_version_plan.md W5: "panels collapsible with remembered state"). Most useful once the
  * layout stacks below ~1000px (styles.css), but the toggle works at any width.
  */
 import { useState } from "preact/hooks";

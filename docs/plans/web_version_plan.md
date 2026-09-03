@@ -106,7 +106,7 @@ follow-up), `advance_generation`, `defend` (three kinds), `consult_advisor`,
   `ContactProgram` methods; no new rules logic.
 - `ContactProgram` gets an optional `data_dir` (currently the path is computed from `__file__`;
   this works fine on Pyodide, but an explicit parameter simplifies tests and the build).
-- A contract document `docs/web_contract.md`: the `view_state` schema (already present in code,
+- A contract document `../reference/web_contract.md`: the `view_state` schema (already present in code,
   describe the fields), all event `kind`s and their `data`, the `perform` response. This is the
   spec for the frontend, and for option C if it's ever needed.
 - Tests `tests/test_web_api.py`: every action via `perform`, a doctrine via `needs`, the
@@ -123,7 +123,7 @@ follow-up), `advance_generation`, `defend` (three kinds), `consult_advisor`,
 - `web/src/worker.ts`: load Pyodide (a current version, Python 3.12) from a CDN or from
   `node_modules`, `unpackArchive`, `import web_api`, a message handler
   `{id, method, args}` → `{id, result | error}`.
-- `bridge.ts` with types hand-generated from `docs/web_contract.md`
+- `bridge.ts` with types hand-generated from `../reference/web_contract.md`
   (`ViewState`, `GameEvent`, `PerformResult`).
 - A loading screen with progress; measure startup time and size for the phase report.
 - A smoke-test page: new game, list of actions, `advance_generation` ten times, print the JSON.
@@ -214,7 +214,7 @@ generation advance is a single 1–2 s animation, all spheres and fleets move fo
 |---|---|
 | Pyodide size and load time | Measure in W1; service worker and caching; a loading screen with progress; if >4 s on a laptop — consider option C |
 | Memory leaks via Pyodide proxies | Only JSON strings cross the boundary, enforced in `bridge.ts` and the W0 test |
-| Frontend and engine drifting apart after rule changes | A single source of truth — `docs/web_contract.md` + a W0 test that `view_state` matches the schema |
+| Frontend and engine drifting apart after rule changes | A single source of truth — `../reference/web_contract.md` + a W0 test that `view_state` matches the schema |
 | Paths to `data/` on the virtual filesystem | `data_dir` parameter + the build script places `data/` next to `src/` |
 | Map readability (4 vs. 51 ly) | Logarithmic radius compression, distance labels, a "true scale" toggle button |
 | Shader performance on weak GPUs | Everything in one `ShaderMaterial` for the spheres, ≤ 100 objects, degrade by disabling the background nebula |

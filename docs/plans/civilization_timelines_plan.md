@@ -1,7 +1,7 @@
 # Legacy of Stars — Civilization Timelines Plan (light-time as the core mechanic)
 
 **Date:** 2026-09-03
-**Basis:** owner's design intent — the game is about the speed of light: while a signal travels, both sides change, so every message is a bet on a future nobody has seen, and the only rational play is to accumulate knowledge, build resilience and prepare one's descendants for an answer that will arrive to them.
+**Basis:** owner's design intent — the game is about the speed of light: while a signal travels, both sides change, so every message is a bet on a future nobody has seen, and the only rational play is to accumulate knowledge, build resilience and prepare one's descendants for an answer that will arrive to them. The idea was first recorded in `../design/cosmic_game_theory_analysis.md` §7.3 H "Time-Delayed Strategy Layer" ("The Messenger in Flight Problem") and in `../design/design_notes.md` §4 "Values for Long-Term Survival" (item 4, "Patience: the ability to wait 500 years for a reply without giving up").
 **Status:** draft for discussion; owner decisions in §9
 
 ---
@@ -236,7 +236,7 @@ Knobs: the hazard table, the drift rate, the reach table. Record the final const
 - System picker and card: the light-time hint stays; add "last change seen: {year}" when any.
 - Console: the dossier prints the observations list; `sky_change` prints like any event.
 - Contract: `sky_change` event kind with `data {system, observed_year, change}`;
-  `systems[].observations[]`; documented in `docs/web_contract.md`.
+  `systems[].observations[]`; documented in `../reference/web_contract.md`.
 
 ---
 

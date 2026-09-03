@@ -2,7 +2,7 @@ import type { Store } from "../store";
 import type { DoctrineNeeds } from "../types";
 
 /**
- * `research_tech`'s follow-up (web_contract.md 4). The technology is already researched;
+ * `research_tech`'s follow-up (docs/reference/web_contract.md 4). The technology is already researched;
  * only the doctrine's effects are pending, so this blocks every other action until answered.
  */
 export function DoctrineModal({ needs, store }: { needs: DoctrineNeeds; store: Store }) {

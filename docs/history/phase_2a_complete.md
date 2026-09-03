@@ -64,7 +64,7 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
 - `attack_warning.py` - AttackWarning class
 - Updated `legacy_of_stars_v3.py` - Defensive methods, attack processing
 - `test_attack_warning.py` - Comprehensive test suite
-- `docs/attack_warning_implementation.md` - Full documentation
+- `attack_warning_implementation.md` - Full documentation
 
 **Test Results**:
 ```
@@ -107,7 +107,7 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
 - `data/tech_tree.json` - Complete rewrite (27 new techs)
 - Updated `legacy_of_stars_v3.py` - Generation gating, special effects
 - `test_tech_tree.py` - Test suite
-- `docs/tech_tree_redesign.md` - Full documentation
+- `tech_tree_redesign.md` - Full documentation
 
 **Test Results**:
 ```
@@ -151,7 +151,7 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
 - `ai_strategic_advisor.py` - Complete advisor system (new)
 - Updated `legacy_of_stars_v3.py` - Integration, menu, consult method
 - `test_ai_advisor.py` - Test suite
-- `docs/ai_advisor_implementation.md` - Full documentation
+- `ai_advisor_implementation.md` - Full documentation
 
 **Test Results**:
 ```
@@ -178,9 +178,9 @@ Phase 2A has been fully implemented, delivering on all 4 priority features from 
   - `data/tech_tree.json` (complete rewrite - 27 techs)
 
 - **Documentation**: 3 new comprehensive docs
-  - `docs/attack_warning_implementation.md`
-  - `docs/tech_tree_redesign.md`
-  - `docs/ai_advisor_implementation.md`
+  - `attack_warning_implementation.md`
+  - `tech_tree_redesign.md`
+  - `ai_advisor_implementation.md`
 
 ### Test Coverage
 - ✅ Attack Warning System - Fully tested

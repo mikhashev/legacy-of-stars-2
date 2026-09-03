@@ -4,7 +4,7 @@
 **Reviewed:** `src/*.py`, `data/star_catalog.json`, `data/tech_tree.json`, `data/templates/*.json`, `README.md`, `docs/*.md`
 **File status:** open, in the repository
 
-The project's own standard is set in `docs/design_notes.md` §8 "Scientific Realism Standards":
+The project's own standard is set in `design_notes.md` §8 "Scientific Realism Standards":
 no FTL, communication limited to *c*, real spectral classes and habitable zones, evolution by
 natural selection. Below is where the game and the documents meet this standard, and where they don't.
 
@@ -104,7 +104,7 @@ Sorted by severity. "Internal" means a contradiction with the game's own rules,
 ### 3.1 ❌ The Wow! storyline contradicts the 0.1c model (internal + scientific)
 
 Where: `src/wow_signal_event.py:214-215, 232`, `src/game_interface.py:121, 147-148`,
-`docs/development_roadmap.md:75, 92`, `docs/phase_2a_complete.md:26, 234`.
+`../plans/development_roadmap.md:75, 92`, `../history/phase_2a_complete.md:26, 234`.
 
 1. **A fleet at the speed of light.** The hostile-outcome text reads: "72 generations for our
    message to reach them. 72 generations for their weapons to reach us." That's 1800 ly in 1800
@@ -259,7 +259,7 @@ mechanic stays the same, the text becomes honest.
 | Technology | Problem | Type |
 |---|---|---|
 | Quantum Communication Detection ("detect quantum-encrypted signals") | Quantum communication does not produce a "class of signal" that can be intercepted from outside; entanglement does not carry information (no-communication theorem). | scientific |
-| Relativistic Communication ("near-light-speed laser probes, faster message delivery") | A probe at 0.2c is *slower* than a radio signal at *c*. Message delivery cannot be sped up. The `message_delivery_speed = 0.175` flag is unused in the code — good, but the description and `docs/passive_leakage_implementation.md:62` ("reduces round-trip by 83%") are wrong. | scientific + doc |
+| Relativistic Communication ("near-light-speed laser probes, faster message delivery") | A probe at 0.2c is *slower* than a radio signal at *c*. Message delivery cannot be sped up. The `message_delivery_speed = 0.175` flag is unused in the code — good, but the description and `../history/passive_leakage_implementation.md:62` ("reduces round-trip by 83%") are wrong. | scientific + doc |
 | Gravitational Wave *Communication* | Generating gravitational waves for communication requires moving stellar masses; as a *detector* of Type II activity it's acceptable speculation. Rename to "Detection." | scientific |
 | Bio-Engineering Foundation ("CRISPR techniques", Gen 7 → 2127) | CRISPR-Cas9 editing dates to 2012. A 115-year anachronism. | chronology |
 | Atmospheric Scrubbing (Gen 6 → 2102) | Direct air capture of CO₂ has operated industrially since 2017 (Climeworks). | chronology |
@@ -273,11 +273,11 @@ mechanic stays the same, the text becomes honest.
 - `src/game_interface.py:107`: "Dr. Jerry Ehman reviews automated radio telescope data" on the
   night of August 15. Ehman actually saw the printout a few days later (usually cited as August
   18). The wording "reviews" in a same-night scene is inaccurate.
-- `docs/development_roadmap.md:151`: "2MASS 19281982-2640123 ruled out" — the star is not
+- `../plans/development_roadmap.md:151`: "2MASS 19281982-2640123 ruled out" — the star is not
   "ruled out," it remains an unconfirmed candidate. A later hypothesis (Méndez et al., 2024,
   Arecibo Wow! project) proposes a natural origin: a hydrogen cloud brightened by a magnetar
   flare.
-- `docs/passive_leakage_implementation.md:353`: "Breakthrough Starshot (NASA/ESA)" — the
+- `../history/passive_leakage_implementation.md:353`: "Breakthrough Starshot (NASA/ESA)" — the
   project belongs to Breakthrough Initiatives (Yuri Milner, 2016), not NASA/ESA. `:355`:
   LightSail-2 is Planetary Society, not NASA.
 - The "Mirror Civilization" event: "even nuclear detonations" visible at 18–30 ly — gamma
@@ -300,15 +300,15 @@ contradicts the current code.
 
 | Document | Claim | Current code |
 |---|---|---|
-| `attack_warning_implementation.md:165, 211` | "Travel time = round-trip light-speed delay", `arrival = gen + ceil(2d/25)` | Fleet at 0.1c: 11·d years (`:711`). The document describes a fleet at the speed of light. |
-| `passive_leakage_implementation.md:62, 266` | Laser sails cut the message round trip by 83% | `message_delivery_speed` is unused; the sail gives +10% to the reply chance. |
-| `passive_leakage_implementation.md:284-293` | "NEW: attacks at 0.175c", "50 LY: 4 gens → 11 gens" | Retaliatory fleets are at 0.1c; 0.175c applies only to probes after a leak. |
-| `tech_tree_redesign.md` | 27 technologies, 5 tiers; Breakthrough Listen Gen 3+ | 44 technologies, 6 tiers (0–5); Breakthrough Listen Gen 2 in the JSON. |
-| `development_roadmap.md:44` | "Extinct civilizations (15% chance)" | 15% is the chance of a civilization at all; of those, 25% are extinct (`:96, :113`). |
-| `development_roadmap.md:1199` | "41 technologies across 5 tiers" | 44 / 6. The README says 44 / 6 — correct. |
+| `../history/attack_warning_implementation.md:165, 211` | "Travel time = round-trip light-speed delay", `arrival = gen + ceil(2d/25)` | Fleet at 0.1c: 11·d years (`:711`). The document describes a fleet at the speed of light. |
+| `../history/passive_leakage_implementation.md:62, 266` | Laser sails cut the message round trip by 83% | `message_delivery_speed` is unused; the sail gives +10% to the reply chance. |
+| `../history/passive_leakage_implementation.md:284-293` | "NEW: attacks at 0.175c", "50 LY: 4 gens → 11 gens" | Retaliatory fleets are at 0.1c; 0.175c applies only to probes after a leak. |
+| `../history/tech_tree_redesign.md` | 27 technologies, 5 tiers; Breakthrough Listen Gen 3+ | 44 technologies, 6 tiers (0–5); Breakthrough Listen Gen 2 in the JSON. |
+| `../plans/development_roadmap.md:44` | "Extinct civilizations (15% chance)" | 15% is the chance of a civilization at all; of those, 25% are extinct (`:96, :113`). |
+| `../plans/development_roadmap.md:1199` | "41 technologies across 5 tiers" | 44 / 6. The README says 44 / 6 — correct. |
 | `cosmic_game_theory_analysis.md:475-476` | The "Ancient Observer" event grants "Quantum Entanglement Communication — instant, no light-speed delay" | Not implemented. **Do not implement it this way**: it violates the no-communication theorem and design_notes §8. |
 | `cosmic_game_theory_analysis.md:457-464` | `age_to_kardashev`: 1000 years → Type I, 10,000 → Type II | Not implemented; Type II (10²⁶ W) in 10,000 years is far beyond any extrapolation. Leave as doc-only. |
-| `development_roadmap.md:75, 92`, `phase_2a_complete.md:26, 234` | Gen 144 = Year 3577 | The formula gives 5552; the UI prints both 3577 and 5577. |
+| `../plans/development_roadmap.md:75, 92`, `../history/phase_2a_complete.md:26, 234` | Gen 144 = Year 3577 | The formula gives 5552; the UI prints both 3577 and 5577. |
 
 ---
 
@@ -330,8 +330,8 @@ Order is by the ratio of "severity / effort."
 7. **Leakage:** radius based on time, detectability ~1/d², a delay for the information attack.
 8. **Extinct civilizations:** tie `extinct_years_ago` to distance, or make all signals beacons.
 9. **Discovery text:** "catalogued" → "added to target list."
-10. **Documents:** mark `attack_warning_implementation.md` and
-    `passive_leakage_implementation.md` as outdated (pre-0.1c model), or update the formulas.
+10. **Documents:** mark `../history/attack_warning_implementation.md` and
+    `../history/passive_leakage_implementation.md` as outdated (pre-0.1c model), or update the formulas.
 
 Items 1–3 do not change the balance. Items 4–8 change the gameplay and require running
 `LOS_SLOW=1 python -m unittest tests.test_balance -v`.

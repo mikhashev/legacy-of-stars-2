@@ -11,7 +11,7 @@ const TITLES: Partial<Record<GameEventKind, string>> = {
   briefing: "Mission Analyst's Briefing",
 };
 
-/** The modal weight for `MODAL_EVENT_KINDS` (web_contract.md 5): big beats, one at a time. */
+/** The modal weight for `MODAL_EVENT_KINDS` (docs/reference/web_contract.md 5): big beats, one at a time. */
 export function EventModal({ event, store }: { event: GameEvent; store: Store }) {
   return (
     <div class="modal-backdrop">

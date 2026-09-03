@@ -4,7 +4,7 @@
  * of the canvas (toolbar, legend, the selected-system card, the systems list overlay).
  *
  * Everything shown here comes from `ViewState.systems[]`; the map never invents a fact the
- * engine did not state (docs/web_contract.md 6).
+ * engine did not state (docs/reference/web_contract.md 6).
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 // `StarMap` pulls in Three.js (~600 kB), which nothing before the main screen needs, so it is

@@ -91,7 +91,7 @@ test("800x1000: stacked, map first, collapsible panels, no overflow", async ({ p
   await page.screenshot({ path: "test-results/layout-800.png", fullPage: true });
 
   // Collapsible panels: toggling one closes its body and remembers that in localStorage
-  // (web_version_plan.md W5: "panels collapsible with remembered state").
+  // (docs/plans/web_version_plan.md W5: "panels collapsible with remembered state").
   const statusHead = page.locator(".status-panel .collapsible-head");
   const statusBody = page.locator(".status-panel .collapsible-body");
   await expect(statusBody).toBeVisible();

@@ -380,7 +380,7 @@ if self.program.leakage_multiplier < 1.0:
 🔨 **Pending**:
 - `src/legacy_of_stars_v3.py` (integration logic, ~150 lines to add)
 - `tests/test_passive_leakage.py` (new file, ~200 lines)
-- `docs/passive_leakage.md` (this file, will be finalized)
+- `passive_leakage_implementation.md` (this file, will be finalized)
 
 ---
 

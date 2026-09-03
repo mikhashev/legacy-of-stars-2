@@ -93,7 +93,7 @@ Paradox evidence (philosophical victory). Both let the game continue.
 The game is complete without any language model: alien replies, swan songs, the strategic
 advisor and the WOW! response all have written versions. If you run Ollama or LM Studio locally,
 or set an Anthropic/OpenAI API key, the same texts are generated instead. See
-[docs/ai_content_roadmap.md](docs/ai_content_roadmap.md) and `.env.example`.
+[docs/plans/ai_content_roadmap.md](docs/plans/ai_content_roadmap.md) and `.env.example`.
 
 ## Development
 
@@ -123,7 +123,7 @@ legacy-of-stars-2/
 │   ├── philosophical_events.py  # mid-game crises with lasting choices
 │   ├── genesis_project.py       # seeding sterile worlds
 │   ├── console.py, ui_text.py   # terminal helpers, help text
-│   └── web_api.py               # GameSession: the JSON facade the browser build calls (docs/web_contract.md)
+│   └── web_api.py               # GameSession: the JSON facade the browser build calls (docs/reference/web_contract.md)
 ├── data/
 │   ├── tech_tree.json           # 44 technologies in 6 tiers, 1977 onward
 │   ├── star_catalog.json        # real nearby stars with distances and coordinates
@@ -135,7 +135,7 @@ legacy-of-stars-2/
 │   └── make_web_fixtures.py     # builds web/tests/fixtures/*.json (fleet/reply/Genesis showcase saves)
 ├── tests/                       # unittest suites
 ├── web/                         # browser front-end: Pyodide + Three.js + Preact (web/README.md)
-├── docs/                        # design notes and development history
+├── docs/                        # design notes, plans, reference and history (docs/README.md)
 └── legacy/                      # earlier engine versions (historical)
 ```
 
@@ -149,7 +149,8 @@ that, built on the same engine with no rule changes.
 **v1.0 - playable release.** Every mechanic described above is implemented, reachable and covered
 by tests; complete games run headlessly without errors, both victories are achievable, and the
 game can be saved and resumed. Earlier development history and design notes live in
-[docs/development_roadmap.md](docs/development_roadmap.md) and [docs/design_notes.md](docs/design_notes.md).
+[docs/plans/development_roadmap.md](docs/plans/development_roadmap.md) and
+[docs/design/design_notes.md](docs/design/design_notes.md).
 
 ## Contributing
 

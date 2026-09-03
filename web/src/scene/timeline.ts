@@ -2,7 +2,7 @@
  * The physics behind every W4 animation, as pure functions: no Three.js, no DOM, no state.
  * `tests/unit/timeline.test.ts` exercises this file directly.
  *
- * All of it is the *game's* physics, read off `docs/web_contract.md`, not new rules:
+ * All of it is the *game's* physics, read off `docs/reference/web_contract.md`, not new rules:
  *
  * - one generation is 25 years (`ViewState.year = start_year + (generation - 1) * 25`), so a
  *   signal, which travels at light speed, covers 25 light-years per generation;
@@ -23,7 +23,7 @@ export const LY_PER_GENERATION = 25;
 /** Genesis arks fly at this fraction of c (plan W4). */
 export const ARK_SPEED_C = 0.12;
 
-/** Fraction of c per `threats[].attack_type` (web_contract.md 5). */
+/** Fraction of c per `threats[].attack_type` (docs/reference/web_contract.md 5). */
 export const ATTACK_SPEED_C: Readonly<Record<string, number>> = {
   fleet: 0.1,
   laser_sail_probe: 0.175,

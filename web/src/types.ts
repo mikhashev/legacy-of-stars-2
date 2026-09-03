@@ -1,5 +1,5 @@
 /**
- * The Python/JavaScript contract, hand-written from `docs/web_contract.md`.
+ * The Python/JavaScript contract, hand-written from `docs/reference/web_contract.md`.
  *
  * `src/web_api.py` is the only producer of these values and that document is the
  * specification for both sides; when the engine changes, the document changes first
@@ -34,7 +34,7 @@ export type ParamName = "system" | "text" | "tech" | "threat" | "defense" | "cho
 /** The three protocols `defend` accepts. */
 export type DefenseKind = "emergency" | "evacuate" | "diplomacy";
 
-/** Integers may travel as JSON numbers or as decimal strings (web_contract.md 2). */
+/** Integers may travel as JSON numbers or as decimal strings (docs/reference/web_contract.md 2). */
 export type IntParam = number | string;
 
 export interface ActionParams {
@@ -57,7 +57,7 @@ export interface ActionParams {
   compose_director_message: Record<string, never>;
   summary: Record<string, never>;
   help: Record<string, never>;
-  /** Steps one action back (web_contract.md 7); never takes parameters. */
+  /** Steps one action back (docs/reference/web_contract.md 7); never takes parameters. */
   undo: Record<string, never>;
 }
 
@@ -388,7 +388,7 @@ export interface DoctrineNeeds {
 
 export type PerformNeeds = DoctrineNeeds;
 
-/** The `data` payloads of the actions that carry one (web_contract.md 3). */
+/** The `data` payloads of the actions that carry one (docs/reference/web_contract.md 3). */
 export interface PerformData {
   wow_reply: {
     /** The whole stored reply (<= 500 characters); `message_full` is the same text. */
@@ -406,7 +406,7 @@ export interface PerformData {
   help: { ai: string };
 }
 
-/** The state of the session's undo stack after an action (web_contract.md 7). */
+/** The state of the session's undo stack after an action (docs/reference/web_contract.md 7). */
 export interface UndoInfo {
   available: boolean;
   depth: number;

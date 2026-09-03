@@ -3,7 +3,7 @@
 A playable browser build of the console game, with a 3D star map (Three.js) as the main
 screen's centre column, animated by shaders off the engine's own event stream. The Python engine (`src/`) is unchanged and runs inside a
 [Pyodide](https://pyodide.org) worker; the main thread only ever talks JSON to it
-(`src/bridge.ts` / `src/worker.ts`, per `docs/web_contract.md`). The UI is Preact, plain CSS,
+(`src/bridge.ts` / `src/worker.ts`, per `docs/reference/web_contract.md`). The UI is Preact, plain CSS,
 no framework.
 
 ## Install
@@ -99,7 +99,7 @@ Screenshots land in `test-results/` (`opening.png`, `main.png`, `dialog-system-p
 web/
 ├── index.html            #app mount point; styles.css is linked here
 ├── src/
-│   ├── types.ts           the contract from docs/web_contract.md, hand-written
+│   ├── types.ts           the contract from docs/reference/web_contract.md, hand-written
 │   ├── worker.ts           Pyodide: unpack engine.zip, one GameSession, {id, method, args}
 │   ├── bridge.ts           EngineBridge: promises, JSON parsing, progress/ready
 │   ├── store.ts            app state: ViewState, journal, dialogs, toast, map selection/scale
@@ -278,7 +278,7 @@ outcome, achievements) lives solely in `build_summary()`'s text. `SummaryModal` 
 breakdown as a table and keeps the full text below it in a `<pre>`, plus "Export save" and
 "New game" buttons. The in-game menu (`MenuModal`) adds an **Achievements** section
 (`state.achievements`) and a **Statistics** grid (`state.stats`), both already in
-`docs/web_contract.md`'s `ViewState` and unused by the UI until now.
+`docs/reference/web_contract.md`'s `ViewState` and unused by the UI until now.
 
 **Help.** `HelpModal` still shows the engine's own `HELP_TEXT`, with a short web-specific
 section appended below it: mouse controls (rotate/zoom/pan, click to select), the key list
@@ -328,7 +328,7 @@ Five things playtesters could not see, now on screen. None of them changes a rul
 and line comes from the engine.
 
 - **Active effects.** `StatusPanel` ends with an "Active effects" list (`state.active_effects`,
-  new in `docs/web_contract.md` §6): the 1977 silence, each defensive/warning/survival/leakage/
+  new in `docs/reference/web_contract.md` §6): the 1977 silence, each defensive/warning/survival/leakage/
   propulsion technology in force, the integration penalty or bonus, and one line per doctrine.
   "None yet" until something applies. The doctrines paragraph that used to sit there is gone -
   the list already names them. An **Achievements** count joins the status rows (the names stay

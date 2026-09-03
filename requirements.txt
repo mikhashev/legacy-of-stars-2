@@ -8,4 +8,4 @@
 #     python -m unittest discover -s tests -t . -v
 #
 # The optional LLM features talk to Ollama / LM Studio / Anthropic / OpenAI over plain
-# HTTP (urllib), so they need no client libraries either. See docs/ai_content_roadmap.md.
+# HTTP (urllib), so they need no client libraries either. See docs/plans/ai_content_roadmap.md.

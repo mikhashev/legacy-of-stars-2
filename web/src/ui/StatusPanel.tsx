@@ -8,7 +8,7 @@ function pct(value: number): string {
 /**
  * What each row means, as a `title` tooltip on both the term and its value. Playtesters read
  * the numbers fine and could not say what moved them, so every rule stated here is one the
- * engine actually applies (docs/web_contract.md 6) - no row promises a mechanic that is not
+ * engine actually applies (docs/reference/web_contract.md 6) - no row promises a mechanic that is not
  * in `legacy_of_stars_v3.py`.
  */
 const HINTS = {

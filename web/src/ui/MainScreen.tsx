@@ -142,7 +142,7 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
         </div>
       </div>
 
-      {/* Dialogs driven by ActionSpec.needs (web_contract.md 2/3). */}
+      {/* Dialogs driven by ActionSpec.needs (docs/reference/web_contract.md 2/3). */}
       {state.dialog?.kind === "system" && <SystemDialog view={view} spec={state.dialog.spec} store={store} />}
       {state.dialog?.kind === "text" && <TextDialog view={view} system={state.dialog.system} store={store} />}
       {state.dialog?.kind === "tech" && <TechDialog view={view} store={store} />}
@@ -154,13 +154,13 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
       {state.dialog?.kind === "advance" && <AdvanceDialog view={view} store={store} />}
       {state.dialog?.kind === "menu" && <MenuModal view={view} store={store} />}
 
-      {/* Big events (web_contract.md 5, MODAL_EVENT_KINDS): one modal at a time. */}
+      {/* Big events (docs/reference/web_contract.md 5, MODAL_EVENT_KINDS): one modal at a time. */}
       {state.modalEvent && <EventModal event={state.modalEvent} store={store} />}
 
       {state.showHelp && <HelpModal store={store} />}
       {state.summaryResult && <SummaryModal store={store} result={state.summaryResult} />}
 
-      {/* The doctrine choice blocks everything else (web_contract.md 4). */}
+      {/* The doctrine choice blocks everything else (docs/reference/web_contract.md 4). */}
       {state.pendingDoctrine && <DoctrineModal needs={state.pendingDoctrine} store={store} />}
 
       {state.toast && <Toast text={state.toast} store={store} />}

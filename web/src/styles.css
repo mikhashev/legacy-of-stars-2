@@ -1,4 +1,4 @@
-/* Legacy of Stars - web UI. One dark stylesheet, no framework (web_version_plan.md W2). */
+/* Legacy of Stars - web UI. One dark stylesheet, no framework (docs/plans/web_version_plan.md W2). */
 
 :root {
   color-scheme: dark;
@@ -267,7 +267,7 @@ input[type="text"], input[type="number"], textarea {
 .advance-unspent:not([data-unspent="0"]) { color: var(--warning); }
 .advance-warning { color: var(--warning); font-size: 0.9rem; }
 
-/* Light-time: what we see of a system left it `distance` years ago (web_contract.md 6). */
+/* Light-time: what we see of a system left it `distance` years ago (docs/reference/web_contract.md 6). */
 .map-card-observed, .dossier-observed, .picker-observed { font-style: italic; }
 
 .program-message pre { color: var(--text); }
@@ -442,7 +442,7 @@ kbd {
 }
 
 /* ---------------------------------------------------------------- responsive */
-/* 1280x800 and 1024x700 both keep the three-column layout (web_version_plan.md W5: "at >=
+/* 1280x800 and 1024x700 both keep the three-column layout (docs/plans/web_version_plan.md W5: "at >=
    1000px keep the current three-column layout"); below 1200px the side columns just give the
    centre map more room. */
 @media (max-width: 1200px) {

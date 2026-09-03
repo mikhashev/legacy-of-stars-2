@@ -5,7 +5,7 @@
  * the action buttons.
  *
  * Nothing here is derived: the rows are `ViewState.generation_log`, written by the engine's
- * own action methods, and "Undo last" is the facade's `undo` action (docs/web_contract.md 7).
+ * own action methods, and "Undo last" is the facade's `undo` action (docs/reference/web_contract.md 7).
  */
 import type { Store } from "../store";
 import type { ViewState } from "../types";

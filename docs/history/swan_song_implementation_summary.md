@@ -30,7 +30,7 @@
 **3. Testing & Documentation**
 - Unit test suite (`test_swan_songs.py`) - All 5 tests passing ✅
 - Integration test (`test_swan_song_integration.py`) - Verified ✅
-- Comprehensive feature documentation (`docs/swan_song_messages.md`)
+- Comprehensive feature documentation (`swan_song_messages.md`)
 - Updated session notes (`NEXT_SESSION.md`)
 
 ---
@@ -161,7 +161,7 @@
 swan_song_messages.py              (231 lines) - Core system
 test_swan_songs.py                 (204 lines) - Unit tests
 test_swan_song_integration.py      (158 lines) - Integration tests
-docs/swan_song_messages.md         (465 lines) - Documentation
+swan_song_messages.md              (465 lines) - Documentation
 ```
 
 ### Modified Files

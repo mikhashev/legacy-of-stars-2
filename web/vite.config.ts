@@ -77,7 +77,7 @@ function precacheVersion(outDir: string, files: string[]): string {
 }
 
 /**
- * Hand-written offline cache (web_version_plan.md W5 - no plugin): after `vite build` writes
+ * Hand-written offline cache (docs/plans/web_version_plan.md W5 - no plugin): after `vite build` writes
  * `dist/`, this walks the finished output (Vite's hashed JS/CSS, `engine.zip`, the Pyodide
  * runtime, index.html) and writes `dist/version.json` plus `dist/sw.js`, a cache-first service
  * worker whose cache name embeds a hash of those files' names *and contents*, so any changed

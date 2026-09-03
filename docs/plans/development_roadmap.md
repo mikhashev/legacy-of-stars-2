@@ -33,8 +33,8 @@ the game:
 
 ## v1.1 - Scientific accuracy pass (2026-09-03)
 
-The game was audited against its own realism standard (`docs/design_notes.md` §8); the audit and
-the seven-phase plan live in `docs/science_accuracy_audit.md` and `docs/science_accuracy_plan.md`.
+The game was audited against its own realism standard (`../design/design_notes.md` §8); the audit and
+the seven-phase plan live in `../design/science_accuracy_audit.md` and `science_accuracy_plan.md`.
 All phases are implemented: no FTL anywhere, technology unlock years derived from the 1977 start,
 the WOW! source is a real star 1,800 LY away whose hostile answer is a signal rather than a
 light-speed fleet, civilization odds depend on spectral class, extinct systems respect light-time,

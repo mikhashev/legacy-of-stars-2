@@ -1,6 +1,6 @@
 name: Deploy web build to GitHub Pages
 
-# web_version_plan.md W5: build engine.zip + the Vite bundle and publish to Pages. The Python
+# docs/plans/web_version_plan.md W5: build engine.zip + the Vite bundle and publish to Pages. The Python
 # engine itself is untouched by this job - it only needs Python to run scripts/build_web_engine.py
 # (invoked by `npm run build`, via web/scripts/engine.mjs) and to run the unit tests below.
 on:

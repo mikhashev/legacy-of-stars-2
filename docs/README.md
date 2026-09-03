@@ -1,59 +1,67 @@
-# Simple Guide: Using Your Game Development Context File
+# Legacy of Stars — Documentation
 
-Here's a straightforward guide on how to use your [personal context file](https://github.com/mikhashev/personal-context-manager/blob/main/use-cases/game-development/game_development_context_template.json) for game development tasks:
+Legacy of Stars is a turn-based strategy game about humanity's multi-generational effort to make
+contact with alien civilizations: each turn is one generation (~25 years), messages and fleets
+travel at light speed or slower, and the answers may be friendship, silence or a fleet. The engine
+lives in [`src/`](../src) (no I/O, testable in isolation), the browser build in [`web/`](../web)
+(Pyodide + Three.js + Preact on top of the same engine), and the test suites in
+[`tests/`](../tests) (Python `unittest`) and `web/tests/` (Vitest + Playwright).
 
-## Step 1: Set Up Your Context File (If you need more accurate answers)
+This directory holds four kinds of document: **design** (why the game is the way it is, revised
+in place as understanding improves), **plans** (proposals and roadmaps, each carrying its own
+status), **reference** (the machine-checkable contract between the engine and the web front-end)
+and **history** (implementation notes from earlier phases, kept for the record and never rewritten
+except for their header note).
 
-1. Open the JSON template or go to Step 2
-2. Replace all [placeholders] with your specific information. Tip: You can AI to ask you qurstions to fill your specific information.
-3. Pay special attention to:
-   - Your experience level and primary role
-   - Current projects and technical environment
-   - Learning style and cognitive preferences
-   - Specific game development skills and goals
+## Design
 
-## Step 2: Share With AI at the Start of Development Sessions
+Living documents: revised in place as the design evolves.
 
-```
-Hello! I'd like to share my personal context file to help you provide more personalized game development support.
-[Paste the entire JSON file here or attach it]
-Please confirm you've received this context and will use it to guide our game development session.
-```
+| File | Description | Status |
+|------|-------------|--------|
+| [design/design_notes.md](design/design_notes.md) | Core design principles — knowledge preservation, dual-use technology, the Great Filter, deep-time survival, and the scientific-realism standard (§8) every other document is checked against. | Living |
+| [design/cosmic_game_theory_analysis.md](design/cosmic_game_theory_analysis.md) | Game-theoretic analysis of interstellar-contact strategies, mapped to design opportunities, events and future mechanics. | Living |
+| [design/science_accuracy_audit.md](design/science_accuracy_audit.md) | Audit of the implemented rules against `design_notes.md` §8; the basis for `plans/science_accuracy_plan.md`. | Living |
 
-## Step 3: Ask Game Development Questions
+## Plans
 
-After sharing the context, you can ask questions like:
+Proposals and roadmaps. Each carries a status; a plan is closed by marking it Done, not by moving
+or deleting it.
 
-- "How should I implement [game mechanic] in my current project using [game engine]?"
-- "I'm struggling with [specific challenge] in my game. Based on my experience level, what approach would you recommend?"
-- "Can you analyze this game system design using the mental models in my context file?"
-- "What would be the next step in my learning journey for mastering [skill]?"
-- "Help me debug this code from my current project with the context of my programming experience."
+| File | Description | Status |
+|------|-------------|--------|
+| [plans/development_roadmap.md](plans/development_roadmap.md) | Overall project roadmap: phase history, current release status, what's next. | Living |
+| [plans/science_accuracy_plan.md](plans/science_accuracy_plan.md) | Seven-phase plan to bring the game up to its own scientific-realism standard, from `design/science_accuracy_audit.md`. | Done 2026-09-03 |
+| [plans/web_version_plan.md](plans/web_version_plan.md) | Plan for the browser build: Pyodide-hosted engine, `web_contract.md`, Three.js scene, Preact UI. | Done 2026-09-03 |
+| [plans/civilization_timelines_plan.md](plans/civilization_timelines_plan.md) | Proposal to make alien civilizations change while a message is in flight — light-time as a strategic mechanic, not just a transport delay. | Draft awaiting owner decisions |
+| [plans/ai_content_roadmap.md](plans/ai_content_roadmap.md) | Optional LLM-generated text layered over the offline-first content bank; principles and provider setup. | Living |
 
-## Step 4: Update Your Context File Regularly
+## Reference
 
-- After completing significant milestones or learning new skills
-- When starting new game projects
-- When identifying new challenges or insights
-- When your development goals or focus changes
+| File | Description | Status |
+|------|-------------|--------|
+| [reference/web_contract.md](reference/web_contract.md) | The JSON protocol between `src/web_api.py` and the browser front-end (`view_state`, events, `perform`); the specification the TypeScript types are hand-written from. | Living — kept in sync with the code and `tests/test_web_api.py` |
 
-## Step 5: Key Sections to Update Frequently
+## History
 
-- **Current Projects**: Update progress, blockers, and current tasks
-- **Learning Progress**: Add newly mastered skills and insights
-- **Knowledge Connections**: Document how different game development areas connect
-- **AI Integration**: Refine prompts based on which ones work best for you
+Pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded
+models (see each file's header note where present).
 
-## Making the Most of Mental Models in Your Context
+| File | Description | Status |
+|------|-------------|--------|
+| [history/phase_2a_complete.md](history/phase_2a_complete.md) | Phase 2A implementation notes: attack warning, tech tree redesign, AI advisor. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/phase_3a_implementation_plan.md](history/phase_3a_implementation_plan.md) | Phase 3A implementation plan: philosophical-depth events. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/tech_tree_redesign.md](history/tech_tree_redesign.md) | Original tech-tree redesign notes (27 technologies / 5 tiers), since superseded by the 44/6 tree. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/attack_warning_implementation.md](history/attack_warning_implementation.md) | Attack early-warning system notes, from the pre-0.1c fleet-speed model. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/passive_leakage_implementation.md](history/passive_leakage_implementation.md) | Passive signal leakage system notes, from the pre-0.1c fleet-speed model. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/swan_song_implementation_summary.md](history/swan_song_implementation_summary.md) | Implementation summary for the swan-song (extinct-civilization final message) feature. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/swan_song_messages.md](history/swan_song_messages.md) | Full feature documentation for swan-song messages. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/ai_advisor_implementation.md](history/ai_advisor_implementation.md) | AI strategic advisor implementation notes. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/personal_context_guide.md](history/personal_context_guide.md) | Guide to using a personal-context JSON template with an AI assistant during development; the origin of this project. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/game_development_context_template.json](history/game_development_context_template.json) | The personal-context JSON template referenced by `personal_context_guide.md`. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
 
-The mental models included in your context file (systems thinking, game theory, etc.) help AI provide more holistic analysis of your game development questions. When facing complex challenges, try:
+## Conventions
 
-- "Analyze my procedural generation system using systems thinking principles"
-- "Help me apply probabilistic thinking to my game's loot system"
-- "Use second-order thinking to evaluate potential player responses to this mechanic"
-
-Remember that your context file is both a tool for AI and a framework for your own development journey. By maintaining it thoughtfully, you'll create a valuable record of your progress and insights as a game developer. Feel free to experimenting and modify context file as you like.
-
--- 
-
-Here is my example of game concept created by only basic idea and this context file with Claude 3.7: https://github.com/mikhashev/legacy-of-stars 
+- Docs are English.
+- Plans have an owner-decisions section.
+- History is never edited except for the header note.

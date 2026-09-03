@@ -92,7 +92,7 @@ export function styleFor(spectralType: string | null): StarStyle {
  * What the player has learned about a system, as far as the *displayed* text says it.
  *
  * `description` is `StarSystem.describe_civilization()` and is empty while `knowledge` is 0
- * (docs/web_contract.md 6). Nothing here peeks at anything the engine did not print: the
+ * (docs/reference/web_contract.md 6). Nothing here peeks at anything the engine did not print: the
  * three markers below are read straight off that sentence.
  */
 export type SystemMood = "unknown" | "quiet" | "extinct" | "inhabited";

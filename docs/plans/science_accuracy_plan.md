@@ -1,10 +1,10 @@
 # Legacy of Stars — Scientific Accuracy Improvement Plan
 
 **Date:** 2026-09-02
-**Basis:** `docs/science_accuracy_audit.md` (audit from the same date)
+**Basis:** `../design/science_accuracy_audit.md` (audit from the same date)
 **File status:** open, in the repository
 
-Goal: bring the game up to its own standard (`docs/design_notes.md` §8) without breaking the
+Goal: bring the game up to its own standard (`../design/design_notes.md` §8) without breaking the
 v1.0 balance. The plan is split into seven phases, on the principle of "cheap and safe first,
 then whatever changes the gameplay." Each phase is self-contained: you can stop after any of them.
 
@@ -55,7 +55,7 @@ None of this touches the mechanics. Tests: `test_content`, `test_tech_tree`, `te
 
 ### 0.2 The Gen 144 year
 - `src/game_interface.py:121`: `(Year 3577)` → `(Year 5577)`.
-- `docs/development_roadmap.md:75, 92`, `docs/phase_2a_complete.md:26, 234`: same.
+- `development_roadmap.md:75, 92`, `../history/phase_2a_complete.md:26, 234`: same.
 - Keep `RESPONSE_GENERATION = 144` — it's already the event's "brand"; the one-generation
   discrepancy (3575 vs. 3600 years) is immaterial.
 
@@ -88,9 +88,9 @@ worth it.
 "industrial pollution, radio broadcasts."
 
 ### 0.7 Facts in the documents
-- `docs/passive_leakage_implementation.md:353`: "Breakthrough Starshot (NASA/ESA)" →
+- `../history/passive_leakage_implementation.md:353`: "Breakthrough Starshot (NASA/ESA)" →
   "(Breakthrough Initiatives, 2016)"; `:355`: "LightSail-2 (Planetary Society)."
-- `docs/development_roadmap.md:151`: "ruled out" → "unconfirmed candidate; a 2024 analysis
+- `development_roadmap.md:151`: "ruled out" → "unconfirmed candidate; a 2024 analysis
   (Arecibo Wow! project) proposes a natural origin — a hydrogen cloud brightened by a magnetar
   flare".
 - `README.md`, Credits: add "David Brin, 'The Great Silence' (1983)" next to Liu Cixin.
@@ -325,18 +325,18 @@ Files: `src/genesis_project.py`, `data/tech_tree.json` (`genesis_bioprogramming`
 
 - A header: "Historical document — describes the pre-v1.0 model (fleets at light speed, message
   probes). Current rules: README and `src/legacy_of_stars_v3.py`." in:
-  `attack_warning_implementation.md`, `passive_leakage_implementation.md`,
-  `tech_tree_redesign.md`, `phase_2a_complete.md`.
+  `../history/attack_warning_implementation.md`, `../history/passive_leakage_implementation.md`,
+  `../history/tech_tree_redesign.md`, `../history/phase_2a_complete.md`.
 - `development_roadmap.md:44`: "Extinct civilizations (15%)" → "15% of stars host a
   civilization, 25% of those extinct"; `:1199`: 41 → 44 technologies, 6 tiers.
-- `cosmic_game_theory_analysis.md`, "Ancient Observer": replace the "Quantum Entanglement
+- `../design/cosmic_game_theory_analysis.md`, "Ancient Observer": replace the "Quantum Entanglement
   Communication — instant" gift with "Deep Archive: reveals the true strategy of every known
   civilization and +500 RP." Add a note: "any form of FTL is forbidden by design_notes §8."
   Same for `age_to_kardashev_scale`: mark "illustrative, not implemented."
-- `design_notes.md` §8: add specifics — "Every distance effect uses light-time; fleets
+- `../design/design_notes.md` §8: add specifics — "Every distance effect uses light-time; fleets
   0.1c, probes 0.175c, fusion 0.12c; the leakage front expands 1 ly/year; habitability
   depends on spectral class."
-- (Optional, public-facing) `docs/science_notes.md` for players: what in the game is real, what
+- (Optional, public-facing) a player-facing notes doc based on `../design/science_accuracy_audit.md` (never written; not planned for v1.0): what in the game is real, what
   is speculative, what is a convention. Useful for the README and the future web version.
 
 ---

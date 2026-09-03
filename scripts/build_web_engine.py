@@ -1,5 +1,5 @@
 """
-Build `web/public/engine.zip`: the Python engine as Pyodide unpacks it (web_version_plan.md, W1).
+Build `web/public/engine.zip`: the Python engine as Pyodide unpacks it (docs/plans/web_version_plan.md, W1).
 
 The archive holds exactly what `src/web_api.py` needs at run time:
 
