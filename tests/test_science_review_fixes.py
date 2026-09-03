@@ -22,6 +22,7 @@ class WowSourceIsolationTest(unittest.TestCase):
         source = p.wow_signal.wow_source_system
         source.has_civilization = True
         source._roll_civilization()
+        source.timeline = None   # hand-written: static, so every frame reads these fields
         source.is_extinct = False
         source.true_strategy = "LA"
         source.civilization_stage = CivilizationStage.DIGITAL
@@ -50,6 +51,7 @@ class WowSourceIsolationTest(unittest.TestCase):
         source = p.wow_signal.wow_source_system
         source.has_civilization = True
         source._roll_civilization()
+        source.timeline = None   # hand-written: static, so every frame reads these fields
         source.is_extinct = False
         source.true_strategy = "LA"
         source.civilization_stage = CivilizationStage.DIGITAL
@@ -120,6 +122,7 @@ class StaleInfoAttackTest(unittest.TestCase):
         target = next(iter(p.star_systems.values()))
         target.has_civilization = True
         target._roll_civilization()
+        target.timeline = None   # hand-written: static, so every frame reads these fields
         target.is_extinct = False
         target.true_strategy = "LB"
         p.pending_info_attacks.append([target.name, p.generation])

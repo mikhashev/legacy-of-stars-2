@@ -75,6 +75,7 @@ def hostile_program(distance: float, seed: int = 4):
     """A silent galaxy with a single hostile listener at a chosen distance."""
     p = ContactProgram(seed=seed, offline=True)
     for system in p.star_systems.values():
+        system.timeline = None    # hand-written systems are static: the fields are the truth
         system.has_civilization = False
         system.true_strategy = None
     target = next(iter(p.star_systems.values()))

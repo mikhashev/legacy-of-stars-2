@@ -317,6 +317,9 @@ SEED1_STATS = {
     "messages_sent": 56, "responses_received": 5, "attacks_scheduled": 0, "attacks_survived": 0,
     "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 28,
     "events_resolved": 1, "techs_researched": 21, "worlds_seeded": 0, "passive_detections": 0,
+    # T2 added the per-message fates. The counters above are unchanged, which is the point:
+    # the receipt frame reads a different year, it does not draw a different random number.
+    "messages_replied": 5, "messages_nobody": 44, "messages_died_in_flight": 1, "messages_silent": 6,
 }
 SEED1_DESCRIPTIONS = [
     ("Proxima Centauri", "No signs of civilization detected."),

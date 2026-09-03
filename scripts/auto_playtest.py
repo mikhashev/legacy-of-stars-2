@@ -27,7 +27,7 @@ os.environ.setdefault("LOS_OFFLINE", "1")
 
 from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
 
-STRATEGIES = ("balanced", "aggressive", "cautious", "integration", "neglect")
+STRATEGIES = ("balanced", "aggressive", "cautious", "integration", "neglect", "observer", "talker")
 
 # Probability weights per strategy: (send message, outreach, swan song, focus research)
 _AP_WEIGHTS = {
@@ -38,7 +38,17 @@ _AP_WEIGHTS = {
     "integration": (0.25, 0.40, 0.15, 0.20),
     # "neglect" ignores the biological-technological transition entirely (never researches Transcendence)
     "neglect": (0.30, 0.40, 0.10, 0.20),
+    # The two measurement profiles the plan fixes (§7a), so the receipt-frame numbers below are
+    # reproducible rather than a by-product of whatever the mixed rotation happened to do:
+    # "observer" studies the sky every generation and only ever writes to a system it already
+    # knows something about; "talker" sends a message with almost every action point it has.
+    "observer": (0.10, 0.20, 0.10, 0.60),
+    "talker": (0.85, 0.05, 0.05, 0.05),
 }
+# Strategies that only message a system they have reason to trust: one that already answered, or
+# one studied past this knowledge floor. Everything else gets studied instead.
+_CAREFUL_MESSAGE_STRATEGIES = {"observer"}
+OBSERVER_KNOWLEDGE_FLOOR = 40
 _PRIORITY_CATEGORIES = {"integration": ("Transcendence", "Computing", "Social")}
 _SKIPPED_CATEGORIES = {"neglect": ("Transcendence",)}
 
@@ -123,9 +133,12 @@ class AutoPlayer:
             before = p.action_points
             roll = random.random()
             if roll < msg_w:
-                target = random.choice(systems)
-                p.send_message(target, "Greetings from Earth. We seek peaceful contact.")
-                self.log(f"Message sent to {target}")
+                target = self.pick_message_target(systems)
+                if target is None:
+                    p.focus_research(random.choice(systems))
+                else:
+                    p.send_message(target, "Greetings from Earth. We seek peaceful contact.")
+                    self.log(f"Message sent to {target}")
             elif roll < msg_w + outreach_w:
                 p.public_outreach()
             elif roll < msg_w + outreach_w + swan_w:
@@ -144,6 +157,35 @@ class AutoPlayer:
             if p.action_points == before:
                 # Action was refused without spending AP; do something that always costs 1 AP.
                 p.focus_research(random.choice(systems))
+
+    def pick_message_target(self, systems):
+        """Which system this profile is willing to write to.
+
+        Most profiles shout at anything in the catalogue. "observer" does not: it writes only to
+        a civilization that has already answered, or one it has studied past
+        `OBSERVER_KNOWLEDGE_FLOOR` - the cautious play the plan asks the metrics to be measured
+        against. With no such target it has nothing to say, and studies instead.
+        """
+        if self.strategy not in _CAREFUL_MESSAGE_STRATEGIES:
+            return random.choice(systems)
+        known = [name for name in systems
+                 if self.program.star_systems[name].received_messages
+                 or self.program.star_systems[name].knowledge >= OBSERVER_KNOWLEDGE_FLOOR]
+        return random.choice(known) if known else None
+
+    def message_fates(self) -> dict:
+        """How every message this game sent turned out (plan §7c).
+
+        These are the engine's hidden fates, not the player's view: "died in flight" is exactly
+        the outcome no director ever gets told at the time, and counting it is the only way to
+        measure how often the receipt frame decided something a static evaluation would not have.
+        """
+        counts = {"in_flight": 0, "replied": 0, "nobody": 0, "died_in_flight": 0, "silent": 0}
+        for system in self.program.star_systems.values():
+            for entry in system.messages_sent:
+                fate = entry.get("fate", "in_flight") if isinstance(entry, dict) else "in_flight"
+                counts[fate] = counts.get(fate, 0) + 1
+        return counts
 
     def resolve_pending_event(self) -> None:
         """Answer a pending philosophical event at random so it never blocks the run."""
@@ -203,8 +245,19 @@ class AutoPlayer:
             "systems_known": len(p.star_systems),
             "passive_detections": p.stats.get("passive_detections", 0),
             "info_attacks": p.stats.get("info_attacks", 0),
+            "messages_sent": p.stats.get("messages_sent", 0),
+            "message_fates": self.message_fates(),
             "exception": None,
         }
+
+
+def format_fates(counts: dict) -> str:
+    """The fate tally as one line: "replied 4, silent 9, nobody 21, died in flight 2"."""
+    if not counts:
+        return "none"
+    order = ("replied", "in_flight", "silent", "nobody", "died_in_flight")
+    parts = [f"{fate.replace('_', ' ')} {counts[fate]}" for fate in order if counts.get(fate)]
+    return ", ".join(parts) or "none"
 
 
 def run_headless(seed=None, strategy: str = "balanced", max_gen: int = 200, run_id: int = 1) -> dict:
@@ -240,6 +293,7 @@ def main(argv=None) -> int:
         try:
             result = run_headless(seed, strategy, args.max_gen, run_id=i + 1)
             print(f"  -> Gen {result['generations']}: {result['end_reason']}")
+            print(f"     messages {result['messages_sent']}: {format_fates(result['message_fates'])}")
         except Exception as exc:  # noqa: BLE001 - report and keep going
             failures += 1
             traceback.print_exc()
@@ -247,7 +301,7 @@ def main(argv=None) -> int:
                 "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
                 "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "sky_changes": 0,
-                "systems_known": 0,
+                "systems_known": 0, "messages_sent": 0, "message_fates": {},
                 "passive_detections": 0, "info_attacks": 0,
                 "end_reason": f"EXCEPTION: {exc!r}", "exception": repr(exc),
             }
@@ -272,6 +326,16 @@ def main(argv=None) -> int:
           f"Information attacks: {total_info} total, {total_info / max(1, len(results)):.2f} per game.")
     print(f"Sky changes (new light showing a watched system change): {total_sky} total, "
           f"{total_sky / max(1, len(results)):.2f} per game.")
+    totals = {}
+    for r in results:
+        for fate, count in (r.get("message_fates") or {}).items():
+            totals[fate] = totals.get(fate, 0) + count
+    sent = sum(totals.values())
+    print(f"Message fates over {sent} message(s): {format_fates(totals)}")
+    if sent:
+        decided_by_the_future = totals.get("died_in_flight", 0)
+        print(f"  Decided by the receipt frame (target gone before our signal landed): "
+              f"{decided_by_the_future} ({decided_by_the_future / sent:.1%}).")
     if failures:
         print(f"\n{failures} run(s) raised exceptions.")
         return 1

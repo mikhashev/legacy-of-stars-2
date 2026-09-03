@@ -180,10 +180,22 @@ export interface ProgramStatus {
   integration_status: string;
 }
 
+/** What the player may know about a message we sent. See web_contract.md §6. */
+export type MessageFate = "in_flight" | "replied" | "nobody" | "unanswered";
+
 export interface SentMessage {
   text: string;
   generation: number;
   arrival_gen: number;
+  /** In-game year an answer would arrive: send year + 2 x distance. */
+  expected_reply_year?: number;
+  /**
+   * Year an observation explains a silence - null until that year has come. The engine knows
+   * when a target will be gone before our signal lands; the player must not, so this stays
+   * null (and `fate` stays "in_flight") until the light of that death has actually arrived.
+   */
+  explanation_year?: number | null;
+  fate?: MessageFate;
 }
 
 export interface StarSystem {

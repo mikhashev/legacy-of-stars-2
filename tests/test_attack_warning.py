@@ -22,6 +22,7 @@ class AttackWarningTest(unittest.TestCase):
     def setUp(self):
         self.p = ContactProgram(seed=31, offline=True)
         for system in self.p.star_systems.values():
+            system.timeline = None   # hand-written systems are static: the fields are the truth
             system.has_civilization = False
             system.true_strategy = None
         self.hostile = next(iter(self.p.star_systems.values()))

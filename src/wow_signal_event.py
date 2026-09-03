@@ -140,8 +140,22 @@ class WOWSignalEvent:
             return False
         return self.program.generation == self.wow_response_gen
 
+    def evaluation_year(self, wow_system) -> int:
+        """The year our 1977 reply lands on the source: 1977 + 1,800 = 3777.
+
+        Seventy-two generations of *their* history separate the burst from the moment anyone
+        there reads what we sent back. The plan (§5) fixes this as the year Generation 144
+        evaluates, and the timeline horizon (1977 + 5,000) is rolled far enough to cover it.
+        """
+        return int(self.program.start_year + round(wow_system.distance))
+
     def trigger_gen144_event(self) -> None:
-        """Handle the Gen 144 WOW response event"""
+        """Handle the Gen 144 WOW response event.
+
+        The answer comes from the civilization *as it is when our reply arrives* (T3), read off
+        its timeline at year 3777 - not from the profile rolled in 1977. Thirty-six centuries is
+        long enough for a listener to have become an aggressor, and long enough to have died.
+        """
         if self.wow_source_system is None:
             self.wow_source_system = create_wow_source_system(self.program)
         wow_system = self.wow_source_system
@@ -151,16 +165,23 @@ class WOWSignalEvent:
             self._wow_outcome_silence()
             return
 
+        year = self.evaluation_year(wow_system)
+        them = wow_system.timeline_state(year)
+
         logging.info("=" * 70)
         logging.info("GENERATION 144 - WOW! SIGNAL RESPONSE")
         logging.info("=" * 70)
         logging.info(f"Source: {wow_system.name}")
-        logging.info(f"Strategy: {wow_system.true_strategy}")
+        logging.info(f"State in {year}: alive={them.alive}, strategy={them.strategy}")
 
-        if wow_system.true_strategy in ("LB", "LR"):
+        if not them.alive:
+            # They read nothing: whoever sent the burst was gone long before our reply arrived.
+            self.outcome = "silence"
+            self._wow_outcome_silence()
+        elif them.strategy in ("LB", "LR"):
             self.outcome = "friendly"
             self._wow_outcome_friendly(wow_system)
-        elif wow_system.true_strategy in ("LA", "LBA"):
+        elif them.strategy in ("LA", "LBA"):
             self.outcome = "hostile"
             self._wow_outcome_hostile(wow_system)
         else:

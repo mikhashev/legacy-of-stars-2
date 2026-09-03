@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T19:22:17",
+  "saved_at": "2026-09-03T19:41:47",
   "label": "",
   "generation": 1,
   "year": 1977,
@@ -121,10 +121,14 @@
         "timeline": null,
         "observations": [],
         "messages_sent": [
-          [
-            "hello",
-            1
-          ]
+          {
+            "text": "hello",
+            "generation": 1,
+            "arrival_gen": 2,
+            "expected_reply_year": 1985,
+            "explanation_year": null,
+            "fate": "in_flight"
+          }
         ],
         "pending_responses": [
           [
@@ -395,7 +399,11 @@
       "events_resolved": 0,
       "techs_researched": 0,
       "worlds_seeded": 0,
-      "passive_detections": 0
+      "passive_detections": 0,
+      "messages_replied": 0,
+      "messages_nobody": 0,
+      "messages_died_in_flight": 0,
+      "messages_silent": 0
     },
     "achievements": [],
     "generation_log": [

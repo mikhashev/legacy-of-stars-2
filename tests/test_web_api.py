@@ -55,6 +55,7 @@ def assert_plain(testcase, value, path="result"):
 def hostile_system(program):
     """Turn the second known system into a silent aggressor and make it launch."""
     system = list(program.star_systems.values())[1]
+    system.timeline = None   # hand-written: static, so the receipt frame reads these fields
     system.has_civilization = True
     system.is_extinct = False
     system.true_strategy = "LA"

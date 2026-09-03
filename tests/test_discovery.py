@@ -153,7 +153,7 @@ class WowSourceSystemTest(unittest.TestCase):
         source = p.wow_signal.wow_source_system
         p.action_points = 2
         p.send_message(WOW_SOURCE_NAME, "Still here")
-        self.assertEqual(source.messages_sent[-1][0], "Still here")
+        self.assertEqual(source.messages_sent[-1]["text"], "Still here")
 
     def _resolve_at_144(self, program, strategy):
         source = program.wow_signal.wow_source_system
@@ -162,6 +162,7 @@ class WowSourceSystemTest(unittest.TestCase):
             source._clear_civilization()
         else:
             source.has_civilization = True
+            source.timeline = None   # hand-written: static, so year 3777 reads these fields
             source.is_extinct = False
             source.true_strategy = strategy
             source.civilization_stage = CivilizationStage.DIGITAL

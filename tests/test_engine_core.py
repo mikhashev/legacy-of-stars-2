@@ -139,6 +139,7 @@ class AttackTest(unittest.TestCase):
     def _hostile_program(self):
         p = make_program(seed=4)
         for system in p.star_systems.values():
+            system.timeline = None    # hand-written systems are static: the fields are the truth
             system.has_civilization = False
             system.true_strategy = None
         target = next(iter(p.star_systems.values()))
@@ -303,6 +304,7 @@ class InterfaceTest(unittest.TestCase):
     def test_defensive_action_through_interface(self):
         p = make_program(seed=9)
         target = next(iter(p.star_systems.values()))
+        target.timeline = None
         target.has_civilization = True
         target.is_extinct = False
         target.true_strategy = "LA"

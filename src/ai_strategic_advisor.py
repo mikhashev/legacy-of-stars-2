@@ -29,6 +29,10 @@ Remember:
 
 Be concise, actionable, and strategic. Format your response with clear sections."""
 
+    # A briefing is read, not scrolled: a program that has been shouting for two centuries can
+    # have a hundred overdue messages, and listing them all would bury everything above.
+    MAX_OVERDUE_LINES = 6
+
     def __init__(self, ai_manager=None):
         self.ai_manager = ai_manager
 
@@ -177,6 +181,12 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
                 break
         if not noted:
             lines.append("  - No systems studied yet. Focus Research reveals who is out there.")
+        overdue = self._unanswered_message_lines(program)
+        for line in overdue[:self.MAX_OVERDUE_LINES]:
+            lines.append(f"  - {line}")
+        if len(overdue) > self.MAX_OVERDUE_LINES:
+            lines.append(f"  - ...and {len(overdue) - self.MAX_OVERDUE_LINES} further message(s) "
+                         "whose answer is overdue.")
         lines.append("")
 
         # Integration
@@ -221,6 +231,35 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         lines.append("AI Advisor analysis complete.")
         lines.append(f"{'=' * 60}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _unanswered_message_lines(program) -> List[str]:
+        """One line per message whose answer is overdue - and no guess about why.
+
+        A message is overdue when the year a reply would have arrived (`send + 2d`) has passed
+        and none came. The advisor knows exactly as much as the player does at that point: the
+        civilization may have chosen silence, or may have been gone before our signal landed,
+        and only an observation - `d` years behind, always - can ever say which. Naming both
+        possibilities is the honest briefing; naming one would be reading the engine's mind.
+        """
+        year_now = program.start_year + (program.generation - 1) * 25
+        lines: List[str] = []
+        for name, system in program.star_systems.items():
+            for entry in getattr(system, "messages_sent", []):
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("fate") in ("replied", "nobody"):
+                    continue
+                expected = entry.get("expected_reply_year")
+                if expected is None or year_now < int(expected):
+                    continue
+                send_year = program.start_year + (int(entry.get("generation", 1)) - 1) * 25
+                receipt_year = send_year + int(round(system.distance))
+                line = (f"Our message to {name} reached its target in {receipt_year}; silence may mean "
+                        "they chose not to answer, or that they are no longer there.")
+                if line not in lines:
+                    lines.append(line)
+        return lines
 
     def get_system_risk_assessment(self, program, system_name: str) -> str:
         """Assess the risk of a specific star system from visible evidence only.

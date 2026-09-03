@@ -24,6 +24,9 @@ def make_program(seed=1):
 
 
 def make_living(system, strategy="LB", stage=CivilizationStage.DIGITAL, civ_type="biological_pure"):
+    # No timeline: a hand-written civilization is static, so the observed, present and receipt
+    # frames all read the fields set below - which is what these tests are about.
+    system.timeline = None
     system.has_civilization = True
     system.is_extinct = False
     system.has_swan_song = False
@@ -37,6 +40,7 @@ def make_living(system, strategy="LB", stage=CivilizationStage.DIGITAL, civ_type
 def quiet_galaxy(program):
     """Remove every civilization so random rolls cannot trigger contacts or attacks."""
     for system in program.star_systems.values():
+        system.timeline = None
         system.has_civilization = False
         system.true_strategy = None
         system.is_extinct = False

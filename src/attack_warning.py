@@ -20,11 +20,16 @@ ATTACK_TYPE_LABELS = {
 class AttackWarning:
     """Tracks an incoming hostile fleet attack"""
 
-    def __init__(self, source_system, arrival_generation, current_generation, attack_type: str = "fleet"):
+    def __init__(self, source_system, arrival_generation, current_generation, attack_type: str = "fleet",
+                 source_stage_name: Optional[str] = None):
         self.source = source_system
         self.arrival_gen = arrival_generation
         self.detected_gen = current_generation
         self.attack_type = attack_type
+        # The stage the source was in when it launched. A fleet is as strong as the civilization
+        # that built it, and it crosses centuries: by the time it arrives its builders may be
+        # further along, or gone. `None` means "read the source's current stage" (old saves).
+        self.source_stage_name = source_stage_name
         self.defensive_actions_taken = []
         self.defense_multiplier = 1.0  # 1.0 = no reduction, 0.5 = 50% reduction
 
@@ -62,6 +67,7 @@ class AttackWarning:
             "arrival_gen": self.arrival_gen,
             "detected_gen": self.detected_gen,
             "attack_type": self.attack_type,
+            "source_stage_name": self.source_stage_name,
             "defensive_actions_taken": list(self.defensive_actions_taken),
             "defense_multiplier": self.defense_multiplier,
         }
@@ -73,7 +79,10 @@ class AttackWarning:
             logging.warning(f"Save refers to an unknown attack source {data.get('source')!r}; warning dropped")
             return None
         warning = cls(source, data["arrival_gen"], data.get("detected_gen", data["arrival_gen"]),
-                      data.get("attack_type", "fleet"))
+                      data.get("attack_type", "fleet"),
+                      # A save written before T2 did not record it: fall back to the source's
+                      # current stage, which is exactly what the engine used to do.
+                      source_stage_name=data.get("source_stage_name"))
         warning.defensive_actions_taken = list(data.get("defensive_actions_taken", []))
         warning.defense_multiplier = data.get("defense_multiplier", 1.0)
         return warning

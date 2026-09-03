@@ -89,6 +89,64 @@ def observed_change(before: Optional[CivState], after: Optional[CivState],
     return None
 
 
+# ---------------------------------------------------------------------- messages in flight (T2)
+# The fate the engine keeps on every sent message. Two of these are secrets: "died_in_flight"
+# says the civilization will be dead when our signal lands, and "silent" says no reply will
+# ever come - both are facts about a future the player has not observed yet, and the whole
+# point of the receipt frame is that nobody on Earth can know them. `public_message_fate`
+# below is the only thing `view_state` may show.
+MESSAGE_FATES = ("in_flight", "replied", "nobody", "died_in_flight", "silent")
+PUBLIC_MESSAGE_FATES = ("in_flight", "replied", "nobody", "unanswered")
+
+
+def sent_message(text: str, generation: int, arrival_gen: int, expected_reply_year: int,
+                 explanation_year: Optional[int] = None, fate: str = "in_flight") -> Dict[str, Any]:
+    """One entry of `StarSystem.messages_sent`.
+
+    `arrival_gen` is when our signal reaches them, `expected_reply_year` when an answer would
+    reach us (`send_year + 2d`), and `explanation_year` the year an observation explains a
+    silence: the send year when we already know nobody can answer, the year the light of their
+    death arrives when they die before receipt, and None while a reply may still be coming.
+    """
+    return {
+        "text": text,
+        "generation": int(generation),
+        "arrival_gen": int(arrival_gen),
+        "expected_reply_year": int(expected_reply_year),
+        "explanation_year": None if explanation_year is None else int(explanation_year),
+        "fate": fate if fate in MESSAGE_FATES else "in_flight",
+    }
+
+
+def public_message_fate(entry: Dict[str, Any], year_now: int) -> str:
+    """The fate of a sent message as the player may see it.
+
+    A reply that came and a target we knew could not answer are public knowledge. Everything
+    else is one of two things the player cannot tell apart, and must not be told apart: a reply
+    still in flight, or a silence - which is exactly what "unanswered" means here.
+    """
+    fate = entry.get("fate", "in_flight")
+    if fate in ("replied", "nobody"):
+        return fate
+    expected = entry.get("expected_reply_year")
+    if expected is not None and int(year_now) >= int(expected):
+        return "unanswered"
+    return "in_flight"
+
+
+def public_explanation_year(entry: Dict[str, Any], year_now: int) -> Optional[int]:
+    """`explanation_year`, but only once that year has arrived.
+
+    The stored value can be in the future ("the light of their death reaches us in 2312"), and
+    publishing it would hand the player the same secret `public_message_fate` withholds. Once
+    the year has passed the observation itself has already been made, so the date is free.
+    """
+    explanation = entry.get("explanation_year")
+    if explanation is None or int(year_now) < int(explanation):
+        return None
+    return int(explanation)
+
+
 # Chance that a star with a perfectly habitable spectral class (G/K main sequence) hosts a
 # civilization. Calibrated so the full 53-star catalog still averages ~8 civilizations, as the
 # flat 0.15 model did: the mean habitability weight of the catalog is 30.8 / 53 = 0.581, and
@@ -470,7 +528,7 @@ class StarSystem:
         timeline = getattr(self, "timeline", None)
         data["timeline"] = timeline.to_dict() if timeline else None
         data["observations"] = [dict(entry) for entry in getattr(self, "observations", [])]
-        data["messages_sent"] = [[text, gen] for text, gen in self.messages_sent]
+        data["messages_sent"] = [dict(entry) for entry in self.normalize_messages(self.messages_sent)]
         data["pending_responses"] = [[text, gen] for text, gen in self.pending_responses]
         data["received_messages"] = list(self.received_messages)
         return data
@@ -500,7 +558,8 @@ class StarSystem:
         system.knowledge = data.get("knowledge", 0)
         # A save written before the observed frame has no history: the dossier starts empty.
         system.observations = [dict(entry) for entry in data.get("observations", [])]
-        system.messages_sent = [tuple(item) for item in data.get("messages_sent", [])]
+        # Saves written before T2 hold `[text, generation]` pairs; they migrate on load.
+        system.messages_sent = system.normalize_messages(data.get("messages_sent", []))
         system.pending_responses = [tuple(item) for item in data.get("pending_responses", [])]
         system.received_messages = list(data.get("received_messages", []))
         system.pending_attack = None
@@ -518,7 +577,36 @@ class StarSystem:
         years = self.distance * 2  # There and back
         generations = (years / 25)  # Each generation is ~25 years
         return max(1, int(generations + 0.999))  # Round up to nearest generation
-    
+
+    def one_way_generations(self) -> int:
+        """Generations our signal needs to reach this system (half the round trip, rounded up)."""
+        return math.ceil(self.get_round_trip_time() / 2)
+
+    def normalize_messages(self, items: List[Any], start_year: int = START_YEAR) -> List[Dict[str, Any]]:
+        """Sent messages as dicts, from either shape a save can hold.
+
+        Before T2 a message was the pair `[text, generation]` and nothing was recorded about
+        what would answer it. Such an entry is rebuilt with the dates the pair implies and the
+        neutral fate "in_flight": an old save cannot know whether its silences were chosen.
+        """
+        one_way = self.one_way_generations()
+        messages: List[Dict[str, Any]] = []
+        for item in items or []:
+            if isinstance(item, dict):
+                generation = int(item.get("generation", 1))
+                send_year = start_year + (generation - 1) * 25
+                messages.append(sent_message(
+                    item.get("text", ""), generation,
+                    item.get("arrival_gen", generation + one_way),
+                    item.get("expected_reply_year", send_year + 2 * int(round(self.distance))),
+                    item.get("explanation_year"), item.get("fate", "in_flight")))
+                continue
+            text, generation = item[0], int(item[1])
+            send_year = start_year + (generation - 1) * 25
+            messages.append(sent_message(text, generation, generation + one_way,
+                                         send_year + 2 * int(round(self.distance))))
+        return messages
+
     
     def describe_civilization(self, year_now: Optional[int] = None) -> str:
         """What the player is told about this system, read in the observed frame.
@@ -757,6 +845,11 @@ class ContactProgram:
             "messages_sent": 0, "responses_received": 0, "attacks_scheduled": 0, "attacks_survived": 0,
             "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 0,
             "events_resolved": 0, "techs_researched": 0, "worlds_seeded": 0, "passive_detections": 0,
+            # What became of every message sent (T2). "died_in_flight" and "silent" are the two
+            # the player is never told apart at the time; they exist so the receipt frame can be
+            # measured (plan §7c) rather than eyeballed.
+            "messages_replied": 0, "messages_nobody": 0, "messages_died_in_flight": 0,
+            "messages_silent": 0,
         }
         self.achievements: List[str] = []
 
@@ -1254,12 +1347,18 @@ class ContactProgram:
                 "primitive tech might make you dismissive."),
     }
 
-    def _reply_context(self, system, message_content: str) -> Dict[str, Any]:
-        """Placeholders available to reply templates."""
+    def _reply_context(self, system, message_content: str, them: Optional[CivState] = None) -> Dict[str, Any]:
+        """Placeholders available to reply templates.
+
+        `them` is the civilization at *receipt* time (T2): the answer is written by whoever
+        reads our signal, so the stage it speaks from is theirs when it arrives, not the one
+        our telescopes were looking at when we sent it.
+        """
         excerpt = (message_content or "").strip().replace("\n", " ")
         if len(excerpt) > 80:
             excerpt = excerpt[:77] + "..."
-        stage = system.civilization_stage.name.replace("_", " ").title() if system.civilization_stage else "Unknown"
+        their_stage = them.stage if them is not None else system.civilization_stage
+        stage = their_stage.name.replace("_", " ").title() if their_stage else "Unknown"
         return {
             "system": system.name,
             "earth_excerpt": excerpt or "...",
@@ -1270,14 +1369,20 @@ class ContactProgram:
             "director": self.current_director.name,
         }
 
-    def _compose_alien_reply(self, system, strategy: str, message_content: str) -> str:
-        """Text of an alien reply: LLM when available, otherwise the written content bank."""
+    def _compose_alien_reply(self, system, strategy: str, message_content: str,
+                             them: Optional[CivState] = None) -> str:
+        """Text of an alien reply: LLM when available, otherwise the written content bank.
+
+        `them` is the state at receipt (T2), so the reply describes the civilization that read
+        the message rather than the one that was visible when it was sent.
+        """
         tech_context = self._build_tech_context()
         system_prompt = self._ALIEN_PROMPTS[strategy].format(name=system.name, tech=tech_context)
         text = self._ai_text(f"Human: {message_content}", system_prompt)
         if text:
             return text
-        return self.content.alien_reply(strategy, system.civilization_type, self._reply_context(system, message_content))
+        civ_type = them.civ_type if them is not None else system.civilization_type
+        return self.content.alien_reply(strategy, civ_type, self._reply_context(system, message_content, them))
 
     def research_tech(self, tech_id: str) -> bool:
         """Attempt to research a technology"""
@@ -1520,11 +1625,21 @@ class ContactProgram:
         logging.info(f"Doctrine Adopted: {option['name']} for {tech.name}")
 
     def _schedule_attack(self, system, arrival_gen: int, attack_type: str = "fleet",
-                         note: str = "", announce: bool = True) -> AttackWarning:
-        """Register an incoming attack. The Early Warning Network adds preparation time."""
+                         note: str = "", announce: bool = True,
+                         source_stage: Optional[str] = None) -> AttackWarning:
+        """Register an incoming attack. The Early Warning Network adds preparation time.
+
+        `source_stage` is what the source was when it *launched* - the receipt year for a fleet
+        answering our message, the present year for one answering our leakage. A fleet is built
+        by the civilization that sends it, so its strength is fixed then; centuries later the
+        senders may have advanced, fallen back or died, and none of that reaches the fleet.
+        """
         bonus = self.warning_time_bonus if arrival_gen > self.generation else 0
         arrival = arrival_gen + bonus
-        warning = AttackWarning(system, arrival, self.generation, attack_type=attack_type)
+        if source_stage is None and system.civilization_stage is not None:
+            source_stage = system.civilization_stage.name
+        warning = AttackWarning(system, arrival, self.generation, attack_type=attack_type,
+                                source_stage_name=source_stage)
         self.pending_attack_warnings.append(warning)
         system.has_detected_earth = True
         self.stats["attacks_scheduled"] += 1
@@ -1829,6 +1944,7 @@ or seek the answer to the ultimate question.
                 message = response[0]
                 system.received_messages.append(message)
                 first = len(system.received_messages) == 1
+                self._mark_message_replied(system)
 
                 k_gain = 10 * self.tech_level
                 if "Visionary" in self.current_director.traits:
@@ -1850,14 +1966,27 @@ or seek the answer to the ultimate question.
                                             f"{'first' if first else 'second'} response from {name}")
                 logging.info(f"Response received from {name} (reply #{replies})")
 
+    def _mark_message_replied(self, system) -> None:
+        """A reply just landed: close the oldest message on this system that was still open."""
+        for entry in getattr(system, "messages_sent", []):
+            if isinstance(entry, dict) and entry.get("fate") == "in_flight":
+                entry["fate"] = "replied"
+                self.stats["messages_replied"] += 1
+                return
+
     def _process_passive_leakage(self) -> None:
-        """Hostile civilizations inside our leakage front may detect Earth's electromagnetic leakage."""
+        """Hostile civilizations inside our leakage front may detect Earth's electromagnetic leakage.
+
+        Leakage is read in the **present** frame (T2): our radio has already reached them, so
+        what decides is who they are right now, not who our telescopes can see them being.
+        """
         year = self.start_year + (self.generation - 1) * 25
         self.broadcast_radius = self.leakage_system.leakage_front(year)
         for system_name, system in list(self.star_systems.items()):
-            if not system.has_civilization or system.is_extinct:
+            if not system.has_civilization:
                 continue
-            if system.true_strategy not in ("LA", "LBA"):
+            now = system.timeline_state(year)
+            if not now.alive or now.strategy not in ("LA", "LBA"):
                 continue
             if system.is_wow_source:
                 continue  # the WOW! source has its own scripted answer in Generation 144
@@ -1870,9 +1999,10 @@ or seek the answer to the ultimate question.
 
             system.has_detected_earth = True
             self.stats["passive_detections"] += 1
-            logging.critical(f"PASSIVE DETECTION: {system_name} ({system.true_strategy}) detected Earth via leakage")
+            logging.critical(f"PASSIVE DETECTION: {system_name} ({now.strategy}) detected Earth via leakage")
             attack_type = self.leakage_system.determine_attack_type(system, system.distance)
             leak_note = " They found us through our own electromagnetic leakage."
+            launch_stage = now.stage.name if now.stage else None
             # The front check above means our leakage has already reached them; what remains is
             # the one-way trip of whatever they send back.
             if attack_type == "information":
@@ -1881,10 +2011,12 @@ or seek the answer to the ultimate question.
                 logging.info(f"LEAKAGE INFO ATTACK IN FLIGHT: {system_name} -> arrival Gen {arrival}")
             elif attack_type == "laser_sail":
                 travel = self.leakage_system.calculate_travel_time(system.distance, "laser_sail")
-                self._schedule_attack(system, self.generation + travel, "laser_sail_probe", note=leak_note)
+                self._schedule_attack(system, self.generation + travel, "laser_sail_probe", note=leak_note,
+                                      source_stage=launch_stage)
             else:
                 travel = self.leakage_system.calculate_travel_time(system.distance, "fusion")
-                self._schedule_attack(system, self.generation + travel, "fusion_strike", note=leak_note)
+                self._schedule_attack(system, self.generation + travel, "fusion_strike", note=leak_note,
+                                      source_stage=launch_stage)
 
     def _deliver_pending_info_attacks(self) -> None:
         """Information attacks in flight land when their signal finally reaches Earth."""
@@ -1894,7 +2026,10 @@ or seek the answer to the ultimate question.
                 continue
             self.pending_info_attacks.remove(entry)
             source = self.star_systems.get(system_name)
-            if source is None or source.true_strategy not in ("LA", "LBA"):
+            # The present frame again (T2): the weapon was aimed centuries ago, but a source
+            # that has since died or turned away never finished sending it.
+            now = source.timeline_state(self.current_year) if source is not None else None
+            if now is None or not now.alive or now.strategy not in ("LA", "LBA"):
                 logging.info(f"Information attack from {system_name} discarded: source no longer hostile")
                 continue
             logging.critical(f"INFORMATION ATTACK ARRIVES: {system_name} (due Gen {arrival_gen})")
@@ -1916,7 +2051,13 @@ or seek the answer to the ultimate question.
 
     def _resolve_attack(self, warning) -> None:
         source = warning.source
-        stage_value = source.civilization_stage.value if source.civilization_stage else CivilizationStage.DIGITAL.value
+        # The fleet is as advanced as its builders were on the day it launched (T2), not as
+        # they are now: whatever became of them since, it cannot reach a ship already in flight.
+        launch_stage = getattr(warning, "source_stage_name", None)
+        if launch_stage is None and source.civilization_stage is not None:
+            launch_stage = source.civilization_stage.name
+        stage_value = (CivilizationStage[launch_stage].value if launch_stage
+                       else CivilizationStage.DIGITAL.value)
         tech_gap = stage_value - self.tech_level
         if tech_gap >= 2:
             base_support, base_funding, devastating, severity = 50, 40, True, "DEVASTATING"
@@ -1952,7 +2093,7 @@ or seek the answer to the ultimate question.
             defense_info = "\n\n🛡️ Defensive actions taken: " + ", ".join(warning.defensive_actions_taken)
         defense_info += f"\nTotal damage reduction: {int((1 - multiplier) * 100)}%"
 
-        stage_name = source.civilization_stage.name if source.civilization_stage else "UNKNOWN"
+        stage_name = launch_stage or "UNKNOWN"
         if devastating:
             self._end_game(f"Earth annihilated by the {warning.type_label} from {source.name}.",
                            f"""💀 GAME OVER: EARTH ANNIHILATED 💀
@@ -2127,7 +2268,6 @@ You have answered one of humanity's greatest questions.
         director = self.current_director
         systems = []
         for index, (name, s) in enumerate(self.star_systems.items(), 1):
-            one_way = math.ceil(s.get_round_trip_time() / 2)
             systems.append({
                 "index": index,
                 "name": name,
@@ -2144,7 +2284,16 @@ You have answered one of humanity's greatest questions.
                 # The dated history of what that light showed, oldest first (Focus Research
                 # writes one, and so does every generation whose new light changed something).
                 "observations": [dict(entry) for entry in getattr(s, "observations", [])],
-                "messages_sent": [{"text": m, "generation": g, "arrival_gen": g + one_way} for m, g in s.messages_sent],
+                # Every message we sent, with the dates that let the UI tell the three classes
+                # of silence apart (plan §8) - and nothing that would let it tell them apart
+                # *early*: the fate is the public one, and the year an observation will explain
+                # a silence appears only once that year has come.
+                "messages_sent": [{"text": m["text"], "generation": m["generation"],
+                                   "arrival_gen": m["arrival_gen"],
+                                   "expected_reply_year": m["expected_reply_year"],
+                                   "explanation_year": public_explanation_year(m, year),
+                                   "fate": public_message_fate(m, year)}
+                                  for m in s.normalize_messages(s.messages_sent)],
                 "responses": list(s.received_messages),
                 "next_response_gen": min((a for _, a in s.pending_responses), default=None),
                 "contacted": bool(s.received_messages),
@@ -2161,7 +2310,10 @@ You have answered one of humanity's greatest questions.
                 "arrival_gen": w.arrival_gen,
                 "arrival_year": self.start_year + (w.arrival_gen - 1) * 25,
                 "source_distance": round(w.source.distance, 1),
-                "enemy_stage": w.source.civilization_stage.name if w.source.civilization_stage else "UNKNOWN",
+                # What the fleet was built by, on the day it launched - which is what decides
+                # the damage when it lands (T2), whatever its builders have become since.
+                "enemy_stage": (getattr(w, "source_stage_name", None)
+                                or (w.source.civilization_stage.name if w.source.civilization_stage else "UNKNOWN")),
                 "defense_pct": w.get_defense_percentage(),
                 "actions_taken": list(w.defensive_actions_taken),
             })
@@ -2365,6 +2517,15 @@ You have answered one of humanity's greatest questions.
         return actions
 
     def send_message(self, system_name: str, message_content: str):
+        """Transmit to a system - and let the civilization that will be there answer it.
+
+        This is the receipt frame (plan §4). Our signal needs `round(distance)` years to cross,
+        and it is read on arrival, by whoever is there *then*: `state_at(now + d)`. A cautious
+        neighbour may have turned expansionist, a friendly one may be dead, a pre-radio one may
+        have learned to listen. None of that is visible from Earth when the message goes out -
+        the observed frame is still `d` years behind - so the reply the player is promised, and
+        the wording they are given, must never give the future away.
+        """
         if self.action_points < 1:
             self.message = "Not enough Action Points!"
             return
@@ -2372,7 +2533,7 @@ You have answered one of humanity's greatest questions.
         if system_name not in self.star_systems:
             self.message = f"System {system_name} not found in database."
             return
-            
+
         system = self.star_systems[system_name]
 
         # Post-biological minds cannot be addressed with radio-era protocols
@@ -2383,17 +2544,31 @@ You have answered one of humanity's greatest questions.
                             "address. Research Post-Biological Transition to attempt contact.")
             return
 
-        system.messages_sent.append((message_content, self.generation))
+        light_years = int(round(system.distance))
+        send_year = self.current_year
+        receipt_year = send_year + light_years
+        them = system.timeline_state(receipt_year)   # who reads this, in the year they read it
+
+        entry = sent_message(message_content, self.generation,
+                             self.generation + system.one_way_generations(),
+                             send_year + 2 * light_years)
+        system.messages_sent.append(entry)
         self.stats["messages_sent"] += 1
-        
+
+        def settle(fate: str, explanation_year: Optional[int] = None) -> None:
+            """Record what will become of this message. Hidden: see `public_message_fate`."""
+            entry["fate"] = fate
+            entry["explanation_year"] = explanation_year
+            self.stats[f"messages_{fate}"] += 1
+
         # Director Diplomacy Skill: Improves message quality
         diplomacy_skill = self.current_director.get_effective_skill("diplomacy")
         # Multiplier: 0.5 (incompetent) to 1.5 (expert)
-        quality_multiplier = 0.5 + diplomacy_skill 
+        quality_multiplier = 0.5 + diplomacy_skill
         effective_quality = self.message_quality * quality_multiplier
-        
+
         logging.info(f"Message Sent to {system_name} (Dir. Skill: {diplomacy_skill:.2f}, Quality Multiplier: {quality_multiplier:.2f})")
-        
+
         self.action_points -= 1
         self.note_player_action("send_message", f"Sent message to {system_name}", "1 AP")
 
@@ -2406,33 +2581,55 @@ You have answered one of humanity's greatest questions.
             logging.info("Message to the WOW! source queued behind the Generation 144 window")
             return
 
-        # Extinct civilizations
-        if system.has_civilization and system.is_extinct:
-            self.message = f"Message sent to {system_name}. No response detected."
-            return
-        
-        if not system.has_civilization or system.civilization_stage.value < CivilizationStage.EARLY_RADIO.value:
-            self.message = f"Message sent to {system_name}, but no response capability detected."
-            return
-        
         round_trip_time = system.get_round_trip_time()
 
-        # A hostile civilization that has already launched against us does not launch again per message
-        if system.true_strategy in ("LA", "LBA") and system.has_detected_earth:
-            self.message = f"Message sent to {system_name}. No response detected."
-            logging.info(f"{system.true_strategy}: {system_name} already committed to attack - no new fleet")
+        def can_answer(state) -> bool:
+            """Somebody is there, and radio-capable enough to make sense of a radio message."""
+            return bool(state.alive and state.stage is not None
+                        and state.stage.value >= CivilizationStage.EARLY_RADIO.value)
+
+        if not can_answer(them):
+            # Nobody will read this. What we may *say* about it depends on what Earth can see:
+            # if our telescopes already show an empty or extinct system, today's wording still
+            # tells the whole truth. If they show a living radio civilization, the silence has
+            # to stay a silence - the observed frame will explain it when the light arrives.
+            if (not them.alive) and them.died_year is not None:
+                settle("died_in_flight", int(them.died_year) + light_years)
+                logging.info(f"{system_name}: nobody left by {receipt_year}; the light of that death "
+                             f"reaches Earth in {entry['explanation_year']}")
+            else:
+                settle("nobody", send_year)
+            if can_answer(system.observed(send_year)):
+                self.message = (f"Message sent to {system_name}. Any reply would arrive around "
+                                f"Generation {self.generation + round_trip_time}.")
+            elif system.has_civilization and system.is_extinct:
+                self.message = f"Message sent to {system_name}. No response detected."
+            else:
+                self.message = f"Message sent to {system_name}, but no response capability detected."
             return
 
+        # A hostile civilization that has already launched against us does not launch again per message
+        if them.strategy in ("LA", "LBA") and system.has_detected_earth:
+            settle("silent")
+            self.message = f"Message sent to {system_name}. No response detected."
+            logging.info(f"{them.strategy}: {system_name} already committed to attack - no new fleet")
+            return
+
+        launch_stage = them.stage.name if them.stage else None
+
         # L Strategy
-        if system.true_strategy == "L":
+        if them.strategy == "L":
+            settle("silent")
             self.message = f"Message sent to {system_name}. No response detected."
             logging.info(f"L Strategy: {system_name} - Silent")
             return
-        
+
         # LA Strategy
-        elif system.true_strategy == "LA":
+        elif them.strategy == "LA":
+            settle("silent")
             # Deep-space monitoring picks up the launch signature of a hostile response
-            warning = self._schedule_attack(system, self.attack_arrival_generation(system), "fleet", announce=False)
+            warning = self._schedule_attack(system, self.attack_arrival_generation(system), "fleet",
+                                            announce=False, source_stage=launch_stage)
             eta = warning.get_etas_remaining(self.generation)
             self.message = f"""⚠️⚠️⚠️ HOSTILE FLEET DETECTED ⚠️⚠️⚠️
 
@@ -2445,68 +2642,76 @@ Time to prepare: {eta} generations.
 
 Use Defensive Actions in the menu to prepare.
 """
-            
+
             logging.critical(f"HOSTILE FLEET DETECTED: {system_name}")
             logging.warning(f"Attack ETA: Gen {self.generation + round_trip_time} ({round_trip_time} gens to prepare)")
             return
-        
-        # LBA Strategy  
-        elif system.true_strategy == "LBA":
-            if system.deception_level > 0.6:
+
+        # LBA Strategy
+        elif them.strategy == "LBA":
+            if them.deception > 0.6:
                 arrival_generation = self.generation + round_trip_time
-                
+
                 # The fleet follows the friendly reply; slower than light, it arrives later
                 attack_gen = max(arrival_generation + 1, self.attack_arrival_generation(system))
-                self._schedule_attack(system, attack_gen, "fleet", announce=False)
+                self._schedule_attack(system, attack_gen, "fleet", announce=False, source_stage=launch_stage)
 
-                
-                response_text = self._compose_alien_reply(system, "LBA", message_content)
+                response_text = self._compose_alien_reply(system, "LBA", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
-                
+
                 self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
                 logging.warning(f"LBA Trap: {system_name} - Friendly bait, attack Gen {attack_gen}")
             else:
                 # Low deception LBA - silent attack, no bait
-                self._schedule_attack(system, self.attack_arrival_generation(system), "fleet", announce=False)
-                
+                settle("silent")
+                self._schedule_attack(system, self.attack_arrival_generation(system), "fleet",
+                                      announce=False, source_stage=launch_stage)
+
                 self.message = f"Message sent to {system_name}. No response detected."
                 logging.critical(f"HOSTILE FLEET DETECTED (LBA low deception): {system_name}")
             return
-        
+
         # LR Strategy
-        elif system.true_strategy == "LR":
+        elif them.strategy == "LR":
             # Use effective_quality instead of self.message_quality
-            response_chance = 0.3 + (effective_quality * 0.2) + (0.1 * system.civilization_stage.value)
+            response_chance = 0.3 + (effective_quality * 0.2) + (0.1 * them.stage.value)
             response_chance = min(0.85, response_chance + self._transmission_bonus())
-            
+
             if random.random() < response_chance:
                 arrival_generation = self.generation + round_trip_time
-                
-                response_text = self._compose_alien_reply(system, "LR", message_content)
+
+                response_text = self._compose_alien_reply(system, "LR", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
-                
+
                 self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
                 self.public_support = min(100, self.public_support + 2)
             else:
+                settle("silent")
                 self.message = f"Message sent to {system_name}. No response (yet)."
             return
-        
+
         # LB Strategy
-        elif system.true_strategy == "LB":
+        elif them.strategy == "LB":
             # Use effective_quality instead of self.message_quality
             response_chance = 0.7 + (effective_quality * 0.2)
-            
+
             if random.random() < min(0.95, response_chance + self._transmission_bonus()):
                 arrival_generation = self.generation + round_trip_time
-                
-                response_text = self._compose_alien_reply(system, "LB", message_content)
+
+                response_text = self._compose_alien_reply(system, "LB", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
-                
+
                 self.message = f"Message sent to {system_name}. Enthusiastic response expected!"
                 self.public_support = min(100, self.public_support + 5)
             else:
+                settle("silent")
                 self.message = f"Message sent to {system_name}. Awaiting response..."
             return
+
+        # Alive and radio-capable but holding no strategy at all (a system written by hand):
+        # there is nobody to decide to answer.
+        settle("silent")
+        self.message = f"Message sent to {system_name}. No response detected."
 
     def focus_research(self, system_name: str):
         """Focus research efforts on a particular system"""
@@ -2866,7 +3071,12 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         diplomacy_skill = self.current_director.get_effective_skill("diplomacy")
         skill_bonus = diplomacy_skill * 0.2 # Up to +20% chance
         
-        if warning.source.true_strategy == "LBA" and warning.source.deception_level < 0.4:
+        # Our peace offer travels at light speed too, so it is read `d` years from now (T2):
+        # the civilization that decides whether to call the fleet back is the one that will be
+        # there then, not the one that launched it.
+        source = warning.source
+        they_answer = source.timeline_state(self.current_year + int(round(source.distance)))
+        if they_answer.strategy == "LBA" and they_answer.deception < 0.4:
             success_chance = 0.3 + skill_bonus # Base 30% + skill
             
             if random.random() < success_chance:
