@@ -126,3 +126,22 @@ export function formatDistance(distanceLy: number): string {
   const rounded = distanceLy >= 100 ? Math.round(distanceLy) : Math.round(distanceLy * 10) / 10;
   return `${rounded.toLocaleString("en-US")} LY`;
 }
+
+/**
+ * A calendar year for display, with years at or before zero written as BC. The engine's
+ * `format_year` does exactly the same (`src/legacy_of_stars_v3.py`), on the astronomical
+ * convention: year 0 is 1 BC, year -1 is 2 BC.
+ */
+export function formatYear(year: number): string {
+  const y = Math.round(year);
+  return y > 0 ? String(y) : `${1 - y} BC`;
+}
+
+/**
+ * "observed as of 1973 (4.2 LY of light-time)" - the honest caption for anything the
+ * telescopes say about a system. `observedYear` is the engine's `systems[].observed_year`;
+ * nothing here recomputes it.
+ */
+export function observedAsOf(observedYear: number, distanceLy: number): string {
+  return `observed as of ${formatYear(observedYear)} (${formatDistance(distanceLy)} of light-time)`;
+}

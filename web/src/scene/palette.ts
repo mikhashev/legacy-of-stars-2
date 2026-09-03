@@ -105,6 +105,8 @@ export const MOOD_COLOR: Record<"extinct" | "inhabited", number> = {
 
 export const SEEDED_COLOR = 0x7fe0a0; // --good: a Genesis ark is on its way or has landed
 export const CONTACTED_COLOR = 0x5fb0ff; // --accent: this system has answered us
+/** The cyan of our own transmissions (`effects.ts` OUTGOING_COLOR): one of ours has landed here. */
+export const DELIVERED_COLOR = 0x4fd6ff;
 
 export function moodFor(knowledge: number, description: string): SystemMood {
   if (knowledge <= 0 || description.trim() === "") return "unknown";

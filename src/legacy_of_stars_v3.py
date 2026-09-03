@@ -62,6 +62,18 @@ def habitability_weight(spectral_type: Optional[str]) -> float:
     return _HABITABILITY_BY_CLASS.get(core[0], _UNKNOWN_CLASS_WEIGHT)
 
 
+def format_year(year: int) -> str:
+    """A calendar year for display, with years at or before 0 written as BC.
+
+    Light-time makes this necessary: what a telescope sees of a system `d` light-years away
+    left it `d` years ago, and for the WOW! source (1,800 LY) that is deep in antiquity. The
+    astronomical convention is used - year 0 is 1 BC, year -1 is 2 BC - so the arithmetic
+    `year - distance` stays a single unbroken number line.
+    """
+    year = int(year)
+    return str(year) if year > 0 else f"{1 - year} BC"
+
+
 def load_star_catalog(path: Path = CATALOG_PATH) -> List[Dict[str, Any]]:
     """Real nearby stars (name, distance in LY, spectral type, RA/Dec), nearest first."""
     try:
@@ -446,6 +458,11 @@ class ContactProgram:
         # they only decide when the mission analyst volunteers a briefing (advance_generation).
         self.actions_this_generation = 0
         self.idle_generations = 0
+        # What the player has done in the current generation, oldest first, as display rows
+        # ({"action", "summary", "cost"}). Written by the action methods, cleared by
+        # `advance_generation`; it decides nothing, it only lets the player see this
+        # generation's decisions before ending it (and the web facade's undo name them).
+        self.generation_log: List[Dict[str, str]] = []
 
         # --- optional AI and the written content bank
         self.ai = AIManager(offline=self.offline)
@@ -570,6 +587,7 @@ class ContactProgram:
             "genesis": self.genesis.to_dict(),
             "stats": dict(self.stats),
             "achievements": list(self.achievements),
+            "generation_log": [dict(entry) for entry in self.generation_log],
         }
 
     @classmethod
@@ -629,6 +647,8 @@ class ContactProgram:
         program.genesis = GenesisProject.from_dict(data.get("genesis", {}))
         program.stats.update({k: v for k, v in data.get("stats", {}).items() if k in program.stats})
         program.achievements = list(data.get("achievements", []))
+        program.generation_log = [dict(entry) for entry in data.get("generation_log", [])
+                                  if isinstance(entry, dict)]
         return program
 
         
@@ -748,14 +768,28 @@ class ContactProgram:
             del self.events[:-500]
         return event
 
-    def note_player_action(self) -> None:
+    def note_player_action(self, action: str = "", summary: str = "", cost: str = "") -> None:
         """Record that the player did something this generation (anti-stagnation only).
 
         Called by the actions that actually went through - never by a refusal, and never by
         a read-only query - so `advance_generation` can tell a generation the player played
         from one they only clicked past. It changes no rule and costs nothing.
+
+        When `action` and `summary` are given the same call also writes the generation log
+        row (`log_action`), so an action states what it did in one place.
         """
         self.actions_this_generation += 1
+        if action and summary:
+            self.log_action(action, summary, cost)
+
+    def log_action(self, action: str, summary: str, cost: str = "") -> None:
+        """Append one row to `generation_log` - what the player just did, in their words.
+
+        Separate from `note_player_action` because two things belong in the log without
+        counting as anti-stagnation activity: the free advisor consultation, and the
+        follow-up choices (a doctrine, a philosophical crisis) that answer an earlier action.
+        """
+        self.generation_log.append({"action": action, "summary": summary, "cost": cost})
 
     def drain_events(self) -> List[GameEvent]:
         events, self.events = self.events, []
@@ -993,7 +1027,7 @@ class ContactProgram:
         # Research complete
         self.research_points -= final_cost
         tech.researched = True
-        self.note_player_action()
+        self.note_player_action("research_tech", f"Researched {tech.name}", f"{final_cost} RP")
         self.stats["techs_researched"] += 1
         self.message = f"Researched {tech.name}!{discount_msg}\nDirector Efficiency Saved {tech.cost - effective_cost} RP."
         logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
@@ -1172,6 +1206,7 @@ class ContactProgram:
         if details:
             summary += " (" + "; ".join(details) + ")"
         self.message = (self.message + "\n\n" if self.message else "") + summary
+        self.log_action("choose_doctrine", f"Adopted the doctrine {option['name']}", "no AP")
         logging.info(f"Doctrine Adopted: {option['name']} for {tech.name}")
 
     def _schedule_attack(self, system, arrival_gen: int, attack_type: str = "fleet",
@@ -1259,6 +1294,7 @@ CHOICE: {event.chosen_option}
 +1 Fermi evidence (Great Filter): humanity confronted this crisis.
 ============================================================
 """
+        self.log_action("respond_event", f"Answered {event.name}: {event.chosen_option}", "no AP")
         logging.info(f"PHILOSOPHICAL EVENT RESOLVED: {event.name} -> {event.chosen_option}")
 
         # Clear pending event
@@ -1301,6 +1337,9 @@ YOUR CHOICE:
         else:
             self.idle_generations = 0
         self.actions_this_generation = 0
+        # A new generation starts with an empty sheet: what the player did last generation is
+        # history the moment it ends (the web facade drops its undo stack at the same point).
+        self.generation_log = []
 
         self.generation += 1
         year = self.start_year + (self.generation - 1) * 25
@@ -1782,6 +1821,9 @@ You have answered one of humanity's greatest questions.
                 "knowledge": int(s.knowledge),
                 "description": s.describe_civilization() if s.knowledge > 0 else "",
                 "round_trip_generations": s.get_round_trip_time(),
+                # Light-time honesty: what our telescopes see of this system left it
+                # `distance` years ago, so everything `description` says describes that year.
+                "observed_year": year - int(round(s.distance)),
                 "messages_sent": [{"text": m, "generation": g, "arrival_gen": g + one_way} for m, g in s.messages_sent],
                 "responses": list(s.received_messages),
                 "next_response_gen": min((a for _, a in s.pending_responses), default=None),
@@ -1861,6 +1903,7 @@ You have answered one of humanity's greatest questions.
                     "outcome": self.wow_signal.outcome},
             "achievements": list(self.achievements),
             "stats": dict(self.stats),
+            "generation_log": [dict(entry) for entry in self.generation_log],
             "actions": [{"id": a.id, "label": a.label, "cost": a.cost, "needs": list(a.needs)} for a in self.available_actions()],
             "game_over": self.game_over,
             "game_over_reason": self.game_over_reason,
@@ -2025,7 +2068,7 @@ You have answered one of humanity's greatest questions.
         logging.info(f"Message Sent to {system_name} (Dir. Skill: {diplomacy_skill:.2f}, Quality Multiplier: {quality_multiplier:.2f})")
         
         self.action_points -= 1
-        self.note_player_action()
+        self.note_player_action("send_message", f"Sent message to {system_name}", "1 AP")
 
         # The WOW! source is 1,800 light-years away: whatever is there answers, if at all, in the
         # scripted response window, and nothing we learn before then reveals its nature.
@@ -2152,8 +2195,8 @@ Use Defensive Actions in the menu to prepare.
         
         # Deduct AP
         self.action_points -= 1
-        self.note_player_action()
-        
+        self.note_player_action("focus_research", f"Focused research on {system_name}", "1 AP")
+
         # Research effectiveness based on science skill
         science_factor = self.current_director.get_effective_skill("science")
         knowledge_gain = 10 * science_factor
@@ -2170,7 +2213,9 @@ Use Defensive Actions in the menu to prepare.
         # Research points
         self.research_points += 5 * science_factor
         
-        self.message = f"Research focused on {system_name}. Knowledge increased by {int(knowledge_gain)} points."
+        observed_year = self.start_year + (self.generation - 1) * 25 - int(round(system.distance))
+        self.message = (f"Research focused on {system_name}. Knowledge increased by {int(knowledge_gain)} points.\n"
+                        f"The light we studied left {system_name} in {format_year(observed_year)}.")
         logging.info(f"Research Focused on {system_name}. Knowledge +{int(knowledge_gain)}")
 
         # Check for Discovery Bonus (Crossing 20% threshold)
@@ -2189,7 +2234,7 @@ Use Defensive Actions in the menu to prepare.
             
         # Deduct AP
         self.action_points -= 1
-        self.note_player_action()
+        self.note_player_action("public_outreach", "Ran a public outreach campaign", "1 AP")
 
         admin_skill = self.current_director.get_effective_skill("administration")
         support_gain = 10 + (20 * admin_skill)
@@ -2252,6 +2297,7 @@ Use Defensive Actions in the menu to prepare.
         
         # Mark as consulted
         self.advisor_consulted_this_gen = True
+        self.log_action("consult_advisor", "Consulted the AI strategic advisor", "free")
         
         # Generate strategic analysis
         logging.info(f"Consulting AI Strategic Advisor - Gen {self.generation}")
@@ -2295,14 +2341,14 @@ Use Defensive Actions in the menu to prepare.
 No data archives detected. This civilization left no final transmission.
 Their ending remains a mystery."""
             self.action_points -= 1
-            self.note_player_action()
+            self.note_player_action("listen_swan_song", f"Deep scan of {system_name}", "1 AP")
             self.scanned_for_swan_song.add(system_name)
             logging.info(f"Swan song scan of {system_name}: None found")
             return
 
         # Consume action point
         self.action_points -= 1
-        self.note_player_action()
+        self.note_player_action("listen_swan_song", f"Deep scan of {system_name}", "1 AP")
         
         # Attempt discovery
         
@@ -2397,7 +2443,7 @@ REWARDS: {' | '.join(reward_msgs)}
         
         # Consume all AP
         self.action_points = 0
-        self.note_player_action()
+        self.note_player_action("defend", f"Emergency defense against {warning.source.name}", "all AP")
         
         # Apply defense
         warning.apply_emergency_defense()
@@ -2436,8 +2482,8 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         
         # Consume 1 AP
         self.action_points -= 1
-        self.note_player_action()
-        
+        self.note_player_action("defend", f"Evacuated infrastructure against {warning.source.name}", "1 AP")
+
         # Apply evacuation
         warning.apply_evacuation()
         
@@ -2475,8 +2521,8 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         
         # Consume 1 AP
         self.action_points -= 1
-        self.note_player_action()
-        
+        self.note_player_action("defend", f"Diplomatic contact with {warning.source.name}", "1 AP")
+
         # Apply diplomatic attempt
         warning.apply_diplomatic_attempt()
         

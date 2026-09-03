@@ -15,7 +15,7 @@ from typing import Callable, Dict, List, Optional
 from . import save_manager
 from .console import QuitGame, read_input
 from .genesis_project import ark_arrival_generation
-from .legacy_of_stars_v3 import ContactProgram
+from .legacy_of_stars_v3 import ContactProgram, format_year
 from .summary import build_summary
 from .ui_text import HELP_TEXT
 
@@ -407,9 +407,38 @@ class GameInterface:
                 f"(menu option {key})."
             )
             return
+        if not self._confirm_advance():
+            return
         self.program.advance_generation()
         if not self.program.game_over:
             self._autosave()
+
+    def _confirm_advance(self) -> bool:
+        """Show what this generation was spent on, then ask before ending it.
+
+        A generation is 25 years and cannot be replayed, so the player sees the decisions they
+        made (`ContactProgram.generation_log`) and the action points still unspent before the
+        program moves on. There is no console undo: this `GameInterface` drives a
+        `ContactProgram` directly, while undo lives on the web facade's `GameSession`, which
+        keeps the snapshots - so the confirmation is the console's answer to "wait, what did
+        I just do?".
+        """
+        p = self.program
+        print(f"\n--- End of Generation {p.generation} (Year {self._year(p.generation)}) ---")
+        if p.generation_log:
+            print("This generation:")
+            for entry in p.generation_log:
+                cost = f" ({entry['cost']})" if entry.get("cost") else ""
+                print(f"  - {entry['summary']}{cost}")
+        else:
+            print("No actions taken this generation.")
+        print(f"Action Points unspent: {p.action_points}/{p.max_action_points}")
+        # Only an explicit yes: a stray Enter is exactly the mistake this prompt exists to catch.
+        answer = read_input("Advance? (y/n): ").lower()
+        if answer in ("y", "yes"):
+            return True
+        p.message = f"Still in Generation {p.generation}."
+        return False
 
     def _autosave(self) -> None:
         try:
@@ -436,6 +465,9 @@ class GameInterface:
             coords = f"  |  RA {s['ra']:.1f}°, Dec {s['dec']:+.1f}°"
         print(f"Distance: {s['distance']} light-years  |  Type: {s.get('spectral_type') or 'unknown'}{coords}")
         print(f"Signal round trip: {s['round_trip_generations']} generation(s)")
+        # Light-time honesty: everything below describes the system as it was when this light
+        # set out, not as it is now (view_state states the year, the engine does the arithmetic).
+        print(f"Observed as of {format_year(s['observed_year'])} ({s['distance']} LY of light-time)")
         print(f"Knowledge: {s['knowledge']}%  -  {s['description'] or 'nothing studied yet'}")
         if s["is_seeded"]:
             print("Genesis Ark Program: an ark from Earth is on its way to this world, or already landed.")

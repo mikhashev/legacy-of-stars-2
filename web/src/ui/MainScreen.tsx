@@ -6,8 +6,10 @@ import { StatusPanel } from "./StatusPanel";
 import { MapPanel } from "./MapPanel";
 import { ThreatsPanel } from "./ThreatsPanel";
 import { ActionsPanel, assignKeys } from "./ActionsPanel";
+import { GenerationPanel } from "./GenerationPanel";
 import { EventLog } from "./EventLog";
 import {
+  AdvanceDialog,
   DefenseDialog,
   DossierPickerDialog,
   EventDialog,
@@ -76,6 +78,12 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
         }
         return;
       }
+      if (key === "enter" && s.dialog?.kind === "advance") {
+        // The one dialog with a default answer: Enter is the console's "y" at "Advance? (y/n)".
+        claim();
+        store.confirmAdvance();
+        return;
+      }
       // Everything else needs a clear screen: no dialog/modal on top, and not mid-doctrine.
       if (s.dialog || s.modalEvent || s.showHelp || s.summaryResult || s.pendingDoctrine || s.busy) return;
       if (key === "v") {
@@ -122,6 +130,7 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
         <div class="main-column main-column-left">
           <StatusPanel view={view} />
           <ActionsPanel view={view} store={store} />
+          <GenerationPanel view={view} store={store} />
           <ThreatsPanel view={view} />
           <ProgramMessage text={state.message} />
         </div>
@@ -142,6 +151,7 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
       {state.dialog?.kind === "event" && <EventDialog view={view} store={store} />}
       {state.dialog?.kind === "dossier" && <DossierModal system={state.dialog.system} view={view} store={store} />}
       {state.dialog?.kind === "dossier-picker" && <DossierPickerDialog view={view} store={store} />}
+      {state.dialog?.kind === "advance" && <AdvanceDialog view={view} store={store} />}
       {state.dialog?.kind === "menu" && <MenuModal view={view} store={store} />}
 
       {/* Big events (web_contract.md 5, MODAL_EVENT_KINDS): one modal at a time. */}

@@ -120,6 +120,33 @@ export function replyFade(nextResponseGen: number, distanceLy: number, t: number
   return expandingFade(t - replyLaunchGen(nextResponseGen, distanceLy), travelGenerations(distanceLy));
 }
 
+/* ------------------------------------------------------------------ message pulses */
+
+/**
+ * How far along the Earth -> star line our transmission has got at scene time `t`, as a
+ * fraction of the trip: `min(1, 25 * (t - generation) / distance)`, never below 0.
+ *
+ * This is the same physics as `messageRadiusLy` - the sphere's radius divided by the
+ * distance - stated as a position rather than a size, because the pulse that carries the
+ * "arrives Gen N" label travels *along* the line while the sphere expands around Earth.
+ */
+export function messageProgress(sentGen: number, distanceLy: number, t: number): number {
+  const distance = Math.max(0, distanceLy);
+  // A system at zero distance (nothing in the catalogue, but the arithmetic must not divide
+  // by it) is reached the instant the message leaves.
+  if (distance === 0) return t >= sentGen ? 1 : 0;
+  return clamp01((LY_PER_GENERATION * (t - sentGen)) / distance);
+}
+
+/**
+ * The same fraction for an inbound reply, measured from the star towards Earth. The engine
+ * only states when the reply *lands* (`next_response_gen`), so the launch is walked back
+ * through `replyLaunchGen` exactly as the reply sphere does.
+ */
+export function replyProgress(nextResponseGen: number, distanceLy: number, t: number): number {
+  return messageProgress(replyLaunchGen(nextResponseGen, distanceLy), distanceLy, t);
+}
+
 /* ------------------------------------------------------------------ fleets and arks */
 
 /**

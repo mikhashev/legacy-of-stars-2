@@ -22,6 +22,7 @@ import type {
   PerformResult,
   PerformResultOf,
   ProgressMessage,
+  UndoInfo,
   ViewState,
 } from "./types";
 import { MODAL_EVENT_KINDS } from "./types";
@@ -38,6 +39,7 @@ export type Dialog =
   | { kind: "event" }
   | { kind: "dossier"; system: string }
   | { kind: "dossier-picker" }
+  | { kind: "advance" }
   | { kind: "menu" };
 
 const JOURNAL_LIMIT = 500;
@@ -73,6 +75,12 @@ export interface UIState {
   lastEvents: GameEvent[];
   /** W4 "Reduce effects": no nebula, no flashes. Persisted in localStorage. */
   reduceEffects: boolean;
+  /**
+   * The session's undo stack after the last `perform()` (web_contract.md 7). The engine owns
+   * it; this is only what the last result said, so the "Undo last" button can be enabled
+   * without asking again.
+   */
+  undo: UndoInfo;
 }
 
 /** Where the effects toggle is remembered between sessions. */
@@ -124,6 +132,7 @@ const initialState: UIState = {
   showSystemList: false,
   lastEvents: [],
   reduceEffects: loadReduceEffects(),
+  undo: { available: false, depth: 0 },
 };
 
 export class Store {
@@ -212,6 +221,7 @@ export class Store {
       selectedSystem: null,
       showSystemList: false,
       lastEvents: [],
+      undo: { available: false, depth: 0 },
     });
     this.maybeOpenGameOverReport();
   }
@@ -279,6 +289,9 @@ export class Store {
       pendingDoctrine: result.needs && result.needs.kind === "doctrine" ? result.needs : null,
       selectedSystem,
       lastEvents: result.events,
+      // An older engine build without the undo block leaves the button switched off rather
+      // than offering an action it would refuse.
+      undo: result.undo ?? { available: false, depth: 0 },
     });
     if (view?.game_over && !this.gameOverReportSeen) this.gameOverReportPending = true;
     this.popModal();
@@ -355,9 +368,10 @@ export class Store {
     }
     if (this.state.busy) return;
     if (spec.needs.length === 0) {
-      // advance_generation gets its own path so a successful advance autosaves, matching the
-      // console (game_interface.py _act_advance); every other zero-parameter action just runs.
-      if (spec.id === "advance_generation") void this.advanceGeneration();
+      // advance_generation gets its own path: the console asks "Advance? (y/n)" after listing
+      // what the generation was spent on, and the browser shows the same thing as a dialog.
+      // Everything else with no parameters just runs.
+      if (spec.id === "advance_generation") this.patch({ dialog: { kind: "advance" } });
       else void this.performDynamic(spec.id, {});
       return;
     }
@@ -522,6 +536,28 @@ export class Store {
   }
 
   /* ------------------------------------------------------------ generation / saves */
+
+  /**
+   * "Undo last": steps one action back. The engine restores the program *and* the RNG, so
+   * redoing the same action gives the same outcome - undo is a way to change your mind, not
+   * a way to re-roll a reply (web_contract.md 7).
+   */
+  async undoLastAction(): Promise<void> {
+    if (this.state.pendingDoctrine || this.state.busy) return;
+    if (!this.state.undo.available) {
+      this.showToast("Nothing to undo.");
+      return;
+    }
+    const result = await this.perform("undo", {});
+    if (result.ok) this.showToast(result.message);
+  }
+
+  /** The end-of-generation confirmation (the console's "Advance? (y/n)"). */
+  confirmAdvance(): void {
+    if (this.state.dialog?.kind !== "advance") return;
+    this.patch({ dialog: null });
+    void this.advanceGeneration();
+  }
 
   async advanceGeneration(): Promise<void> {
     if (this.state.pendingDoctrine) {

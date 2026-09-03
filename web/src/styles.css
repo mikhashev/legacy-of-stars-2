@@ -243,6 +243,33 @@ input[type="text"], input[type="number"], textarea {
 }
 .actions-gameover-reason { margin: 0 0 0.7rem; color: var(--text-dim); font-size: 0.85rem; }
 
+/* "This generation": the log of what the player has done, and the way back out of it. */
+.generation-log { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.generation-log-row { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.85rem; }
+.generation-log-summary { flex: 1 1 auto; }
+.generation-log-cost { flex: 0 0 auto; color: var(--text-dim); font-size: 0.78rem; }
+.generation-empty { color: var(--text-dim); font-size: 0.85rem; margin: 0; }
+.generation-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.generation-ap { color: var(--accent); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.generation-undo { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+
+/* The end-of-generation confirmation (Dialogs.tsx AdvanceDialog). */
+.advance-log { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.2rem 0 0; padding-left: 1.1rem; }
+.advance-log-summary { margin-right: 0.4rem; }
+.advance-log-cost { color: var(--text-dim); font-size: 0.8rem; }
+.advance-unspent { margin-top: 0.7rem; font-size: 0.85rem; color: var(--text-dim); }
+.advance-unspent:not([data-unspent="0"]) { color: var(--warning); }
+.advance-warning { color: var(--warning); font-size: 0.9rem; }
+
+/* Light-time: what we see of a system left it `distance` years ago (web_contract.md 6). */
+.map-card-observed, .dossier-observed, .picker-observed { font-style: italic; }
+
 .program-message pre { color: var(--text); }
 
 /* ---------------------------------------------------------------- collapsible panels (W5) */
@@ -562,6 +589,19 @@ kbd {
   user-select: none;
 }
 .fleet-label[data-urgent="true"] { color: #ff6a58; font-weight: 600; }
+
+/* the label riding the pulse of a transmission (or a reply) in flight */
+.message-label {
+  position: absolute;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  color: #9fe8ff;
+  white-space: nowrap;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  user-select: none;
+}
+.message-label[data-kind="reply"] { color: #ffe9c4; }
 
 /* the selected-system card */
 .map-card {

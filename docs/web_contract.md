@@ -44,6 +44,7 @@ class GameSession:
   "events": [ /* GameEvent */ ],
   "state": { /* ViewState */ },   // null only when no game is in progress
   "needs": null,              // or a follow-up request, see §4
+  "undo": {"available": true, "depth": 1},   // this session's undo stack, see §7
   "data": { }                 // present only for the actions marked "data" in §3
 }
 ```
@@ -71,7 +72,7 @@ own return value — never by parsing `message`. Engine refusals (`"Not enough A
 | Unexpected engine exception | `internal error in action 'x': ...` |
 
 The availability check applies to all actions except the ungated ones: `wow_reply`, `wow_silent`,
-`compose_director_message`, `choose_doctrine`, `summary`, `help`. Once `state.game_over` is true only
+`compose_director_message`, `choose_doctrine`, `summary`, `help`, `undo`. Once `state.game_over` is true only
 `summary` and `help` still work.
 
 ### Differences from the console dispatcher
@@ -112,11 +113,12 @@ Integers may be sent as JSON numbers or as decimal strings.
 | `wow_reply` | `{text}` | the 1977 decision was open | Opening scene. Empty/absent `text` sends the standard message; longer text is truncated at 500 characters. `data`: `{message, message_full, excerpt, arrival_gen: 72, response_gen: 144, replied: true}` — `message` and `message_full` are both the whole stored reply (at most 500 characters), `excerpt` its first 100 characters plus `...`, which is what the console prints. |
 | `wow_silent` | `{}` | the 1977 decision was open | `data`: `{replied: false, attack_damage_reduction: 0.15}`. |
 | `compose_director_message` | `{}` | always | Returns the director's draft in `message`; decides nothing. `data`: `{draft}`. Feed it back as `wow_reply`'s `text`. |
+| `undo` | `{}` | a snapshot was on the stack | Steps one action back (§7). Ungated. `ok: false` with `"nothing to undo"` when the stack is empty. |
 | `summary` | `{}` | always | `message`: `build_summary()` text. `data`: `{score, score_breakdown: {label: points}}`. Works after game over. |
 | `help` | `{}` | always | `message`: the console's `HELP_TEXT`. `data`: `{ai}` (the AI provider description). |
 
 `state.actions` lists the ids the engine currently offers, with `label`, `cost` and `needs` — use it
-to build the action bar; the ungated six above are never in it.
+to build the action bar; the ungated actions above (including `undo`) are never in it.
 
 ---
 
@@ -220,6 +222,7 @@ strategies, deception levels) ever appears here.
 | `systems[].knowledge` | int | 0–100; 0 hides the description, 20 reveals a civilization (and lists an extinct one in `swan_song_targets`), 30 enables swan song recovery |
 | `systems[].description` | str | what is known (empty while `knowledge` is 0) |
 | `systems[].round_trip_generations` | int | generations for a message and its reply |
+| `systems[].observed_year` | int | the year the light we are looking at left this system: `year - round(distance)`. Everything `description` says describes the system in *that* year, not now - show it as "observed as of {observed_year}". It can be at or below zero for a distant source (the WOW! source is 1,800 LY away), which the front-end writes as "{n} BC" on the astronomical convention (year 0 = 1 BC). `focus_research` states the same fact in its `message` |
 | `systems[].messages_sent[]` | `{text, generation, arrival_gen}` | our transmissions and when they land |
 | `systems[].responses` | list[str] | replies received so far |
 | `systems[].next_response_gen` | int \| null | generation the next reply arrives |
@@ -256,6 +259,38 @@ strategies, deception levels) ever appears here.
 | `wow` | `{decided: bool, replied: bool, outcome: null \| "silence" \| "friendly" \| "hostile"}` | the 1977 decision and its Generation 144 result |
 | `achievements` | list[str] | unlocked achievement names |
 | `stats` | dict[str, int] | `messages_sent`, `responses_received`, `attacks_scheduled`, `attacks_survived`, `attacks_landed`, `info_attacks`, `swan_songs_found`, `systems_discovered`, `events_resolved`, `techs_researched`, `worlds_seeded`, `passive_detections` |
+| `generation_log[]` | `{action, summary, cost}` | what the player has done in the current generation, oldest first (`action` is the action id, `summary` the sentence to show, `cost` a short string like `"1 AP"`). Written by the engine's own action methods, emptied by `advance_generation`, and part of a save. Display only |
 | `actions[]` | `{id, label, cost, needs}` | what the engine offers now; `needs` lists the parameter names the UI must collect (`system`, `text`, `tech`, `threat`, `defense`, `choice`) |
 | `game_over` | bool | the run has ended |
 | `game_over_reason` | str | why (empty while playing) |
+
+---
+
+## 7. Undo
+
+`GameSession` keeps an in-memory undo stack: before every action that can change the game it
+pushes `(program.to_dict(), random.getstate())`. `perform("undo")` pops one snapshot, rebuilds
+the program with `ContactProgram.from_dict(...)` and restores the RNG.
+
+- **Not pushed:** `advance_generation` (it ends the generation and *clears* the stack instead),
+  `help`, `summary`, `compose_director_message`, and `undo` itself.
+- **Dropped again** when the engine refused the action (`ok: false`): an action that changed
+  nothing is not a step worth stepping back over.
+- **Cleared** by `advance_generation`, `new_game()` and `load()`. Depth is capped at 20.
+- **The RNG is part of the snapshot.** Restoring it means redoing an undone action produces
+  exactly the same outcome, so undo cannot be used to re-roll an alien's reply or a diplomatic
+  breakthrough.
+- **Never saved.** `save()` serializes the program only; a save round trip starts with an empty
+  stack. `state.generation_log` *is* saved - it is game state, not session state.
+
+Every `perform` result carries the state of the stack alongside `needs`, so a front-end can
+enable or disable its "Undo last" control without a second call:
+
+```jsonc
+"undo": {"available": true, "depth": 2}
+```
+
+An empty stack answers `ok: false` with `message: "nothing to undo"`. The console
+(`game_interface.py`) has no undo: it drives a `ContactProgram` directly, and the snapshots
+live on the web facade's `GameSession`. It asks for confirmation before advancing instead,
+listing the same `generation_log`.

@@ -52,8 +52,14 @@ import {
   positionForSystem,
   radiusFor,
 } from "./coords";
-import { type DebugArk, type DebugFleet, type DebugSphere, SceneEffects } from "./effects";
-import { CONTACTED_COLOR, MOOD_COLOR, SEEDED_COLOR, moodFor, styleFor } from "./palette";
+import {
+  type DebugArk,
+  type DebugFleet,
+  type DebugMessageLine,
+  type DebugSphere,
+  SceneEffects,
+} from "./effects";
+import { CONTACTED_COLOR, DELIVERED_COLOR, MOOD_COLOR, SEEDED_COLOR, moodFor, styleFor } from "./palette";
 import { type Nebula, type Starfield, createNebula, createStarfield } from "./starfield";
 import { easeInOut } from "./timeline";
 
@@ -95,6 +101,10 @@ export interface MapDebug {
   samples(): number[];
   /** Message and reply spheres currently in the scene. */
   spheres(): DebugSphere[];
+  /** Routes of the transmissions and replies in flight, with their pulses and labels. */
+  messageLines(): DebugMessageLine[];
+  /** Systems wearing the "we have spoken to them" ring: a message of ours has landed. */
+  messageRings(): string[];
   fleets(): DebugFleet[];
   /** Genesis arks in flight or landed (the colony glow is `stage >= 1`, i.e. `landed`). */
   arks(): DebugArk[];
@@ -211,19 +221,6 @@ function ringTexture(innerFraction: number, outerFraction: number): CanvasTextur
   return new CanvasTexture(canvas);
 }
 
-function squareTexture(): CanvasTexture {
-  const size = 32;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillRect(6, 6, size - 12, size - 12);
-  }
-  return new CanvasTexture(canvas);
-}
-
 /**
  * Whether to publish `window.__losMap`. The URL flag is what `tests/animation.spec.ts` uses,
  * because Playwright runs against `vite preview` - a production build, where `import.meta.env`
@@ -268,7 +265,8 @@ export class StarMap {
   private readonly glowTexture: CanvasTexture;
   private readonly haloTexture: CanvasTexture;
   private readonly ringMarkTexture: CanvasTexture;
-  private readonly tickTexture: CanvasTexture;
+  /** The thin ring a star wears once a transmission of ours has actually got there. */
+  private readonly deliveredTexture: CanvasTexture;
 
   private readonly entries = new Map<string, StarEntry>();
   private readonly ringLoops: {
@@ -278,6 +276,8 @@ export class StarMap {
   }[] = [];
 
   private scale: ScaleMode = "compressed";
+  /** The generation of the last `ViewState` applied (scene time glides towards it). */
+  private stateGeneration = 1;
   private selected: string | null = null;
   private hovered: string | null = null;
 
@@ -345,8 +345,9 @@ export class StarMap {
     this.glowTexture = discTexture();
     this.haloTexture = ringTexture(0.3, 0.4);
     this.ringMarkTexture = ringTexture(0.36, 0.44);
-    this.tickTexture = squareTexture();
-    this.textures.push(this.starTexture, this.glowTexture, this.haloTexture, this.ringMarkTexture, this.tickTexture);
+    this.deliveredTexture = ringTexture(0.46, 0.5);
+    this.textures.push(this.starTexture, this.glowTexture, this.haloTexture, this.ringMarkTexture,
+                       this.deliveredTexture);
 
     this.starfield = createStarfield(this.renderer.getPixelRatio());
     this.nebula = createNebula();
@@ -395,6 +396,8 @@ export class StarMap {
       animating: () => this.timeAnimating,
       samples: () => [...this.timeSamples],
       spheres: () => this.effects.debugSpheres(),
+      messageLines: () => this.effects.debugMessageLines(),
+      messageRings: () => this.debugMessageRings(),
       fleets: () => this.effects.debugFleets(),
       arks: () => this.effects.debugArks(),
       leakageLy: () => this.effects.debugLeakageLy(),
@@ -488,6 +491,9 @@ export class StarMap {
     if (this.disposed) return;
 
     const scaleChanged = view.scale !== this.scale;
+    // Before the entries are refreshed: whether a star wears the "we have spoken to them"
+    // ring depends on the generation the state describes, not on the gliding scene time.
+    this.stateGeneration = view.generation;
     this.scale = view.scale;
     if (scaleChanged) this.applyRingScale();
 
@@ -567,6 +573,15 @@ export class StarMap {
     this.timeAnimating = true;
     this.timeSamples = [];
     this.requestRender();
+  }
+
+  /** Systems the "we have spoken to them" ring is currently drawn on. */
+  private debugMessageRings(): string[] {
+    const names: string[] = [];
+    for (const [name, entry] of this.entries) {
+      if (entry.decorations.some((sprite) => sprite.material.map === this.deliveredTexture)) names.push(name);
+    }
+    return names;
   }
 
   /** Scene position of a system the map is drawing; `effects.ts` asks by name. */
@@ -671,8 +686,16 @@ export class StarMap {
       system.is_seeded ? "seeded" : "",
       system.contacted ? "contacted" : "",
       system.messages_sent.length,
+      // Not the same thing as "a message was sent": the ring appears the generation the
+      // light lands, which is a later state of the same unchanged message list.
+      this.hasDeliveredMessage(system) ? "delivered" : "",
       system.distance,
     ].join("|");
+  }
+
+  /** True once at least one of our transmissions has reached this system. */
+  private hasDeliveredMessage(system: StarSystem): boolean {
+    return system.messages_sent.some((message) => message.arrival_gen <= this.stateGeneration);
   }
 
   private createEntry(system: StarSystem): StarEntry {
@@ -775,11 +798,12 @@ export class StarMap {
     } else if (system.is_seeded) {
       entry.decorations.push(this.addSprite(entry, this.ringMarkTexture, SEEDED_COLOR, size * 3.2, 0.85));
     }
-    // A small tick for transmissions on their way there.
-    if (system.messages_sent.length > 0) {
-      const tick = this.addSprite(entry, this.tickTexture, 0xd6dde8, size * 0.5, 0.9);
-      tick.position.set(size * 0.85, size * 0.85, 0);
-      entry.decorations.push(tick);
+    // "We have spoken to them": a thin cyan ring, once one of our transmissions has actually
+    // arrived. It is deliberately permanent - the light got there, and that cannot un-happen.
+    // A message still in flight is not marked here at all; it is the dotted route and the
+    // travelling pulse in `effects.ts` that say one is on its way.
+    if (this.hasDeliveredMessage(system)) {
+      entry.decorations.push(this.addSprite(entry, this.deliveredTexture, DELIVERED_COLOR, size * 4.0, 0.8));
     }
 
     entry.label.position.set(0, size * 0.75, 0);

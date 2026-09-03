@@ -12,8 +12,9 @@ arguments, and returns whatever the engine put in `program.message`.  The two
 deliberate differences from the console are documented on `perform`.
 """
 import json
+import random
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from . import save_manager
 from .legacy_of_stars_v3 import ContactProgram
@@ -28,9 +29,20 @@ DEFENSES = ("emergency", "evacuate", "diplomacy")
 #: the 1977 opening, the doctrine follow-up and the two read-only queries.
 UNGATED_ACTIONS = frozenset({
     "wow_reply", "wow_silent", "compose_director_message", "choose_doctrine", "summary", "help",
+    "undo",
 })
 #: Actions that still work once the game is over (they only read state).
 POST_GAME_ACTIONS = frozenset({"summary", "help"})
+
+#: Actions that do not push an undo snapshot: `advance_generation` ends the generation (and
+#: clears the stack instead), the three read-only queries change nothing, and `undo` is the
+#: thing doing the popping.
+NON_UNDOABLE_ACTIONS = frozenset({
+    "advance_generation", "help", "summary", "compose_director_message", "undo",
+})
+#: How many actions back a player may step. One generation is a handful of AP, so 20 is well
+#: past "everything I did this generation" and keeps the snapshots bounded.
+UNDO_LIMIT = 20
 
 
 class _ParamError(Exception):
@@ -140,13 +152,19 @@ class GameSession:
             "compose_director_message": self._do_compose_director_message,
             "summary": self._do_summary,
             "help": self._do_help,
+            "undo": self._do_undo,
         }
+        # One snapshot per undoable action, oldest first: `(program.to_dict(), RNG state)`.
+        # In memory only - it is not part of a save (`save()` serializes the program alone),
+        # so exporting a game and loading it back starts with nothing to undo.
+        self._undo_stack: List[Tuple[Dict[str, Any], tuple]] = []
 
     # ------------------------------------------------------------------ lifecycle
     def new_game(self, seed: Optional[int] = None) -> str:
         """Start a fresh program and return its `view_state` as JSON."""
         self.program = ContactProgram(seed=seed, offline=self.offline, data_dir=self.data_dir)
         self.program.drain_events()
+        self._undo_stack.clear()
         return self.state()
 
     def load(self, save_json: str) -> str:
@@ -157,6 +175,7 @@ class GameSession:
         program = save_manager.deserialize(save_json, offline=self.offline, data_dir=self.data_dir)
         program.drain_events()
         self.program = program
+        self._undo_stack.clear()
         return self.state()
 
     def save(self) -> str:
@@ -187,6 +206,11 @@ class GameSession:
         `needs` is non-null only after `research_tech` unlocked a doctrine choice;
         answer it with the `choose_doctrine` action.
 
+        `undo` is always present: `{"available": bool, "depth": int}`, the state of this
+        session's undo stack after the action. Every action that can change the game pushes a
+        snapshot of the program and the RNG first (except `advance_generation`, which ends the
+        generation and clears the stack instead), so `perform("undo")` steps one action back.
+
         Errors never escape: an unknown action, a missing or malformed parameter,
         an action that `available_actions()` does not currently offer, a finished
         game, or an unexpected exception all return `ok=false` with a message.
@@ -203,17 +227,22 @@ class GameSession:
                 # front-end reads `result.data.ai` on both paths, so leaving it out made the
                 # Start screen's Help link throw instead of opening.
                 return _dumps({"ok": True, "message": HELP_TEXT, "events": [], "state": None,
-                               "needs": None, "data": {"ai": ""}})
+                               "needs": None, "data": {"ai": ""}, "undo": self._undo_info()})
             return _dumps({"ok": False, "message": "no game in progress: call new_game() or load() first",
-                           "events": [], "state": None, "needs": None})
-        program = self.program
+                           "events": [], "state": None, "needs": None, "undo": self._undo_info()})
         result = self._invoke(action_id, params_json)
+        # After `_invoke`, not before: `undo` rebuilds the program, so the state and the
+        # events reported below must come from whichever program the session now holds.
+        program = self.program
         payload: Dict[str, Any] = {
             "ok": result.ok,
             "message": result.message if result.message is not None else (program.message or ""),
             "events": [_serialize_event(event) for event in program.drain_events()],
             "state": program.view_state(),
             "needs": result.needs,
+            # Alongside `needs` so the UI can enable or disable "Undo last" from the result of
+            # the action it just ran, without a second call.
+            "undo": self._undo_info(),
         }
         if result.data is not None:
             payload["data"] = result.data
@@ -243,12 +272,61 @@ class GameSession:
         if action_id != "choose_doctrine":
             program.message = ""
 
+        # The snapshot is taken before the action runs and dropped again when the engine
+        # refused it: an action that changed nothing is not a step worth stepping back over.
+        snapshot = self._push_undo(action_id)
         try:
-            return self._handlers[action_id](params)
+            result = self._handlers[action_id](params)
         except _ParamError as exc:
+            self._drop_undo(snapshot)
             return _Result(False, message=str(exc))
         except Exception as exc:  # noqa: BLE001 - the bridge must never raise
+            self._drop_undo(snapshot)
             return _Result(False, message=f"internal error in action '{action_id}': {exc!r}")
+        if not result.ok:
+            self._drop_undo(snapshot)
+        return result
+
+    # ------------------------------------------------------------------ undo
+    def _undo_info(self) -> Dict[str, Any]:
+        """The `undo` block every `perform` result carries: can the UI offer it, and how deep."""
+        return {"available": bool(self._undo_stack), "depth": len(self._undo_stack)}
+
+    def _push_undo(self, action_id: str) -> Optional[Tuple[Dict[str, Any], tuple]]:
+        """Remember the program and the RNG before an undoable action; returns what was pushed.
+
+        The RNG matters as much as the state: `random` is module-level and the engine rolls
+        against it (an alien's reply, a diplomatic breakthrough). Restoring it means redoing
+        an undone action produces the same outcome, so undo cannot be used to re-roll a reply.
+        """
+        if action_id in NON_UNDOABLE_ACTIONS or self.program is None:
+            return None
+        snapshot = (self.program.to_dict(), random.getstate())
+        self._undo_stack.append(snapshot)
+        if len(self._undo_stack) > UNDO_LIMIT:
+            del self._undo_stack[:-UNDO_LIMIT]
+        return snapshot
+
+    def _drop_undo(self, snapshot: Optional[Tuple[Dict[str, Any], tuple]]) -> None:
+        """Undo the push above, for an action the engine ended up refusing."""
+        if snapshot is None or not self._undo_stack:
+            return
+        if self._undo_stack[-1] is snapshot:
+            self._undo_stack.pop()
+
+    def _do_undo(self, params: Dict[str, Any]) -> _Result:
+        """Step one action back: rebuild the program from the snapshot and restore the RNG."""
+        if not self._undo_stack:
+            return _Result(False, message="nothing to undo")
+        undone = self.program.generation_log[-1] if self.program.generation_log else None
+        snapshot, rng_state = self._undo_stack.pop()
+        program = ContactProgram.from_dict(snapshot, offline=self.offline, data_dir=self.data_dir)
+        program.drain_events()
+        self.program = program
+        # After the rebuild, so that whatever `from_dict` drew from the RNG is undone too.
+        random.setstate(rng_state)
+        summary = undone["summary"] if undone else "the last action"
+        return _Result(True, message=f"Undone: {summary}.")
 
     @staticmethod
     def _parse_params(params_json: Any) -> Dict[str, Any]:
@@ -331,6 +409,9 @@ class GameSession:
         program.advance_generation()
         if program.generation <= before:
             return _Result(False)
+        # The generation is over, and so is everything that could be taken back inside it -
+        # the same point at which the engine empties `generation_log`.
+        self._undo_stack.clear()
         if not program.message:
             year = program.start_year + (program.generation - 1) * 25
             program.message = f"Advanced to Generation {program.generation} (Year {year})."

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T16:16:50",
+  "saved_at": "2026-09-03T17:07:52",
   "label": "",
   "generation": 1,
   "year": 1977,
@@ -368,6 +368,13 @@
       "worlds_seeded": 0,
       "passive_detections": 0
     },
-    "achievements": []
+    "achievements": [],
+    "generation_log": [
+      {
+        "action": "send_message",
+        "summary": "Sent message to Proxima Centauri",
+        "cost": "1 AP"
+      }
+    ]
   }
 }

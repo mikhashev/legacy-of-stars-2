@@ -8,6 +8,7 @@
  */
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { observedAsOf } from "../scene/coords";
 import type { Store } from "../store";
 import type { ActionSpec, ViewState } from "../types";
 
@@ -95,6 +96,7 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
                 <span class="picker-meta">
                   {s.distance} LY{s.spectral_type ? `, ${s.spectral_type}` : ""} &middot; {s.knowledge}% known
                 </span>
+                <span class="picker-meta picker-observed">{observedAsOf(s.observed_year, s.distance)}</span>
               </button>
             </li>
           ))}
@@ -244,6 +246,50 @@ export function DossierPickerDialog({ view, store }: { view: ViewState; store: S
           ))}
         </ul>
       )}
+    </DialogFrame>
+  );
+}
+
+/**
+ * The end-of-generation confirmation: what this generation was spent on, what is left
+ * unspent, and the last chance to go back and change it. The console asks the same question
+ * ("Advance? (y/n)") over the same list, `ViewState.generation_log`.
+ */
+export function AdvanceDialog({ view, store }: { view: ViewState; store: Store }) {
+  const log = view.generation_log;
+  const unspent = view.status.action_points;
+  return (
+    <DialogFrame
+      title={`End of Generation ${view.generation}`}
+      resources={apLine(view)}
+      onClose={() => store.closeDialog()}
+    >
+      {log.length === 0 ? (
+        <p class="advance-warning">
+          No actions taken this generation. Advancing spends 25 years on nothing - go back if that was
+          not the plan.
+        </p>
+      ) : (
+        <ol class="advance-log">
+          {log.map((entry, i) => (
+            <li key={`${entry.action}-${i}`} data-action={entry.action}>
+              <span class="advance-log-summary">{entry.summary}</span>
+              {entry.cost && <span class="advance-log-cost">{entry.cost}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+      <p class="advance-unspent" data-unspent={unspent}>
+        {unspent === 0
+          ? "All action points spent."
+          : `${unspent} of ${view.status.max_action_points} action points still unspent.`}
+      </p>
+      <div class="modal-actions">
+        <button onClick={() => store.closeDialog()}>Back</button>
+        <button class="primary" onClick={() => store.confirmAdvance()}>
+          Advance
+        </button>
+      </div>
     </DialogFrame>
   );
 }

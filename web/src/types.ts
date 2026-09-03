@@ -25,7 +25,8 @@ export type ActionId =
   | "wow_silent"
   | "compose_director_message"
   | "summary"
-  | "help";
+  | "help"
+  | "undo";
 
 /** Parameter names the UI must collect for an action (`ViewState.actions[].needs`). */
 export type ParamName = "system" | "text" | "tech" | "threat" | "defense" | "choice";
@@ -56,6 +57,8 @@ export interface ActionParams {
   compose_director_message: Record<string, never>;
   summary: Record<string, never>;
   help: Record<string, never>;
+  /** Steps one action back (web_contract.md 7); never takes parameters. */
+  undo: Record<string, never>;
 }
 
 /** The action bar: what the engine offers now. The six ungated actions are never listed. */
@@ -196,6 +199,13 @@ export interface StarSystem {
   knowledge: number;
   description: string;
   round_trip_generations: number;
+  /**
+   * The year the light we are looking at left this system (`year - round(distance)`).
+   * Everything `description` says describes the system in *that* year - show it as
+   * "observed as of {observed_year}". It can be at or below zero for a distant source, which
+   * `formatYear` writes as "{n} BC".
+   */
+  observed_year: number;
   messages_sent: SentMessage[];
   responses: string[];
   next_response_gen: number | null;
@@ -296,6 +306,16 @@ export interface WowState {
   outcome: null | "silence" | "friendly" | "hostile";
 }
 
+/** One thing the player did this generation (`ViewState.generation_log`). */
+export interface GenerationLogEntry {
+  /** The action id it came from, e.g. "send_message". */
+  action: string;
+  /** The sentence to show, e.g. "Sent message to Proxima Centauri". */
+  summary: string;
+  /** A short cost string, e.g. "1 AP"; may be empty. */
+  cost: string;
+}
+
 /** messages_sent, responses_received, attacks_scheduled, ... (all ints). */
 export type GameStats = Record<string, number>;
 
@@ -338,6 +358,11 @@ export interface ViewState {
   wow: WowState;
   achievements: string[];
   stats: GameStats;
+  /**
+   * What the player has done in the current generation, oldest first. The engine writes it
+   * and empties it in `advance_generation`; display only.
+   */
+  generation_log: GenerationLogEntry[];
   actions: ActionSpec[];
   game_over: boolean;
   /** Empty while playing. */
@@ -381,6 +406,12 @@ export interface PerformData {
   help: { ai: string };
 }
 
+/** The state of the session's undo stack after an action (web_contract.md 7). */
+export interface UndoInfo {
+  available: boolean;
+  depth: number;
+}
+
 export interface PerformResult {
   /** True when the engine applied the action; a refusal is false with the engine's message. */
   ok: boolean;
@@ -390,6 +421,11 @@ export interface PerformResult {
   /** null only when no game is in progress. */
   state: ViewState | null;
   needs: PerformNeeds | null;
+  /**
+   * Always sent by the current facade, so the UI can enable "Undo last" without a second
+   * call. Optional here only so an older engine build cannot break the front-end.
+   */
+  undo?: UndoInfo;
   /** Present only for the actions listed in `PerformData`. */
   data?: Record<string, unknown>;
 }

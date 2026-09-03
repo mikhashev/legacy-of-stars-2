@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 // splits it into its own chunk; `scene/coords` is a handful of pure functions with no imports
 // of its own, so it stays static.
 import type { StarMap } from "../scene/StarMap";
-import { formatDistance } from "../scene/coords";
+import { formatDistance, observedAsOf } from "../scene/coords";
 import type { Store } from "../store";
 import type { ActionId, ActionSpec, StarSystem, ViewState } from "../types";
 import { SystemsPanel } from "./SystemsPanel";
@@ -65,6 +65,7 @@ function SelectedCard({ system, view, store }: { system: StarSystem; view: ViewS
         {formatDistance(system.distance)} &middot; {system.spectral_type ?? "type unknown"} &middot;{" "}
         {system.knowledge}% known
       </p>
+      <p class="map-card-meta map-card-observed">{observedAsOf(system.observed_year, system.distance)}</p>
       <p class="map-card-description">{system.description || "Nothing studied yet."}</p>
       {lastResponse && <p class="map-card-reply">&ldquo;{excerpt(lastResponse)}&rdquo;</p>}
       {system.next_response_gen !== null && (

@@ -13,7 +13,9 @@ import {
   direction,
   fallbackDirection,
   formatDistance,
+  formatYear,
   isBeyondRim,
+  observedAsOf,
   positionFor,
   positionForSystem,
   radiusFor,
@@ -142,5 +144,22 @@ describe("formatDistance", () => {
     expect(formatDistance(1800)).toBe("1,800 LY");
     expect(formatDistance(4.24)).toBe("4.2 LY");
     expect(formatDistance(51)).toBe("51 LY");
+  });
+});
+
+describe("light-time captions", () => {
+  it("writes a year at or before zero as BC (year 0 = 1 BC)", () => {
+    expect(formatYear(1977)).toBe("1977");
+    expect(formatYear(1)).toBe("1");
+    expect(formatYear(0)).toBe("1 BC");
+    expect(formatYear(-1)).toBe("2 BC");
+    expect(formatYear(-176)).toBe("177 BC");
+  });
+
+  it("says when the light left, and how long it has been travelling", () => {
+    // Proxima in 1977: 4.2 LY away, so we are looking at 1973.
+    expect(observedAsOf(1973, 4.24)).toBe("observed as of 1973 (4.2 LY of light-time)");
+    // The WOW! source is 1,800 LY away; at the far end of a run that is a BC year.
+    expect(observedAsOf(-23, 1800)).toBe("observed as of 24 BC (1,800 LY of light-time)");
   });
 });

@@ -158,7 +158,7 @@ class InterfaceSaveTest(unittest.TestCase):
                 ui.dispatch("s", items)
             self.assertIn("saved", p.message.lower())
             self.assertTrue((Path(tmp) / "slot_one.json").exists())
-            with mock.patch(RANDOM, return_value=0.99), contextlib.redirect_stdout(io.StringIO()):
+            with mock.patch(RANDOM, return_value=0.99),                     mock.patch("builtins.input", side_effect=["y"]),                     contextlib.redirect_stdout(io.StringIO()):
                 ui.dispatch("5", items)
             self.assertTrue((Path(tmp) / "autosave.json").exists())
             loaded = save_manager.load_game(Path(tmp) / "autosave.json", offline=True)

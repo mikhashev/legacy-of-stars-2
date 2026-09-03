@@ -51,6 +51,13 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       await page.waitForTimeout(200);
       continue;
     }
+    // Since W5 the Advance button opens the end-of-generation confirmation first.
+    const advanceConfirm = page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true });
+    if (await advanceConfirm.isVisible().catch(() => false)) {
+      await advanceConfirm.click();
+      await page.waitForTimeout(300);
+      continue;
+    }
     if ((await header.innerText()) !== before) return;
     await page.getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);
@@ -122,8 +129,36 @@ test("scene time animates a message sphere from Earth to Proxima Centauri", asyn
   expect(beforeAdvance[0]!.launchGen).toBe(1);
   expect(beforeAdvance[0]!.radiusLy).toBe(0);
 
+  // W5: the message is readable at map zoom, not only as an expanding shell - a dotted route
+  // from Earth to Proxima, a pulse on it, and a label saying when it lands. Proxima is 4.2 LY
+  // away, so the engine lands the transmission in Generation 2.
+  await page.waitForFunction(
+    () => (window.__losMap?.messageLines() ?? []).some((l) => l.system === "Proxima Centauri"),
+    undefined,
+    { timeout: 30_000 },
+  );
+  const inFlight = await page.evaluate(() =>
+    window.__losMap!.messageLines().filter((l) => l.system === "Proxima Centauri"),
+  );
+  expect(inFlight.length).toBe(1);
+  expect(inFlight[0]!.kind).toBe("outgoing");
+  expect(inFlight[0]!.launchGen).toBe(1);
+  expect(inFlight[0]!.arrivalGen).toBe(2);
+  expect(inFlight[0]!.visible).toBe(true);
+  // At rest in generation 1 the pulse is still at Earth: nothing has been travelling yet.
+  expect(inFlight[0]!.progress).toBe(0);
+  expect(inFlight[0]!.label).toBe("message · arrives Gen 2");
+  // No ring yet - the light has not got there, and the ring means it has.
+  expect(await page.evaluate(() => window.__losMap!.messageRings())).not.toContain("Proxima Centauri");
+  // The label is really on the page, not just in the scene graph.
+  await expect(page.locator('.message-label[data-system="Proxima Centauri"]')).toHaveText(
+    "message · arrives Gen 2",
+  );
+  await page.screenshot({ path: "test-results/message-inflight.png", fullPage: true });
+
   // Advance one generation: nothing is pending yet at Generation 1, so this always applies.
   await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+  await page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true }).click();
 
   // Mid-flight: scene time is strictly between the two generations, and Earth is wearing the
   // expanding shell of the transmission. The screenshot is taken as soon as that shell is
@@ -187,6 +222,19 @@ test("scene time animates a message sphere from Earth to Proxima Centauri", asyn
   expect(proxima, "the message sphere for Proxima Centauri is gone").toBeTruthy();
   expect(proxima!.radiusLy).toBeCloseTo(4.2, 6);
   expect(proxima!.opacity).toBe(0);
+
+  // The transmission has landed: the route is off the map, and the star wears the permanent
+  // cyan ring instead - "we have spoken to them".
+  const arrived = await page.evaluate(() => ({
+    lines: window.__losMap!.messageLines().filter((l) => l.system === "Proxima Centauri"),
+    rings: window.__losMap!.messageRings(),
+  }));
+  expect(arrived.lines.filter((l) => l.visible)).toEqual([]);
+  expect(arrived.rings).toContain("Proxima Centauri");
+  // The CSS2D layer keeps the element around and hides it once its pulse stops being drawn.
+  await expect(page.locator('.message-label[data-system="Proxima Centauri"]')).toBeHidden();
+  await dismissBlockingUi(page);
+  await page.screenshot({ path: "test-results/message-arrived.png", fullPage: true });
 
   // The leakage front grew with the generation, and the animated layer stayed within budget.
   expect(after.leakageLy).toBeGreaterThan(mid.leakageLy);

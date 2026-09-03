@@ -35,12 +35,16 @@ import type { GameEvent, GenesisWorld, StarSystem, Threat } from "../types";
 import { createBeamMaterial, createMarkerMaterial, createSphereMaterial } from "./shaders";
 import {
   arkProgress,
+  clamp01,
   fleetLaunchGen,
   fleetProgress,
   leakageRadiusLy,
   messageFade,
+  messageProgress,
   messageRadiusLy,
   replyFade,
+  replyLaunchGen,
+  replyProgress,
   replyRadiusLy,
 } from "./timeline";
 
@@ -49,6 +53,8 @@ import {
 /** At most this many transmissions per system are drawn (plan W4: "the last 3"). */
 export const MAX_MESSAGES_PER_SYSTEM = 3;
 const MAX_MESSAGE_SPHERES = 36;
+/** Lines (message or reply) drawn at once; each is a line, a pulse and a CSS2D label. */
+const MAX_MESSAGE_LINES = 18;
 const MAX_FLEETS = 12;
 const MAX_ARKS = 8;
 const MAX_FLASHES = 20;
@@ -104,6 +110,32 @@ interface SphereVisual {
   /** Last computed values, for the debug hook. */
   radiusLy: number;
   opacity: number;
+}
+
+/**
+ * One transmission in flight, drawn as the thing the player actually reads: a dotted line
+ * along its whole route, a bright pulse where the signal has got to, and the label that says
+ * when it lands. The expanding sphere is still there (it is the honest picture of a signal
+ * spreading), but at map zoom it is the line and the pulse that say "a message is on its way
+ * to *that* star, and it arrives in generation N".
+ */
+interface MessageLineVisual {
+  key: string;
+  system: string;
+  kind: "outgoing" | "reply";
+  /** The generation the signal left its source (derived for a reply, stated for a message). */
+  launchGen: number;
+  /** The generation the engine says it lands in; the line is gone after it. */
+  arrivalGen: number;
+  distance: number;
+  line: Line<BufferGeometry, LineDashedMaterial>;
+  pulse: Mesh<IcosahedronGeometry, ShaderMaterial>;
+  label: CSS2DObject;
+  labelEl: HTMLDivElement;
+  /** The star end of the route, remembered so the line is only re-laid when it moves. */
+  anchor: Vector3;
+  progress: number;
+  visible: boolean;
 }
 
 interface FleetVisual {
@@ -162,6 +194,20 @@ export interface DebugSphere {
   opacity: number;
 }
 
+/** One row of `window.__losMap.messageLines()`. */
+export interface DebugMessageLine {
+  system: string;
+  kind: "outgoing" | "reply";
+  launchGen: number;
+  arrivalGen: number;
+  /** 0-1 along the route at the current scene time (`messageProgress`/`replyProgress`). */
+  progress: number;
+  /** False once the signal has landed - the line is taken off the map at that point. */
+  visible: boolean;
+  /** The text of the CSS2D label, e.g. "message - arrives Gen 2". */
+  label: string;
+}
+
 export interface DebugFleet {
   source: string;
   attackType: string;
@@ -195,6 +241,7 @@ export class SceneEffects {
   private readonly beamGeometry: CylinderGeometry;
 
   private readonly spheres = new Map<string, SphereVisual>();
+  private readonly messageLines = new Map<string, MessageLineVisual>();
   private readonly fleets = new Map<string, FleetVisual>();
   private readonly arks = new Map<string, ArkVisual>();
   private flashes: Flash[] = [];
@@ -258,6 +305,7 @@ export class SceneEffects {
   applyState(state: EffectsState): void {
     this.state = state;
     this.syncSpheres(state);
+    this.syncMessageLines(state);
     this.syncFleets(state);
     this.syncArks(state);
     this.host.requestRender();
@@ -328,6 +376,114 @@ export class SceneEffects {
   private destroySphere(visual: SphereVisual): void {
     this.root.remove(visual.mesh);
     visual.mesh.material.dispose();
+  }
+
+  /**
+   * The routes: one per transmission still in flight, and one per reply the engine has named
+   * an arrival generation for. A message that has landed keeps no line - the star wears a
+   * cyan ring from then on (`StarMap.applyEntry`), which is the "we have spoken to them" mark.
+   */
+  private syncMessageLines(state: EffectsState): void {
+    const seen = new Set<string>();
+    let budget = MAX_MESSAGE_LINES;
+
+    for (const system of state.systems) {
+      if (budget <= 0) break;
+      // In flight at the generation this state describes; the last three, oldest of them
+      // first, so a system that has been shouted at for centuries stays legible.
+      const inFlight = system.messages_sent
+        .filter((message) => message.arrival_gen >= state.generation)
+        .slice(-MAX_MESSAGES_PER_SYSTEM);
+      for (const message of inFlight) {
+        if (budget <= 0) break;
+        const key = `line-out|${system.name}|${message.generation}`;
+        seen.add(key);
+        budget -= 1;
+        if (this.messageLines.has(key)) continue;
+        this.messageLines.set(
+          key,
+          this.createMessageLine(key, system.name, "outgoing", message.generation, message.arrival_gen,
+                                 system.distance),
+        );
+      }
+
+      if (system.next_response_gen !== null && budget > 0) {
+        const key = `line-in|${system.name}|${system.next_response_gen}`;
+        seen.add(key);
+        budget -= 1;
+        if (!this.messageLines.has(key)) {
+          this.messageLines.set(
+            key,
+            this.createMessageLine(key, system.name, "reply",
+                                   replyLaunchGen(system.next_response_gen, system.distance),
+                                   system.next_response_gen, system.distance),
+          );
+        }
+      }
+    }
+
+    for (const [key, visual] of this.messageLines) {
+      if (seen.has(key)) continue;
+      this.destroyMessageLine(visual);
+      this.messageLines.delete(key);
+    }
+  }
+
+  private createMessageLine(
+    key: string,
+    system: string,
+    kind: "outgoing" | "reply",
+    launchGen: number,
+    arrivalGen: number,
+    distance: number,
+  ): MessageLineVisual {
+    const color = kind === "outgoing" ? OUTGOING_COLOR : INCOMING_COLOR;
+    // Dotted rather than dashed: short marks read as a signal path, and keep the message
+    // routes apart from the long-dashed fleet trajectories at a glance.
+    const line = this.createTrajectory(color, kind === "outgoing" ? 0.9 : 0.8, 0.9, 0.7);
+    line.name = `message-line:${key}`;
+
+    const pulse = new Mesh(this.markerGeometry, createMarkerMaterial(color, 1));
+    pulse.name = `message-pulse:${key}`;
+    pulse.frustumCulled = false;
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "message-label";
+    labelEl.dataset["kind"] = kind;
+    labelEl.dataset["system"] = system;
+    labelEl.textContent = `${kind === "outgoing" ? "message" : "reply"} · arrives Gen ${arrivalGen}`;
+    const label = new CSS2DObject(labelEl);
+    // Beside the pulse, not under it: a message that has just left Earth has its pulse *on*
+    // Earth, and a label hanging below would lie across the very route it is describing.
+    label.center.set(0, 0.5);
+    label.position.set(2.2, 0, 0);
+    pulse.add(label);
+
+    this.root.add(line, pulse);
+    return {
+      key,
+      system,
+      kind,
+      launchGen,
+      arrivalGen,
+      distance,
+      line,
+      pulse,
+      label,
+      labelEl,
+      anchor: new Vector3(Number.NaN, Number.NaN, Number.NaN),
+      progress: 0,
+      visible: false,
+    };
+  }
+
+  private destroyMessageLine(visual: MessageLineVisual): void {
+    visual.labelEl.remove();
+    visual.pulse.remove(visual.label);
+    this.root.remove(visual.line, visual.pulse);
+    visual.line.geometry.dispose();
+    visual.line.material.dispose();
+    visual.pulse.material.dispose();
   }
 
   private syncFleets(state: EffectsState): void {
@@ -459,13 +615,18 @@ export class SceneEffects {
   }
 
   /** A dashed straight line, sampled at `TRAJECTORY_POINTS` so it can draw itself in. */
-  private createTrajectory(color: number, opacity: number): Line<BufferGeometry, LineDashedMaterial> {
+  private createTrajectory(
+    color: number,
+    opacity: number,
+    dashSize = 1.6,
+    gapSize = 1.4,
+  ): Line<BufferGeometry, LineDashedMaterial> {
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", new Float32BufferAttribute(new Float32Array(TRAJECTORY_POINTS * 3), 3));
     const material = new LineDashedMaterial({
       color,
-      dashSize: 1.6,
-      gapSize: 1.4,
+      dashSize,
+      gapSize,
       transparent: true,
       opacity,
       depthWrite: false,
@@ -664,6 +825,9 @@ export class SceneEffects {
     for (const visual of this.spheres.values()) {
       this.stepSphere(visual, t);
     }
+    for (const visual of this.messageLines.values()) {
+      this.stepMessageLine(visual, t, seconds);
+    }
     for (const visual of this.fleets.values()) {
       busy = this.stepFleet(visual, t, seconds) || busy;
     }
@@ -699,8 +863,52 @@ export class SceneEffects {
       const star = this.host.positionOf(visual.system);
       if (star) visual.mesh.position.copy(star);
     }
-    visual.mesh.material.uniforms["uOpacity"]!.value = opacity * 0.8;
+    // Since W5 the line and its pulse are what the player reads a transmission off, so our
+    // own sphere is dimmed to a supporting role - brightest just after it leaves Earth, where
+    // it says "this went out from here", and faint by the time it reaches the star.
+    const spread = visual.distance > 0 ? clamp01(radiusLy / visual.distance) : 1;
+    const weight = visual.kind === "outgoing" ? 0.8 - 0.45 * spread : 0.8;
+    visual.mesh.material.uniforms["uOpacity"]!.value = opacity * weight;
     visual.mesh.visible = true;
+  }
+
+  /**
+   * The route, the pulse on it and the label that travels with the pulse. The line lives
+   * exactly as long as the engine says the signal is in flight (`arrival_gen > t`); the
+   * pulse sits where `timeline.messageProgress`/`replyProgress` put it.
+   */
+  private stepMessageLine(visual: MessageLineVisual, t: number, seconds: number): void {
+    const star = this.host.positionOf(visual.system);
+    if (!star || t >= visual.arrivalGen) {
+      // Arrived (or the star is off the map): the line goes, and the star keeps the ring.
+      visual.visible = false;
+      visual.line.visible = false;
+      visual.pulse.visible = false;
+      visual.progress = star ? 1 : visual.progress;
+      return;
+    }
+    if (!star.equals(visual.anchor)) {
+      visual.anchor.copy(star);
+      // Both routes are drawn Earth -> star; only the pulse knows which way it is going.
+      this.layTrajectory(visual.line, this.scratch.set(0, 0, 0), star);
+    }
+    const progress =
+      visual.kind === "outgoing"
+        ? messageProgress(visual.launchGen, visual.distance, t)
+        : replyProgress(visual.arrivalGen, visual.distance, t);
+    visual.progress = progress;
+    visual.visible = true;
+    visual.line.visible = true;
+    visual.pulse.visible = true;
+    // Outgoing runs Earth -> star, a reply runs star -> Earth.
+    const along = visual.kind === "outgoing" ? progress : 1 - progress;
+    visual.pulse.position.copy(star).multiplyScalar(along);
+    // Bigger than a fleet marker: at map zoom the nearest stars are a few dozen pixels from
+    // Earth, and the pulse has to be findable on a route that short.
+    visual.pulse.scale.setScalar(2.1);
+    const uniforms = visual.pulse.material.uniforms;
+    uniforms["uTime"]!.value = seconds;
+    uniforms["uPulse"]!.value = 1;
   }
 
   private stepFleet(visual: FleetVisual, t: number, seconds: number): boolean {
@@ -836,6 +1044,18 @@ export class SceneEffects {
     }));
   }
 
+  debugMessageLines(): DebugMessageLine[] {
+    return [...this.messageLines.values()].map((v) => ({
+      system: v.system,
+      kind: v.kind,
+      launchGen: v.launchGen,
+      arrivalGen: v.arrivalGen,
+      progress: v.progress,
+      visible: v.visible,
+      label: v.labelEl.textContent ?? "",
+    }));
+  }
+
   debugFleets(): DebugFleet[] {
     return [...this.fleets.values()].map((v) => ({
       source: v.source,
@@ -873,6 +1093,8 @@ export class SceneEffects {
     this.clearFlashes();
     for (const visual of this.spheres.values()) this.destroySphere(visual);
     this.spheres.clear();
+    for (const visual of this.messageLines.values()) this.destroyMessageLine(visual);
+    this.messageLines.clear();
     for (const visual of this.fleets.values()) this.destroyFleet(visual);
     this.fleets.clear();
     for (const visual of this.arks.values()) this.destroyArk(visual);

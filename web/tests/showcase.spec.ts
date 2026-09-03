@@ -56,6 +56,13 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       await page.waitForTimeout(200);
       continue;
     }
+    // Since W5 the Advance button opens the end-of-generation confirmation first.
+    const advanceConfirm = page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true });
+    if (await advanceConfirm.isVisible().catch(() => false)) {
+      await advanceConfirm.click();
+      await page.waitForTimeout(300);
+      continue;
+    }
     if ((await header.innerText()) !== before) return;
     await page.getByRole("button", { name: "Advance to Next Generation" }).click();
     await page.waitForTimeout(300);

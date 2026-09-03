@@ -45,6 +45,13 @@ async function advanceOneGeneration(page: Page): Promise<void> {
       continue;
     }
 
+    // Since W5 the Advance button opens the end-of-generation confirmation first.
+    const advanceConfirm = page.locator(".dialog-modal").getByRole("button", { name: "Advance", exact: true });
+    if (await advanceConfirm.isVisible().catch(() => false)) {
+      await advanceConfirm.click();
+      await page.waitForTimeout(300);
+      continue;
+    }
     const after = await header.innerText();
     if (after !== before) return;
 
@@ -84,6 +91,12 @@ test("a full slice: new game, WOW! decision, actions, advance, save, reload, loa
   await expect(page.locator(".header-gen")).toContainText("1977");
   await page.screenshot({ path: "test-results/main.png", fullPage: true });
 
+  // The generation starts with a clean sheet and nothing to undo.
+  const generationPanel = page.locator(".generation-panel");
+  await expect(generationPanel.locator(".generation-empty")).toBeVisible();
+  await expect(generationPanel.getByRole("button", { name: "Undo last" })).toBeDisabled();
+  const apBefore = await page.locator(".generation-ap").innerText();
+
   // focus_research on the first system: opens the system-picker dialog.
   await page.getByRole("button", { name: "Focus Research on Star System" }).click();
   await expect(page.getByText("choose a system")).toBeVisible();
@@ -91,12 +104,55 @@ test("a full slice: new game, WOW! decision, actions, advance, save, reload, loa
   await page.locator(".picker-list .picker-row").first().click();
   await expect(page.locator(".dialog-modal")).toHaveCount(0);
 
+  // ... and "This generation" now lists it, with what it cost.
+  const logRows = generationPanel.locator(".generation-log-row");
+  await expect(logRows).toHaveCount(1);
+  await expect(logRows.first()).toHaveAttribute("data-action", "focus_research");
+  await expect(logRows.first()).toContainText("Focused research on");
+  await expect(logRows.first()).toContainText("1 AP");
+  await expect(page.locator(".generation-ap")).not.toHaveText(apBefore);
+  await page.screenshot({ path: "test-results/generation-panel.png", fullPage: true });
+
+  // Undo: the action point comes back and the sheet is clean again.
+  await generationPanel.getByRole("button", { name: "Undo last" }).click();
+  await expect(generationPanel.locator(".generation-empty")).toBeVisible({ timeout: 15_000 });
+  await expect(logRows).toHaveCount(0);
+  await expect(page.locator(".generation-ap")).toHaveText(apBefore);
+  await expect(generationPanel.getByRole("button", { name: "Undo last" })).toBeDisabled();
+
+  // Do it again (undo is a change of mind, not a way out of spending the point) and add one
+  // more action, so the confirmation below has something to list.
+  await page.getByRole("button", { name: "Focus Research on Star System" }).click();
+  await page.locator(".picker-list .picker-row").first().click();
+  await expect(page.locator(".dialog-modal")).toHaveCount(0);
+
   // public_outreach: no parameters, runs immediately.
   await page.getByRole("button", { name: "Conduct Public Outreach Campaign" }).click();
-  await page.waitForTimeout(300);
+  await expect(logRows).toHaveCount(2);
+
+  // The Advance button asks first, listing exactly what the generation was spent on.
+  await page.getByRole("button", { name: "Advance to Next Generation" }).click();
+  const advanceDialog = page.locator(".dialog-modal");
+  await expect(advanceDialog.getByRole("heading", { name: "End of Generation 1" })).toBeVisible();
+  await expect(advanceDialog.locator(".advance-log li")).toHaveCount(2);
+  await expect(advanceDialog.locator(".advance-log li").first()).toHaveAttribute("data-action", "focus_research");
+  await expect(advanceDialog.locator(".advance-log li").nth(1)).toHaveAttribute("data-action", "public_outreach");
+  await expect(advanceDialog.locator(".advance-unspent")).toBeVisible();
+  await page.screenshot({ path: "test-results/advance-confirm.png", fullPage: true });
+
+  // "Back" leaves the generation exactly where it was; the log is still there.
+  await advanceDialog.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.locator(".dialog-modal")).toHaveCount(0);
+  await expect(page.locator(".header-gen")).toContainText("Generation 1");
+  await expect(logRows).toHaveCount(2);
 
   // Advance one generation, answering whatever dialog the engine raises.
   await advanceOneGeneration(page);
+  // A new generation is a clean sheet: last generation's actions are gone from the panel.
+  // (Answering a philosophical crisis raised *by* the advance can already have written a row
+  // of its own, so this checks the old rows are gone rather than that the list is empty.)
+  await expect(generationPanel.locator('.generation-log-row[data-action="focus_research"]')).toHaveCount(0);
+  await expect(generationPanel.locator('.generation-log-row[data-action="public_outreach"]')).toHaveCount(0);
   const generationAfterAdvance = await page.locator(".header-gen").innerText();
 
   // Manual save via the menu.

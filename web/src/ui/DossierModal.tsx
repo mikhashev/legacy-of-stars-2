@@ -1,4 +1,5 @@
 import { useEffect } from "preact/hooks";
+import { observedAsOf } from "../scene/coords";
 import type { Store } from "../store";
 import type { ViewState } from "../types";
 
@@ -30,6 +31,8 @@ export function DossierModal({ system, view, store }: { system: string; view: Vi
           )}
         </p>
         <p class="dossier-meta">Signal round trip: {s.round_trip_generations} generation(s)</p>
+        {/* Light-time honesty: the knowledge below describes the system as the light left it. */}
+        <p class="dossier-meta dossier-observed">{observedAsOf(s.observed_year, s.distance)}</p>
         <p class="dossier-knowledge">
           Knowledge: {s.knowledge}% - {s.description || "nothing studied yet"}
         </p>

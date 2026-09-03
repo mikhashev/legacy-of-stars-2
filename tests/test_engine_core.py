@@ -244,7 +244,8 @@ class InterfaceTest(unittest.TestCase):
     def test_minimal_session_advance_and_quit(self):
         p = make_program(seed=7)
         with mock.patch(RANDOM, return_value=0.99):
-            ui, output = self._play(p, ["", "5", "5", "6", "y", ""])
+            # Each "5" is now answered by the end-of-generation confirmation ("Advance? (y/n)").
+            ui, output = self._play(p, ["", "5", "y", "5", "y", "6", "y", ""])
         self.assertTrue(p.game_over)
         self.assertEqual(p.generation, 3)
         self.assertIn("Thank you for playing", output)

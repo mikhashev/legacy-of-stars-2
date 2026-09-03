@@ -79,7 +79,7 @@ class ContractShapeTest(unittest.TestCase):
     def test_perform_result_shape(self):
         session = new_session()
         result = call(session, "public_outreach")
-        self.assertEqual(set(result) - {"data"}, {"ok", "message", "events", "state", "needs"})
+        self.assertEqual(set(result) - {"data"}, {"ok", "message", "events", "state", "needs", "undo"})
         self.assertIsInstance(result["ok"], bool)
         self.assertIsInstance(result["message"], str)
         self.assertIsInstance(result["events"], list)
@@ -99,6 +99,7 @@ class ContractShapeTest(unittest.TestCase):
             "send_message", "focus_research", "public_outreach", "research_tech", "choose_doctrine",
             "advance_generation", "defend", "consult_advisor", "listen_swan_song", "genesis_seed",
             "respond_event", "wow_reply", "wow_silent", "compose_director_message", "summary", "help",
+            "undo",
         })
 
 
@@ -673,3 +674,124 @@ class StartScreenAndViewStateTest(unittest.TestCase):
         self.assertIsInstance(swan_targets, list)
         self.assertTrue(set(swan_targets) <= names)
 
+
+
+class UndoTest(unittest.TestCase):
+    """The facade's undo stack (web_contract.md 3/7): one step back per undoable action."""
+
+    def test_undo_restores_action_points_messages_and_the_generation_log(self):
+        session = new_session(seed=11)
+        name = json.loads(session.state())["systems"][0]["name"]
+        before = json.loads(session.state())
+        sent = call(session, "send_message", system=name, text="hello")
+        self.assertTrue(sent["ok"])
+        self.assertEqual(sent["state"]["systems"][0]["messages_sent"][0]["text"], "hello")
+        self.assertEqual([e["action"] for e in sent["state"]["generation_log"]], ["send_message"])
+        self.assertTrue(sent["undo"]["available"])
+
+        undone = call(session, "undo")
+        self.assertTrue(undone["ok"])
+        self.assertIn("Sent message", undone["message"])
+        self.assertEqual(undone["state"]["status"]["action_points"], before["status"]["action_points"])
+        self.assertEqual(undone["state"]["systems"][0]["messages_sent"], [])
+        self.assertEqual(undone["state"]["generation_log"], [])
+        self.assertEqual(undone["state"]["stats"]["messages_sent"], before["stats"]["messages_sent"])
+
+    def test_undo_restores_the_rng_so_a_redone_action_is_identical(self):
+        """The point of restoring `random`: undo must not be a way to re-roll a reply."""
+        session = new_session(seed=11)
+        program = session.program
+        system = list(program.star_systems.values())[1]
+        system.has_civilization = True
+        system.is_extinct = False
+        system.true_strategy = "LR"  # answers on a die roll, and the reply text is drawn too
+        system.deception_level = 0.1
+        system.civilization_stage = CivilizationStage.DIGITAL
+        system.knowledge = 40
+
+        rng_before = random.getstate()
+        first = call(session, "send_message", system=system.name, text="hello")
+        self.assertTrue(first["ok"])
+        self.assertNotEqual(random.getstate(), rng_before, "sending a message must roll the dice")
+
+        call(session, "undo")
+        self.assertEqual(random.getstate(), rng_before, "undo must put the dice back")
+
+        second = call(session, "send_message", system=system.name, text="hello")
+        self.assertEqual(second["message"], first["message"])
+        self.assertEqual(second["state"]["systems"], first["state"]["systems"])
+        self.assertEqual(second["state"]["threats"], first["state"]["threats"])
+
+    def test_undo_stack_empties_after_advance_generation(self):
+        session = new_session(seed=11)
+        name = json.loads(session.state())["systems"][0]["name"]
+        self.assertTrue(call(session, "focus_research", system=name)["undo"]["available"])
+        advanced = call(session, "advance_generation")
+        self.assertTrue(advanced["ok"])
+        self.assertEqual(advanced["undo"], {"available": False, "depth": 0})
+        self.assertEqual(advanced["state"]["generation_log"], [])
+        refused = call(session, "undo")
+        self.assertFalse(refused["ok"])
+        self.assertEqual(refused["message"], "nothing to undo")
+
+    def test_undo_is_refused_when_there_is_nothing_to_undo(self):
+        session = GameSession()
+        session.new_game(seed=11)
+        result = call(session, "undo")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["message"], "nothing to undo")
+        self.assertEqual(result["undo"], {"available": False, "depth": 0})
+
+    def test_a_refused_action_does_not_become_an_undo_step(self):
+        session = new_session(seed=11)
+        depth = call(session, "public_outreach")["undo"]["depth"]
+        refused = call(session, "focus_research", system="Nowhere")
+        self.assertFalse(refused["ok"])
+        self.assertEqual(refused["undo"]["depth"], depth)
+
+    def test_the_stack_is_capped_and_cleared_by_new_game_and_load(self):
+        session = new_session(seed=11)
+        name = json.loads(session.state())["systems"][0]["name"]
+        for _ in range(25):
+            session.program.action_points = 5
+            call(session, "focus_research", system=name)
+        self.assertEqual(call(session, "public_outreach")["undo"]["depth"], 20)
+
+        text = session.save()
+        session.new_game(seed=11)
+        self.assertEqual(call(session, "undo")["message"], "nothing to undo")
+        session.load(text)
+        self.assertEqual(call(session, "undo")["message"], "nothing to undo")
+
+    def test_undo_snapshots_are_not_written_into_saves(self):
+        session = new_session(seed=11)
+        name = json.loads(session.state())["systems"][0]["name"]
+        call(session, "focus_research", system=name)
+        payload = json.loads(session.save())
+        self.assertNotIn("undo", payload)
+        self.assertNotIn("_undo_stack", json.dumps(payload))
+        assert_plain(self, payload)
+        # The saved program carries the generation log itself, though: it is game state.
+        self.assertEqual([e["action"] for e in payload["program"]["generation_log"]], ["focus_research"])
+
+
+class ObservedYearTest(unittest.TestCase):
+    """Light-time honesty: what we see of a system left it `distance` years ago."""
+
+    def test_view_state_states_the_year_the_light_left(self):
+        session = new_session(seed=11)
+        state = json.loads(session.state())
+        for system in state["systems"]:
+            self.assertEqual(system["observed_year"], state["year"] - round(system["distance"]))
+        advanced = call(session, "advance_generation")["state"]
+        for system in advanced["systems"]:
+            self.assertEqual(system["observed_year"], advanced["year"] - round(system["distance"]))
+
+    def test_focus_research_says_when_the_light_left(self):
+        session = new_session(seed=11)
+        state = json.loads(session.state())
+        system = state["systems"][0]
+        result = call(session, "focus_research", system=system["name"])
+        self.assertTrue(result["ok"])
+        self.assertIn(f"The light we studied left {system['name']} in {system['observed_year']}",
+                      result["message"])

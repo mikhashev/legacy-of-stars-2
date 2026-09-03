@@ -18,8 +18,10 @@ import {
   fleetProgress,
   leakageRadiusLy,
   messageFade,
+  messageProgress,
   messageRadiusLy,
   replyFade,
+  replyProgress,
   replyLaunchGen,
   replyRadiusLy,
   travelGenerations,
@@ -170,5 +172,46 @@ describe("the leakage front", () => {
     expect(leakageRadiusLy(100, 4, 3)).toBeCloseTo(75, 12);
     // Never negative: the front did not exist before the programme started transmitting.
     expect(leakageRadiusLy(25, 1, -5)).toBe(0);
+  });
+});
+
+describe("message and reply pulses", () => {
+  it("does not leave Earth before the generation it was sent in", () => {
+    expect(messageProgress(3, PROXIMA_LY, 2)).toBe(0);
+    expect(messageProgress(3, PROXIMA_LY, 3)).toBe(0);
+  });
+
+  it("covers 25 light-years of the trip per generation", () => {
+    // Vega is exactly one generation of light travel away.
+    expect(messageProgress(1, VEGA_LY, 1.5)).toBeCloseTo(0.5, 12);
+    expect(messageProgress(1, VEGA_LY, 2)).toBe(1);
+    // Proxima at 4.24 LY is reached a sixth of the way through the generation.
+    expect(messageProgress(1, PROXIMA_LY, 1 + 4.24 / 25)).toBeCloseTo(1, 12);
+    expect(messageProgress(1, PROXIMA_LY, 1.05)).toBeCloseTo((25 * 0.05) / 4.24, 12);
+  });
+
+  it("stops at the star and stays there", () => {
+    expect(messageProgress(1, PROXIMA_LY, 4)).toBe(1);
+    expect(messageProgress(1, VEGA_LY, 99)).toBe(1);
+  });
+
+  it("agrees with the expanding sphere it belongs to", () => {
+    for (const t of [1.1, 1.4, 1.9, 2.3]) {
+      expect(messageProgress(1, VEGA_LY, t)).toBeCloseTo(messageRadiusLy(1, VEGA_LY, t) / VEGA_LY, 12);
+    }
+  });
+
+  it("walks a reply back from the arrival generation the engine states", () => {
+    // A reply landing in generation 5 from 25 LY away left the star in generation 4.
+    expect(replyProgress(5, VEGA_LY, 4)).toBe(0);
+    expect(replyProgress(5, VEGA_LY, 3)).toBe(0);
+    expect(replyProgress(5, VEGA_LY, 4.5)).toBeCloseTo(0.5, 12);
+    expect(replyProgress(5, VEGA_LY, 5)).toBe(1);
+    expect(replyProgress(5, VEGA_LY, 6)).toBe(1);
+  });
+
+  it("treats a zero distance as arrived the moment it is sent", () => {
+    expect(messageProgress(2, 0, 1)).toBe(0);
+    expect(messageProgress(2, 0, 2)).toBe(1);
   });
 });
