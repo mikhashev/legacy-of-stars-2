@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T23:30:16",
+  "saved_at": "2026-09-04T03:57:42",
   "label": "",
   "generation": 1,
   "year": 1977,
@@ -15,7 +15,7 @@
       "funding": 50,
       "research_points": 100,
       "message_quality": 1.0,
-      "public_support": 65,
+      "public_support": 60,
       "knowledge_base": 10,
       "game_over": false,
       "game_over_reason": "",

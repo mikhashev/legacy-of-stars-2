@@ -216,12 +216,17 @@ export interface SentMessage {
  * generation whose new light changed something for a system at 20%+ knowledge.
  */
 export interface Observation {
-  /** The in-game year we looked (when this entry was recorded). */
+  /** The in-game year we looked (when this entry was recorded) - the Earth-frame year to show
+   * for "last change seen", never `observed_year`, which is the far side's own year. */
   year: number;
   /** The year the light that produced this observation left the system. */
   observed_year: number;
   /** One line, e.g. "digital era, cautious" or "Silent for 0 years." */
   summary: string;
+  /** True only when this entry came from an actual sky change; false (or absent, on an older
+   * save) for a routine research check that found nothing new. "Last change seen" must only
+   * ever read a `changed: true` entry. */
+  changed?: boolean;
 }
 
 export interface StarSystem {

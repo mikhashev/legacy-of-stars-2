@@ -81,7 +81,7 @@ class DeadOnArrivalTest(unittest.TestCase):
         program, system = self._program()
         program.send_message(system.name, "Hello")
         self.assertEqual(system.pending_responses, [])
-        self.assertIn("Any reply would arrive around Generation", program.message)
+        self.assertIn("If anyone answers, the reply arrives around Generation", program.message)
         for leak in ("dead", "extinct", "no response capability", "2060"):
             self.assertNotIn(leak, program.message.lower())
 
@@ -171,7 +171,8 @@ class ReceiptFrameDecidesTest(unittest.TestCase):
         program.send_message(system.name, "Hello")
         self.assertEqual(len(program.pending_attack_warnings), 1)
         self.assertEqual(len(system.pending_responses), 1)   # the friendly bait still comes
-        self.assertIn("Response expected", program.message)
+        # The wording must not distinguish a trap's bait from any other silent send.
+        self.assertIn("If anyone answers, the reply arrives around Generation", program.message)
 
     def test_a_fleet_is_as_advanced_as_its_builders_were_at_launch(self):
         system = make_system(strategy="LA", stage=CivilizationStage.DIGITAL,
@@ -198,6 +199,22 @@ class ReceiptFrameDecidesTest(unittest.TestCase):
         program.send_message(system.name, "Hello")
         restored = ContactProgram.from_dict(program.to_dict(), offline=True)
         self.assertEqual(restored.pending_attack_warnings[0].source_stage_name, "DIGITAL")
+
+    def test_send_text_does_not_reveal_who_is_listening(self):
+        """L (never answers), LB (usually friendly) and LR (sometimes friendly) must read
+        identically at send time - the wording is the only thing the player has, and it must
+        not give away which hidden strategy, or which roll, is behind a given target."""
+        texts = {}
+        for strategy in ("L", "LB", "LR"):
+            for roll in (0.0, 0.99):   # covers both a response and a silence, where applicable
+                system = make_system(strategy=strategy)
+                program = make_program(system, generation=4)
+                with mock.patch(RANDOM, return_value=roll):
+                    program.send_message(system.name, "Hello")
+                texts[(strategy, roll)] = program.message
+        unique = set(texts.values())
+        self.assertEqual(len(unique), 1, texts)
+        self.assertIn("If anyone answers, the reply arrives around Generation", unique.pop())
 
 
 class PresentFrameTest(unittest.TestCase):

@@ -95,6 +95,12 @@ input[type="text"], input[type="number"], textarea {
   font-size: 0.85rem;
   color: var(--text-dim);
 }
+.start-seed-preview {
+  margin: -0.3rem 0 0.6rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--text-dim);
+}
 .start-help-link { margin-top: 0.5rem; }
 
 .save-list { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.5rem 0; }

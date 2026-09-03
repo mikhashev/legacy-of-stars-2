@@ -186,6 +186,8 @@ class SkyChangeTest(unittest.TestCase):
         entry = watched.observations[-1]
         self.assertEqual((entry["year"], entry["observed_year"]), (2077, 2057))
         self.assertIn("Silent", entry["summary"])
+        # A real sky change, not a research check - the only kind "last change seen" may show.
+        self.assertTrue(entry["changed"])
 
 
 class ObservationHistoryTest(unittest.TestCase):
@@ -198,6 +200,8 @@ class ObservationHistoryTest(unittest.TestCase):
         entry = system.observations[-1]
         self.assertEqual((entry["year"], entry["observed_year"]), (2052, 2032))
         self.assertIn("digital era", entry["summary"])
+        # A routine research check, not a sky change - must not count as "last change seen".
+        self.assertFalse(entry["changed"])
         # The same year showing the same sky is not a second observation.
         self.assertIsNone(system.record_observation(program.current_year))
         self.assertEqual(len(system.observations), 1)
@@ -210,7 +214,7 @@ class ObservationHistoryTest(unittest.TestCase):
         state = program.view_state()["systems"][0]
         self.assertEqual(state["observed_year"], 2032)
         self.assertEqual(len(state["observations"]), 1)
-        self.assertEqual(set(state["observations"][0]), {"year", "observed_year", "summary"})
+        self.assertEqual(set(state["observations"][0]), {"year", "observed_year", "summary", "changed"})
         blob = json.dumps(program.view_state())
         self.assertNotIn("true_strategy", blob)
         self.assertNotIn("LBA", blob)

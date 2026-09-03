@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 // of its own, so it stays static.
 import type { StarMap } from "../scene/StarMap";
 import { formatDistance, formatYear, observedAsOf } from "../scene/coords";
-import { lastObservation, messageFateText } from "../messageFate";
+import { lastChangeObservation, messageFateText } from "../messageFate";
 import type { Store } from "../store";
 import type { ActionId, ActionSpec, StarSystem, ViewState } from "../types";
 import { SystemsPanel } from "./SystemsPanel";
@@ -55,7 +55,7 @@ function CardAction({
 function SelectedCard({ system, view, store }: { system: StarSystem; view: ViewState; store: Store }) {
   const lastResponse = system.responses[system.responses.length - 1];
   const lastMessage = system.messages_sent[system.messages_sent.length - 1];
-  const lastChange = lastObservation(system.observations);
+  const lastChange = lastChangeObservation(system.observations);
   return (
     <section class="map-card" data-system={system.name}>
       <div class="map-card-head">

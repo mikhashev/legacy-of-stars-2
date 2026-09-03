@@ -10,7 +10,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { affordabilityOf } from "../affordability";
 import { formatYear, observedAsOf } from "../scene/coords";
-import { lastObservation } from "../messageFate";
+import { lastChangeObservation } from "../messageFate";
 import type { Store } from "../store";
 import type { ActionSpec, ViewState } from "../types";
 
@@ -88,7 +88,7 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
       ) : (
         <ul class="picker-list">
           {eligible.map((s) => {
-            const lastChange = lastObservation(s.observations);
+            const lastChange = lastChangeObservation(s.observations);
             return (
               <li key={s.name}>
                 <button

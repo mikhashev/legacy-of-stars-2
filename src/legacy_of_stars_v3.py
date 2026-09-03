@@ -664,10 +664,18 @@ class StarSystem:
             summary = f"{summary}, {attitude}"
         return summary
 
-    def record_observation(self, year_now: int, summary: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Append one dated observation, unless it repeats the last one verbatim."""
+    def record_observation(self, year_now: int, summary: Optional[str] = None,
+                           changed: bool = False) -> Optional[Dict[str, Any]]:
+        """Append one dated observation, unless it repeats the last one verbatim.
+
+        `changed` marks an entry produced by an actual sky change (`_observe_sky`'s
+        `observed_change`), as opposed to a routine research check that found nothing new -
+        the only thing the web UI's "last change seen" line is allowed to read (finding 2:
+        showing a research-only entry there displays a date with nothing behind it).
+        """
         entry = {"year": int(year_now), "observed_year": self.observed_year(year_now),
-                 "summary": summary if summary is not None else self.observation_summary(year_now)}
+                 "summary": summary if summary is not None else self.observation_summary(year_now),
+                 "changed": changed}
         history = getattr(self, "observations", None)
         if history is None:
             history = self.observations = []
@@ -1332,7 +1340,7 @@ class ContactProgram:
             if change is None:
                 continue
             observed_year = system.observed_year(year)
-            system.record_observation(year)
+            system.record_observation(year, changed=True)
             self.emit("sky_change", self._sky_change_text(name, observed_year, change, after),
                       system=name, observed_year=observed_year, change=change)
             logging.info(f"SKY CHANGE: {name} ({change}) as of {format_year(observed_year)}")
@@ -2760,6 +2768,17 @@ You have answered one of humanity's greatest questions.
                                       "", ("choice",)))
         return actions
 
+    def _await_reply_message(self, system_name: str, round_trip_time: int) -> str:
+        """The one line every target the observed frame has not already ruled out gets, no
+        matter the hidden strategy or roll behind it (send_message's docstring): a reply may or
+        may not come, and the wording must never say which - that would leak that someone is
+        there, and how they feel about us.
+        """
+        arrival_generation = self.generation + round_trip_time
+        arrival_year = self.start_year + (arrival_generation - 1) * 25
+        return (f"Message sent to {system_name}. If anyone answers, the reply arrives around "
+                f"Generation {arrival_generation} (year {arrival_year}).")
+
     def send_message(self, system_name: str, message_content: str):
         """Transmit to a system - and let the civilization that will be there answer it.
 
@@ -2844,8 +2863,7 @@ You have answered one of humanity's greatest questions.
             else:
                 settle("nobody", send_year)
             if can_answer(system.observed(send_year)):
-                self.message = (f"Message sent to {system_name}. Any reply would arrive around "
-                                f"Generation {self.generation + round_trip_time}.")
+                self.message = self._await_reply_message(system_name, round_trip_time)
             elif system.has_civilization and system.is_extinct:
                 self.message = f"Message sent to {system_name}. No response detected."
             else:
@@ -2864,7 +2882,7 @@ You have answered one of humanity's greatest questions.
         # L Strategy
         if them.strategy == "L":
             settle("silent")
-            self.message = f"Message sent to {system_name}. No response detected."
+            self.message = self._await_reply_message(system_name, round_trip_time)
             logging.info(f"L Strategy: {system_name} - Silent")
             return
 
@@ -2903,7 +2921,7 @@ Use Defensive Actions in the menu to prepare.
                 response_text = self._compose_alien_reply(system, "LBA", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
 
-                self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
+                self.message = self._await_reply_message(system_name, round_trip_time)
                 logging.warning(f"LBA Trap: {system_name} - Friendly bait, attack Gen {attack_gen}")
             else:
                 # Low deception LBA - silent attack, no bait
@@ -2911,7 +2929,7 @@ Use Defensive Actions in the menu to prepare.
                 self._schedule_attack(system, self.attack_arrival_generation(system), "fleet",
                                       announce=False, source_stage=launch_stage)
 
-                self.message = f"Message sent to {system_name}. No response detected."
+                self.message = self._await_reply_message(system_name, round_trip_time)
                 logging.critical(f"HOSTILE FLEET DETECTED (LBA low deception): {system_name}")
             return
 
@@ -2927,11 +2945,10 @@ Use Defensive Actions in the menu to prepare.
                 response_text = self._compose_alien_reply(system, "LR", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
 
-                self.message = f"Message sent to {system_name}. Response expected in ~{round_trip_time * 25} years."
-                self.public_support = min(100, self.public_support + 2)
+                self.message = self._await_reply_message(system_name, round_trip_time)
             else:
                 settle("silent")
-                self.message = f"Message sent to {system_name}. No response (yet)."
+                self.message = self._await_reply_message(system_name, round_trip_time)
             return
 
         # LB Strategy
@@ -2945,17 +2962,16 @@ Use Defensive Actions in the menu to prepare.
                 response_text = self._compose_alien_reply(system, "LB", message_content, them)
                 system.pending_responses.append((response_text, arrival_generation))
 
-                self.message = f"Message sent to {system_name}. Enthusiastic response expected!"
-                self.public_support = min(100, self.public_support + 5)
+                self.message = self._await_reply_message(system_name, round_trip_time)
             else:
                 settle("silent")
-                self.message = f"Message sent to {system_name}. Awaiting response..."
+                self.message = self._await_reply_message(system_name, round_trip_time)
             return
 
         # Alive and radio-capable but holding no strategy at all (a system written by hand):
         # there is nobody to decide to answer.
         settle("silent")
-        self.message = f"Message sent to {system_name}. No response detected."
+        self.message = self._await_reply_message(system_name, round_trip_time)
 
     def focus_research(self, system_name: str):
         """Focus research efforts on a particular system"""

@@ -57,6 +57,23 @@ export function lastObservation(observations: readonly Observation[]): Observati
 }
 
 /**
+ * The most recent entry that recorded an actual sky change, or null when the sky has never
+ * changed for this system. `observations[]` also holds routine research checks (Focus Research
+ * records one every time, whether or not anything moved) - `lastObservation` above would happily
+ * return one of those, which is how "last change seen" ended up showing the date of a research
+ * click with nothing behind it (finding 2). This is the one the "last change seen" line - the
+ * map card and the system picker - must read; its `.year` is the Earth-frame year to show, never
+ * `.observed_year`, which is the far side's own year when the change happened.
+ */
+export function lastChangeObservation(observations: readonly Observation[]): Observation | null {
+  for (let i = observations.length - 1; i >= 0; i -= 1) {
+    const entry = observations[i];
+    if (entry?.changed) return entry;
+  }
+  return null;
+}
+
+/**
  * "our message reaches them in {receipt_year}; they will have {n} more years of history than
  * we have seen" - the dossier line for an in-flight message (docs/plans/civilization_timelines_plan.md
  * §8). `receipt_year` is when our signal lands (`expected_reply_year - distance`, half the

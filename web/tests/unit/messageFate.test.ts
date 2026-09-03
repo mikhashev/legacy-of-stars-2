@@ -4,7 +4,7 @@
  * selected-system card and the picker actually show.
  */
 import { describe, expect, it } from "vitest";
-import { inFlightHint, lastObservation, messageFateText } from "../../src/messageFate";
+import { inFlightHint, lastChangeObservation, lastObservation, messageFateText } from "../../src/messageFate";
 import type { Observation } from "../../src/types";
 
 describe("messageFateText", () => {
@@ -79,5 +79,31 @@ describe("lastObservation", () => {
 
   it("the last entry, not the first", () => {
     expect(lastObservation([a, b])).toBe(b);
+  });
+});
+
+describe("lastChangeObservation", () => {
+  // A real sky change in 2027 (Earth-frame `year`), then a Focus Research click in 2052 that
+  // found nothing new - `changed` is unset, exactly like an observation recorded before this
+  // field existed (an older save). "Last change seen" must still land on 2027, not 2052 or
+  // 1977 (the far side's own `observed_year` for the change).
+  const change: Observation = { year: 2027, observed_year: 1977, summary: "digital era, cautious", changed: true };
+  const research: Observation = { year: 2052, observed_year: 2002, summary: "digital era, cautious" };
+
+  it("null for an empty history", () => {
+    expect(lastChangeObservation([])).toBeNull();
+  });
+
+  it("null when nothing in the history was ever a change", () => {
+    expect(lastChangeObservation([research, { ...research, year: 2077 }])).toBeNull();
+  });
+
+  it("skips a later research-only entry and returns the change", () => {
+    expect(lastChangeObservation([change, research])).toBe(change);
+  });
+
+  it("returns the most recent of several changes", () => {
+    const earlier: Observation = { ...change, year: 2002, changed: true };
+    expect(lastChangeObservation([earlier, change, research])).toBe(change);
   });
 });

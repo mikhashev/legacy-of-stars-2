@@ -5,46 +5,62 @@ function pct(value: number): string {
   return `${Math.round(value)}%`;
 }
 
+/** "three" for 3, "5" for anything past this short list - matches `src/ui_text.py`'s
+ * `_NUMBER_WORDS`, which spells the same goal out in the console help text. */
+const NUMBER_WORDS: Record<number, string> = { 3: "three", 4: "four", 5: "five" };
+
+function numberWord(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
 /**
  * What each row means, as a `title` tooltip on both the term and its value. Playtesters read
  * the numbers fine and could not say what moved them, so every rule stated here is one the
  * engine actually applies (docs/reference/web_contract.md 6) - no row promises a mechanic that is not
  * in `legacy_of_stars_v3.py`.
+ *
+ * `contacts` is built from `view.contacts_goal` rather than a number written into this file -
+ * a playtester once read "Three replies is the contact victory" here while the engine's actual
+ * goal (`CONTACT_VICTORY_GOAL`) was 5, because this row had drifted out of sync with it.
  */
-const HINTS = {
-  action_points:
-    "What you may do this generation. Most actions cost 1 AP; research is free. Unspent points do not carry over - advancing the generation refills them.",
-  funding:
-    "The program's budget. Each generation it moves with public support (and the director's administration skill); below 20% the program is defunded and the run ends.",
-  public_support:
-    "How much the public backs the program. Outreach raises it, replies and recovered archives raise it, crises and low integration cost it.",
-  knowledge_base:
-    "Everything the program has learned, across all systems. Grows with replies from civilizations, recovered swan songs and resolved crises; Focus Research raises a single system's knowledge instead.",
-  research_points: "Spent on technologies. The per-generation figure is passive income, scaled by integration.",
-  tech_level: "The highest technology tier researched. Alien civilizations read it as how advanced we look.",
-  broadcast_radius:
-    "How far Earth's broadcasts since the 1930s have travelled. It grows one light-year a year no matter what you do: technology changes how loud we are, not how far.",
-  self_destruct_risk:
-    "The chance per generation that Earth ends itself - war, runaway technology, a failed transition. Low integration and reckless doctrines raise it; safeguards lower it.",
-  ecological_risk:
-    "The chance per generation of an ecological collapse at home. Industrial expansion raises it; ecological and integration technologies lower it.",
-  integration:
-    "Biological-technological integration. Below 30% after Generation 30 it costs support and raises self-destruct risk; Transcendence technologies raise it. Grace period until Generation 30.",
-  contacts:
-    "Civilizations that have answered us. Three replies is the contact victory: only a reply counts, not a message sent.",
-  fermi_evidence:
-    "Evidence toward an answer to the Fermi paradox: extinctions found, hostile encounters survived, peaceful contacts and great-filter discoveries. 15 points is the philosophical victory.",
-  achievements: "Milestones this run has unlocked: see Menu for the list.",
-  detection_reach:
-    "Detection technologies extend how far we can catalogue stars. Beyond it, undiscovered stars wait for a deeper tier.",
-  active_effects:
-    "The permanent modifiers in force right now - the 1977 decision, researched technologies, doctrines and the integration bonus or penalty. The engine writes these lines; each one is a rule it is applying.",
-} as const;
+function buildHints(view: ViewState) {
+  return {
+    action_points:
+      "What you may do this generation. Most actions cost 1 AP; research is free. Unspent points do not carry over - advancing the generation refills them. " +
+      "Base is 2; public support above 70%, funding above 70% and a director whose administration skill is above 70% each add 1 - that is why one game can start at 2/2 and another at 3/3.",
+    funding:
+      "The program's budget. Each generation it moves with public support (and the director's administration skill); below 20% the program is defunded and the run ends.",
+    public_support:
+      "How much the public backs the program. Outreach raises it, replies and recovered archives raise it, crises and low integration cost it.",
+    knowledge_base:
+      "Everything the program has learned, across all systems. Grows with replies from civilizations, recovered swan songs and resolved crises; Focus Research raises a single system's knowledge instead.",
+    research_points: "Spent on technologies. The per-generation figure is passive income, scaled by integration.",
+    tech_level: "The highest technology tier researched. Alien civilizations read it as how advanced we look.",
+    broadcast_radius:
+      "How far Earth's broadcasts since the 1930s have travelled. It grows one light-year a year no matter what you do: technology changes how loud we are, not how far.",
+    self_destruct_risk:
+      "The chance per generation that Earth ends itself - war, runaway technology, a failed transition. Low integration and reckless doctrines raise it; safeguards lower it.",
+    ecological_risk:
+      "The chance per generation of an ecological collapse at home. Industrial expansion raises it; ecological and integration technologies lower it.",
+    integration:
+      "Biological-technological integration. Below 30% after Generation 30 it costs support and raises self-destruct risk; Transcendence technologies raise it. Grace period until Generation 30.",
+    contacts:
+      `Civilizations that have answered us. ${numberWord(view.contacts_goal)} replies is the contact victory: only a reply counts, not a message sent.`,
+    fermi_evidence:
+      "Evidence toward an answer to the Fermi paradox: extinctions found, hostile encounters survived, peaceful contacts and great-filter discoveries. 15 points is the philosophical victory.",
+    achievements: "Milestones this run has unlocked: see Menu for the list.",
+    detection_reach:
+      "Detection technologies extend how far we can catalogue stars. Beyond it, undiscovered stars wait for a deeper tier.",
+    active_effects:
+      "The permanent modifiers in force right now - the 1977 decision, researched technologies, doctrines and the integration bonus or penalty. The engine writes these lines; each one is a rule it is applying.",
+  } as const;
+}
 
 /** The console's "Program Status" block, plus win-condition counters and doctrines. */
 export function StatusPanel({ view }: { view: ViewState }) {
   const s = view.status;
   const evidence = view.fermi_evidence;
+  const HINTS = buildHints(view);
   return (
     <Collapsible id="status" title="Program status" extraClass="status-panel">
       <p class="status-hint">Hover a row for what it means.</p>

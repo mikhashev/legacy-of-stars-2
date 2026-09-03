@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../store";
 import { importSaveFile, listSaves, loadSaveText, type SaveMeta } from "../saves";
+import { resolveSeed, seedPreview } from "../seed";
 
 function formatDate(iso: string): string {
   if (!iso) return "unknown date";
@@ -23,12 +24,7 @@ export function StartScreen({ store }: { store: Store }) {
 
   const startNew = () => {
     const trimmed = seed.trim();
-    const seedValue = trimmed === "" ? undefined : Number(trimmed);
-    if (trimmed !== "" && !Number.isFinite(seedValue)) {
-      store.showToast("Seed must be a number.");
-      return;
-    }
-    void store.newGame(seedValue);
+    void store.newGame(trimmed === "" ? undefined : resolveSeed(trimmed));
   };
 
   const load = (meta: SaveMeta) => {
@@ -64,12 +60,12 @@ export function StartScreen({ store }: { store: Store }) {
           Seed (optional)
           <input
             type="text"
-            inputMode="numeric"
             value={seed}
-            placeholder="random"
+            placeholder="random, or any text"
             onInput={(e) => setSeed((e.target as HTMLInputElement).value)}
           />
         </label>
+        {seedPreview(seed) && <p class="start-seed-preview">{seedPreview(seed)}</p>}
         <button class="primary" onClick={startNew} disabled={store.state.busy}>
           Start
         </button>
