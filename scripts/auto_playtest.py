@@ -40,15 +40,25 @@ _AP_WEIGHTS = {
     "neglect": (0.30, 0.40, 0.10, 0.20),
     # The two measurement profiles the plan fixes (§7a), so the receipt-frame numbers below are
     # reproducible rather than a by-product of whatever the mixed rotation happened to do:
-    # "observer" studies the sky every generation and only ever writes to a system it already
-    # knows something about; "talker" sends a message with almost every action point it has.
-    "observer": (0.10, 0.20, 0.10, 0.60),
+    # "observer" spends three quarters of its action points on the sky and keeps a watch list
+    # (see `study_target`); "talker" sends a message with almost every action point it has.
+    #
+    # T5 note: the observer's share was 0.60 and its studies picked a *uniformly random* system,
+    # which is not an observatory - with 50-90 catalogued stars it never brought more than ~20 of
+    # them past the 20 % knowledge the engine needs before it watches a star at all, so the
+    # sky-change metric measured the harness's scattering rather than the sky. The mix below is
+    # the policy T5 fixes: study, and study the same stars until they are on the watch list.
+    "observer": (0.15, 0.05, 0.05, 0.75),
     "talker": (0.85, 0.05, 0.05, 0.05),
 }
-# Strategies that only message a system they have reason to trust: one that already answered, or
-# one studied past this knowledge floor. Everything else gets studied instead.
+# Strategies that keep a watch list: they study the stars they have already begun to study, and
+# only message a system on that list (or one that has already answered).
 _CAREFUL_MESSAGE_STRATEGIES = {"observer"}
-OBSERVER_KNOWLEDGE_FLOOR = 40
+_WATCH_LIST_STRATEGIES = {"observer"}
+# The knowledge at which a star counts as watched. It is the engine's own
+# `OBSERVATION_KNOWLEDGE_REQUIRED`: below it nobody is pointing a telescope at that star from one
+# generation to the next, so no sky change is ever noticed there.
+OBSERVER_KNOWLEDGE_FLOOR = 20
 # The distance that makes a one-way signal a multi-generation bet: 80 LY is more than three
 # generations of light-time each way, so the director who sends will not read the answer.
 FAR_SYSTEM_LY = 80.0
@@ -75,6 +85,42 @@ class AutoPlayer:
         # FAR_SYSTEM_LY. It measures the detection tiers, not luck: reach gating means a star
         # that far can only be drawn once the Detection tree has been pushed to tier 3.
         self.first_far_system_gen = None
+        # T5 calibration (plan §7). The kinds of the sky changes in the order they were seen -
+        # the first-impression metric asks whether one of the first three is a stage advance
+        # rather than a death, so the order matters and the count alone does not.
+        self.sky_change_kinds = []
+        # The generation the first alien reply landed: the other first-impression metric.
+        self.first_reply_gen = None
+        # One entry per catalogued civilization, taken the generation its star is first
+        # resolved: {"distance", "extinct"}. "extinct" is the *observed* frame - a death whose
+        # light has already reached Earth - which is what "extinct at first observation" means.
+        self.first_observations = []
+        self._seen_systems = set()
+        self._note_new_systems()
+
+    def _note_new_systems(self) -> None:
+        """Record the observed state of every star resolved since the last call (plan §7b).
+
+        A star enters the catalogue at most once, so the first look at it is the only one this
+        metric may use: `system.observed(year)` is the civilization as the light arriving now
+        shows it, and a civilization whose death is already visible is "extinct at first
+        observation". A civilization that has not been born yet in the light we receive is not
+        extinct - it is simply not there - and counts as alive-so-far.
+        """
+        p = self.program
+        for name, system in p.star_systems.items():
+            if name in self._seen_systems:
+                continue
+            self._seen_systems.add(name)
+            if not system.has_civilization or system.is_wow_source:
+                continue
+            if getattr(system, "timeline", None) is None:
+                extinct = bool(system.is_extinct)          # an old save: the cached fields are all there is
+            else:
+                state = system.observed(p.current_year)
+                extinct = (not state.alive) and state.died_year is not None
+            self.first_observations.append(
+                {"distance": float(system.distance), "extinct": bool(extinct)})
 
     def log(self, msg: str) -> None:
         self.logs.append(f"[Gen {self.program.generation}] {msg}")
@@ -142,7 +188,7 @@ class AutoPlayer:
             if roll < msg_w:
                 target = self.pick_message_target(systems)
                 if target is None:
-                    p.focus_research(random.choice(systems))
+                    p.focus_research(self.study_target(systems))
                 else:
                     p.send_message(target, "Greetings from Earth. We seek peaceful contact.")
                     self.log(f"Message sent to {target}")
@@ -157,13 +203,33 @@ class AutoPlayer:
                     p.listen_for_swan_song(target)
                     self.log(f"Listened for swan song at {target}")
                 else:
-                    p.focus_research(random.choice(systems))
+                    p.focus_research(self.study_target(systems))
             else:
-                p.focus_research(random.choice(systems))
+                p.focus_research(self.study_target(systems))
 
             if p.action_points == before:
                 # Action was refused without spending AP; do something that always costs 1 AP.
-                p.focus_research(random.choice(systems))
+                p.focus_research(self.study_target(systems))
+
+    def study_target(self, systems):
+        """Which system this profile points its telescopes at.
+
+        Most profiles study at random, which is what a program with no observing plan does. The
+        "observer" profile keeps a **watch list**: it finishes the star it has already begun -
+        the one closest to the 20 % knowledge the engine needs before it notices anything at
+        that star - and only then opens a new one, nearest first. Once every catalogued star is
+        watched it deepens the least-known of them. This is the T5 measurement policy: the
+        sky-change metric is about what a watchful program sees, so the instrument has to watch.
+        """
+        if self.strategy not in _WATCH_LIST_STRATEGIES:
+            return random.choice(systems)
+        p = self.program
+        unwatched = [p.star_systems[name] for name in systems
+                     if p.star_systems[name].knowledge < OBSERVER_KNOWLEDGE_FLOOR]
+        if unwatched:
+            return min(unwatched, key=lambda s: (-s.knowledge, s.distance)).name
+        partial = [p.star_systems[name] for name in systems if p.star_systems[name].knowledge < 100]
+        return min(partial, key=lambda s: s.knowledge).name if partial else random.choice(systems)
 
     def pick_message_target(self, systems):
         """Which system this profile is willing to write to.
@@ -210,9 +276,13 @@ class AutoPlayer:
             self.resolve_pending_event()
             self.make_decisions()
             p.advance_generation()
+            self._note_new_systems()
             for event in p.drain_events():
                 if event.kind == "sky_change":
                     self.sky_changes += 1
+                    self.sky_change_kinds.append(event.data.get("change", "?"))
+                elif event.kind == "response_received" and self.first_reply_gen is None:
+                    self.first_reply_gen = p.generation
                 elif (event.kind == "system_discovered" and self.first_far_system_gen is None
                       and event.data.get("distance", 0) >= FAR_SYSTEM_LY):
                     self.first_far_system_gen = p.generation
@@ -254,6 +324,9 @@ class AutoPlayer:
             "contact_names": contacts,
             "swan_songs_found": swan_found,
             "sky_changes": self.sky_changes,
+            "sky_change_kinds": list(self.sky_change_kinds),
+            "first_reply_gen": self.first_reply_gen,
+            "first_observations": list(self.first_observations),
             "first_far_system_gen": self.first_far_system_gen,
             "detection_reach_ly": p.detection_reach_ly(),
             "farthest_known_ly": max((s.distance for s in p.star_systems.values()
@@ -265,6 +338,96 @@ class AutoPlayer:
             "message_fates": self.message_fates(),
             "exception": None,
         }
+
+
+# ---------------------------------------------------------------------- calibration (T5, plan section 7)
+# The distance bands the "extinct at first observation" share is reported in. Far stars are seen
+# further in the past, so their band reads higher; one flat number would hide exactly that.
+DISTANCE_BANDS = ((0.0, 20.0, "<=20 LY"), (20.0, 60.0, "20-60 LY"), (60.0, 160.0, "60-160 LY"))
+
+
+def _median(values):
+    """The median of a list of numbers, or None for an empty one."""
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[middle])
+    return (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+def calibration_metrics(results) -> dict:
+    """The plan section 7 calibration metrics over a batch of runs of one profile.
+
+    Every number here is a target in the plan, and each is measured the same way every time:
+
+    * ``extinct`` - the share of catalogued civilizations whose death was already visible the
+      generation their star was first resolved, overall and per distance band (target 20-30 %);
+    * ``sky_changes_per_40`` - sky changes normalised to a 40-generation game (target 3-6 for
+      the "observer" profile, which is the one that studies the sky every generation and so is
+      the only profile that watches enough systems for the number to mean anything);
+    * ``differing_outcomes`` - the share of messages to an inhabited target whose outcome the
+      receipt frame decided differently from a static evaluation, approximated as
+      ``died_in_flight / (replied + silent + died_in_flight)`` (target 10-20 %);
+    * ``victory_rate`` - contact or philosophical victories per game (target: within 20 % of
+      the pre-timelines baseline);
+    * ``first_reply_median`` - the median generation of the first reply (target: no later than
+      the baseline);
+    * ``stage_up_first_three`` - the share of games whose first three sky changes contain a
+      stage advance rather than only deaths (the "the galaxy is alive" first impression).
+    """
+    results = [r for r in results if not r.get("exception")]
+    games = len(results)
+    bands = {label: {"civs": 0, "extinct": 0} for _, _, label in DISTANCE_BANDS}
+    for result in results:
+        for observation in result.get("first_observations") or []:
+            for low, high, label in DISTANCE_BANDS:
+                if low < observation["distance"] <= high or (low == 0.0 and observation["distance"] <= high):
+                    bands[label]["civs"] += 1
+                    bands[label]["extinct"] += bool(observation["extinct"])
+                    break
+    civs = sum(band["civs"] for band in bands.values())
+    extinct = sum(band["extinct"] for band in bands.values())
+
+    generations = sum(r["generations"] for r in results) or 1
+    sky_changes = sum(r.get("sky_changes", 0) for r in results)
+
+    fates = {}
+    for result in results:
+        for fate, count in (result.get("message_fates") or {}).items():
+            fates[fate] = fates.get(fate, 0) + count
+    inhabited = fates.get("replied", 0) + fates.get("silent", 0) + fates.get("died_in_flight", 0)
+
+    wins = sum(1 for r in results if r["victory"] or r["philosophical_victory"])
+    replies = [r["first_reply_gen"] for r in results if r.get("first_reply_gen") is not None]
+
+    with_three = [r for r in results if len(r.get("sky_change_kinds") or []) >= 3]
+    stage_up = sum(1 for r in with_three if "stage_up" in (r["sky_change_kinds"] or [])[:3])
+
+    return {
+        "games": games,
+        "civilizations_observed": civs,
+        "extinct_share": (extinct / civs) if civs else None,
+        "extinct_by_band": {
+            label: {"civs": band["civs"], "extinct": band["extinct"],
+                    "share": (band["extinct"] / band["civs"]) if band["civs"] else None}
+            for label, band in bands.items()
+        },
+        "sky_changes": sky_changes,
+        "sky_changes_per_game": sky_changes / games if games else 0.0,
+        "sky_changes_per_40": 40.0 * sky_changes / generations,
+        "message_fates": fates,
+        "messages_to_inhabited": inhabited,
+        "differing_outcomes": (fates.get("died_in_flight", 0) / inhabited) if inhabited else None,
+        "victories": wins,
+        "victory_rate": wins / games if games else 0.0,
+        "first_reply_median": _median(replies),
+        "games_with_a_reply": len(replies),
+        "stage_up_first_three": (stage_up / len(with_three)) if with_three else None,
+        "games_with_three_sky_changes": len(with_three),
+        "games_below_three_sky_changes": games - len(with_three),
+    }
 
 
 def format_fates(counts: dict) -> str:
@@ -317,6 +480,7 @@ def main(argv=None) -> int:
                 "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
                 "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "sky_changes": 0,
+                "sky_change_kinds": [], "first_reply_gen": None, "first_observations": [],
                 "systems_known": 0, "messages_sent": 0, "message_fates": {},
                 "first_far_system_gen": None, "detection_reach_ly": 0.0, "farthest_known_ly": 0.0,
                 "passive_detections": 0, "info_attacks": 0,

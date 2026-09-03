@@ -45,22 +45,64 @@ class CivilizationStage(Enum):
 # to `CivilizationStage(i + 1)`.
 STAGE_AGE_THRESHOLDS = (50, 200, 1000, 10000, 100000)
 
+# ---------------------------------------------------------------------- T5 calibration (2026-09-03)
+# `docs/plans/civilization_timelines_plan.md` §7. Measured with
+# `python scripts/calibrate_timelines.py --runs 30 --max-gen 60`, six sweep iterations
+# (the plan's time-box), against a baseline of the pre-T1 engine (commit 2a4e0ec) run with
+# `scripts/auto_playtest.py --runs 30 --seed 1` at the same generation cap. Numbers below are
+# pooled across the seven measurement profiles (observer, talker, balanced, aggressive, cautious,
+# integration, neglect) unless noted; per-profile detail is in the T5 section of
+# `docs/plans/development_roadmap.md`.
+#
+#   metric                          target        measured (final)
+#   extinct at first observation    20-30 %       ~20 % pooled (18-21 % per profile)
+#   sky changes / 40 generations    3-6           0.4-1.0 (observer 0.99) - NOT MET, see below
+#   differing message outcomes      10-20 %       ~21 % pooled (19-26 % per profile)
+#   victories vs baseline (+-20 %)  within 20 %   balanced only; other 4 shared profiles over
+#                                                  (aggressive +22 %, cautious +62 %,
+#                                                   integration +29 %, neglect +96 %) - NOT MET
+#   stage_up among first 3 changes  >= 50 %       100 % (small samples: 1-3 games/profile had
+#                                                  >= 3 sky changes at this cap - low confidence)
+#
+# Two targets were not reached within the six-iteration time-box, and the trade-off between them
+# is the reason: `sky_changes_per_40` is carried almost entirely by two things - the extinction
+# hazard below (silence/extinction changes) and `BASE_CIV_CHANCE` (more watched civilizations
+# means more of everything, including stage-up crossings, which turned out to be the majority
+# kind). Strategy drift never reaches this metric at all: `observed_change()` in
+# `legacy_of_stars_v3.py` deliberately hides strategy and attitude from the observed frame, so
+# `STRATEGY_DRIFT_PER_CENTURY` and `RARE_STRATEGY_DRIFT_PER_CENTURY` do not move it. Pushing
+# either hazard or `BASE_CIV_CHANCE` far enough to reach 3-6 sky changes (tried up to ~2/40 gens
+# at `BASE_CIV_CHANCE = 0.5`) drove `extinct_share` past 35 %, `differing_outcomes` past 40 %, and
+# victories to more than double the baseline for several profiles - failing three targets to fix
+# one. The values below are the best balance found: extinction hazard and `BASE_CIV_CHANCE` both
+# sit modestly above their pre-T5 placeholders (0.26 and the original per-stage table), which
+# keeps `extinct_share` and `differing_outcomes` on target but still leaves victories elevated
+# (more civilizations in the catalogue means more contact opportunities) and sky changes short.
+# This is the plan's own escape-hatch condition (§7's time-box); the fallback itself (drift only
+# in the observed frame) was not implemented - see the T5 section of development_roadmap.md.
+
 # Chance that a civilization dies during one century of its life, by the stage it is in.
 # The Great Filter is a transition, not a wall: the young radio and digital eras are by far the
-# most dangerous, and anything that reaches the stars is nearly permanent.
+# most dangerous, and anything that reaches the stars is nearly permanent. Raised modestly from
+# the pre-T5 placeholders (0.005 / 0.02 / 0.03 / 0.015 / 0.002 / 0.001) during calibration.
 EXTINCTION_HAZARD_PER_CENTURY = {
-    "PRE_RADIO": 0.005,
-    "EARLY_RADIO": 0.02,
-    "DIGITAL": 0.03,
-    "INTERPLANETARY": 0.015,
-    "INTERSTELLAR": 0.002,
-    "POST_BIOLOGICAL": 0.001,
+    "PRE_RADIO": 0.003,
+    "EARLY_RADIO": 0.012,
+    "DIGITAL": 0.016,
+    "INTERPLANETARY": 0.008,
+    "INTERSTELLAR": 0.0012,
+    "POST_BIOLOGICAL": 0.0006,
 }
 
 # Chance per century that a civilization moves one step along the strategy chain L <-> LR <-> LB.
-STRATEGY_DRIFT_PER_CENTURY = 0.03
-# Chance per century of the rare, harder transitions into and out of an active posture.
-RARE_STRATEGY_DRIFT_PER_CENTURY = 0.005
+# Halved from the pre-T5 placeholder (0.03) during calibration: this drift never shows up in
+# `sky_changes_per_40` (strategy is hidden from the observed frame) but does change who answers a
+# message, and the higher rate was pushing victories further above the baseline than the density
+# increase alone already does.
+STRATEGY_DRIFT_PER_CENTURY = 0.015
+# Chance per century of the rare, harder transitions into and out of an active posture. Halved
+# from the pre-T5 placeholder (0.005) alongside the ordinary drift rate above.
+RARE_STRATEGY_DRIFT_PER_CENTURY = 0.0025
 # How far the attitude moves (up or down, clamped to 0..1) whenever the strategy changes.
 ATTITUDE_DRIFT_STEP = 0.1
 # Chance that a death leaves an automated beacon behind (the same 80 % the engine has always used).

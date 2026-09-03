@@ -36,10 +36,13 @@ class CivilizationTypeTest(unittest.TestCase):
         cls.extinct = [s for s in cls.civs if s.is_extinct]
 
     def test_galaxy_is_mostly_silent(self):
+        # T5 (2026-09-03) raised BASE_CIV_CHANCE 0.26 -> 0.32 and lowered the extinct-at-creation
+        # share 0.25 -> 0.15 during calibration (docs/plans/civilization_timelines_plan.md §7);
+        # see the calibration block in src/civ_timeline.py.
         fraction = len(self.civs) / len(self.systems)
-        self.assertTrue(0.10 < fraction < 0.20, fraction)
+        self.assertTrue(0.15 < fraction < 0.27, fraction)
         extinct_fraction = len(self.extinct) / len(self.civs)
-        self.assertTrue(0.18 < extinct_fraction < 0.32, extinct_fraction)
+        self.assertTrue(0.10 < extinct_fraction < 0.20, extinct_fraction)
 
     def test_every_civilization_has_a_valid_type(self):
         for system in self.civs:
@@ -100,15 +103,15 @@ class CatalogCivilizationCountTest(unittest.TestCase):
 
     The per-star chance was calibrated on the original 53-star catalogue, where it averaged
     ~8 civilizations. T4 deepened the catalogue to 94 stars out to ~160 LY without touching
-    the constant (T5 owns calibration), so the *density* is unchanged and the totals simply
-    follow the larger sky: ~16.2 over the whole catalogue, of which ~8.5 lie within 20 LY -
-    i.e. the near field the player starts in is what it always was, plus the six nearby stars
-    the science accuracy audit listed as missing. The far field is the new content, and it is
-    gated behind the detection tiers, so it arrives over the course of a game rather than at
-    generation one.
+    the constant, so the density stayed unchanged through T4 and the totals simply followed the
+    larger sky: ~16.2 over the whole catalogue, of which ~8.5 lie within 20 LY.
+
+    T5 calibration (2026-09-03, plan §7) then raised BASE_CIV_CHANCE 0.26 -> 0.32 to bring the
+    observed-frame sky-change rate up (see src/civ_timeline.py's calibration block), which raised
+    both totals: ~19.8 over the whole catalogue, ~10.2 within 20 LY.
     """
 
-    def test_full_catalog_averages_about_sixteen_civilizations(self):
+    def test_full_catalog_averages_about_twenty_civilizations(self):
         random.seed(2026)
         runs = 300
         total = 0
@@ -121,9 +124,8 @@ class CatalogCivilizationCountTest(unittest.TestCase):
                         near += 1
         mean = total / runs
         near_mean = near / runs
-        self.assertTrue(14.5 <= mean <= 18.0, f"mean civilizations per catalog: {mean}")
-        # The near field must not have drifted away from the original calibration target.
-        self.assertTrue(7.0 <= near_mean <= 9.5, f"mean civilizations within 20 LY: {near_mean}")
+        self.assertTrue(18.0 <= mean <= 21.5, f"mean civilizations per catalog: {mean}")
+        self.assertTrue(8.5 <= near_mean <= 12.0, f"mean civilizations within 20 LY: {near_mean}")
 
     def test_evolved_stars_never_host_anyone(self):
         random.seed(7)

@@ -1,5 +1,5 @@
 # Legacy of Stars - Development Roadmap
-**Updated**: 2026-09-02 - v1.0 playable release
+**Updated**: 2026-09-03 - v1.2 civilization timelines
 
 ## ✅ v1.0 - Playable release (2026-09-02)
 
@@ -52,6 +52,77 @@ the leakage front grows one light-year per year, and the Genesis Project sends e
   `genesis_project.py`, `game_interface.py`, plus `START_YEAR` for `Technology.year_context`).
   Add `YEARS_PER_GENERATION` and a `ContactProgram.year_of(generation)` helper and route every
   caller through it.
+
+## v1.2 - Civilization timelines (2026-09-03)
+
+Every catalogued civilization now has its own history instead of a state rolled once and frozen.
+`docs/plans/civilization_timelines_plan.md` (approved 2026-09-03) ran in six phases, T0-T6; the
+five below were completed (T6, the web/console front-end for it, is not yet started):
+
+- **T0** - `src/civ_timeline.py`: a deterministic, per-system-seeded list of dated `CivEvent`s
+  (`stage`/`strategy`/`attitude`/`extinct`) and `state_at(year)` to replay them; old saves load
+  as static timelines (`timeline = None`) with no behaviour change.
+- **T1** - the observed frame: descriptions, extinction, swan songs and the dossier all read
+  `state_at(now - d)`; a `sky_change` event fires when new light shows a watched system change.
+- **T2** - the receipt frame: `send_message` decides from `state_at(now + d)`; a civilization that
+  dies before receipt gets no reply and a later sky-change explains why; every sent message
+  carries `expected_reply_year` and `explanation_year`.
+- **T3** - the WOW! source's Generation 144 evaluation reads `state_at(1977 + 1800)`, the
+  civilization as it is when the reply arrives, instead of its state at first roll.
+- **T4** - the catalogue deepened to 94 real stars out to ~160 LY, gated by detection tier
+  (20/35/60/100 LY, unlimited at tier 4); the map and mirror-spawn logic respect the reach.
+
+**T4 deviations from the plan text.** Two additions were needed to make the deepened catalogue
+actually playable rather than partially inert:
+
+1. **A tier-4 Detection technology** (`solar_gravitational_lens`, "Solar Gravitational Lens
+   Telescope", `data/tech_tree.json`) was added so `UNLIMITED_REACH_LY` is reachable at all - the
+   tech tree's Detection category topped out at tier 3 (100 LY reach), which permanently stranded
+   HD 10180 (127 LY) and HD 209458 (159 LY) outside detection range for every game.
+2. **Three planet-host stars in the 80-100 LY band** (HD 134987, HD 216437, HD 82943, all real
+   exoplanet hosts) were added to `data/star_catalog.json` alongside the T4 catalogue so that band
+   is not empty - the plan's star list left a gap between the ~60 LY group and HD 10180 at 127 LY.
+
+**T5 - calibration.** Measured with `scripts/calibrate_timelines.py` against a baseline of the
+pre-T1 engine (commit `2a4e0ec`, `scripts/auto_playtest.py --runs 30 --seed 1`, matched to the
+same 60-generation cap for the victory comparison). Six sweep iterations (the plan's time-box);
+final numbers pooled across all seven measurement profiles unless noted - see the calibration
+block in `src/civ_timeline.py` for the full iteration-by-iteration trade-off:
+
+| Metric | Target (§7) | Measured (final) | Met? |
+|---|---|---|---|
+| Extinct at first observation | 20-30 % | ~20 % pooled (18-21 % per profile) | yes (floor) |
+| Sky changes / 40 generations (observer) | 3-6 | 0.4-1.0 (observer 0.99) | **no** |
+| Differing message outcomes | 10-20 % | ~21 % pooled (19-26 % per profile) | close (~1 pt over) |
+| Victories vs. baseline, per shared profile | within ±20 % | balanced +5 % (met); aggressive +22 %, cautious +62 %, integration +29 %, neglect +96 % | **no** (4/5) |
+| First-reply median vs. baseline | not later | baseline harness has no such field; not numerically comparable (see below) | n/a |
+| Stage-up among first 3 sky changes | ≥ 50 % of games with ≥ 3 changes | 100 %, but only 1-3 such games per 30-run profile | yes (low confidence) |
+
+**Constants changed:** `BASE_CIV_CHANCE` 0.26 → 0.32, `EXTINCT_AT_CREATION_CHANCE` 0.25 → 0.15,
+`EXTINCTION_HAZARD_PER_CENTURY` raised modestly across all stages, `STRATEGY_DRIFT_PER_CENTURY`
+0.03 → 0.015 and `RARE_STRATEGY_DRIFT_PER_CENTURY` 0.005 → 0.0025 (see `src/civ_timeline.py` and
+`src/legacy_of_stars_v3.py` for the per-constant rationale).
+
+**Time-box outcome (honest report, per §7's escape hatch clause).** Two targets were not met
+within the six iterations:
+
+- *Sky changes per 40 generations* stayed at ~1, well under the 3-6 target. The metric is carried
+  almost entirely by two things: the extinction hazard (silence/extinction changes) and
+  `BASE_CIV_CHANCE` (more watched civilizations means more of everything, including stage-up
+  crossings, which are the majority kind - strategy drift never reaches this metric at all, since
+  the observed frame deliberately hides strategy). Reaching 3-6 required pushing hazard or civ
+  density far enough to break the other three targets (tried up to ~2/40 gens at
+  `BASE_CIV_CHANCE = 0.5`, at which point `extinct_share` exceeded 35 %, `differing_outcomes`
+  exceeded 40 %, and victories were more than double the baseline for several profiles).
+- *Victories within ±20 % of baseline* held for `balanced` only; the other four shared profiles
+  ran over, `neglect` badly (+96 %) because a denser catalogue is also more contact/reply
+  opportunities, which disproportionately helps a strategy whose only path to victory is contact
+  rather than the integration tech tree.
+
+The plan's recorded escape hatch (owner decision 2, §9 variant B - drift only in the observed
+frame, replies evaluated at send time as before) was **not implemented**; T2's receipt-frame
+replies stay as shipped. This is the owner's call to make, not something to decide unilaterally
+under a time-box.
 
 The sections below are the historical development notes of Phases 1-3. Some figures in them
 (27 technologies, 8 star systems, Gemini AI) describe earlier builds.

@@ -304,6 +304,22 @@
             "detection_bonus": 0.1
         },
         {
+            "id": "solar_gravitational_lens",
+            "name": "Solar Gravitational Lens Telescope",
+            "description": "Probes at the solar gravitational focus resolve exoplanets across the neighbourhood. Full catalogue reach. +30 RP/turn.",
+            "tier": 4,
+            "min_generation": 10,
+            "cost": 1000,
+            "prerequisites": [
+                "dyson_sphere_detection",
+                "laser_sail_propulsion"
+            ],
+            "category": "Detection",
+            "passive_rp": 30,
+            "detection_bonus": 0.1,
+            "history": "Proposed 1979; JPL mission concept studies 2020s."
+        },
+        {
             "id": "orbital_defense_grid",
             "name": "Orbital Defense Grid",
             "description": "Planetary defense platforms. Passive -40% attack damage.",

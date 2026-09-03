@@ -312,44 +312,49 @@ class EngineWiringTest(unittest.TestCase):
         self.assertTrue(target.timeline_state(program.start_year + (program.generation - 1) * 25).alive)
 
 
-# --- Recorded from the engine before timelines existed -------------------------------------
+# --- Recorded from the engine before timelines existed, re-recorded after T5 calibration ---
+# (2026-09-03, plan §7) changed BASE_CIV_CHANCE, EXTINCT_AT_CREATION_CHANCE and the hazard/drift
+# tables in a way that shows up in this 30-generation run (a different star hosts a civilization,
+# a different knowledge threshold is reached) - see the calibration block in src/civ_timeline.py.
+# The point this test still guards is narrower than its T0 name: the RNG stream itself is
+# deterministic and stable under the *current* constants, not that the constants never move.
 SEED1_STATS = {
-    "messages_sent": 56, "responses_received": 5, "attacks_scheduled": 0, "attacks_survived": 0,
+    "messages_sent": 59, "responses_received": 5, "attacks_scheduled": 0, "attacks_survived": 0,
     "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 28,
-    "events_resolved": 1, "techs_researched": 21, "worlds_seeded": 0, "passive_detections": 0,
+    "events_resolved": 2, "techs_researched": 21, "worlds_seeded": 0, "passive_detections": 0,
     # T2 added the per-message fates. The counters above are unchanged, which is the point:
     # the receipt frame reads a different year, it does not draw a different random number.
-    "messages_replied": 5, "messages_nobody": 44, "messages_died_in_flight": 1, "messages_silent": 6,
+    "messages_replied": 5, "messages_nobody": 44, "messages_died_in_flight": 3, "messages_silent": 7,
 }
 SEED1_DESCRIPTIONS = [
     ("Proxima Centauri", "No signs of civilization detected."),
     ("Barnard's Star", "No signs of civilization detected."),
     ("Lalande 21185", "No signs of civilization detected."),
     ("Sirius", "No signs of civilization detected."),
-    ("Ross 154", "INTERPLANETARY civilization with 33% positive attitude toward contact."),
+    ("Ross 154", "INTERPLANETARY civilization. Attitude: potentially hostile."),
     ("Alpha Centauri", "No signs of civilization detected."),
     ("Wolf 359", "Interplanetary civilization spanning multiple worlds in their system."),
     ("Luyten 726-8", ""),
     ("Ross 248", ""),
     ("Epsilon Eridani", "No signs of civilization detected."),
     ("Lacaille 9352", "No signs of civilization detected."),
-    ("Ross 128", ""),
+    ("Ross 128", "No signs of civilization detected."),
     ("EZ Aquarii", "No signs of civilization detected."),
-    ("61 Cygni", ""),
-    ("Procyon", "Faint signals detected. System appears lifeless."),
+    ("61 Cygni", "No signs of civilization detected."),
+    ("Procyon", ""),
     ("Struve 2398", ""),
-    ("Groombridge 34", ""),
-    ("DX Cancri", "No signs of civilization detected."),
+    ("Groombridge 34", "DIGITAL civilization. Attitude: seemingly friendly."),
+    ("DX Cancri", ""),
     ("Epsilon Indi", "No signs of civilization detected."),
     ("Tau Ceti", "No signs of civilization detected."),
-    ("GJ 1061", "No signs of civilization detected."),
+    ("GJ 1061", ""),
     ("YZ Ceti", "No signs of civilization detected."),
-    ("Luyten's Star", "No signs of civilization detected."),
-    ("Teegarden's Star", ""),
+    ("Luyten's Star", "Possible artificial signals detected."),
+    ("Teegarden's Star", "No signs of civilization detected."),
     ("Kapteyn's Star", "No signs of civilization detected."),
-    ("Lacaille 8760", "No signs of civilization detected."),
-    ("Kruger 60", "No signs of civilization detected."),
-    ("Wolf 1061", ""),
+    ("Lacaille 8760", ""),
+    ("Kruger 60", ""),
+    ("Wolf 1061", "No signs of civilization detected."),
     ("Van Maanen's Star", ""),
     ("Gliese 1", ""),
     ("Wolf 424", ""),

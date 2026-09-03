@@ -170,7 +170,22 @@ def public_explanation_year(entry: Dict[str, Any], year_now: int) -> Optional[in
 # larger sky: the summed habitability weight is now 62.8, i.e. ~16.2 civilizations over the whole
 # catalog, of which ~8.5 lie within 20 LY - the near field the player starts in is what it was,
 # plus the six nearby stars the science audit listed as missing.
-BASE_CIV_CHANCE = 0.26
+# T5 calibration (2026-09-03, docs/plans/civilization_timelines_plan.md §7) raised this from 0.26
+# to 0.32: `sky_changes_per_40` (the observed-frame drift target) turned out to scale with how
+# many civilizations are ever watched, not just with the extinction hazard, since most watched
+# sky changes are stage advances, not deaths. The six-iteration time-box did not find a value
+# that reached the 3-6/40-generation target without pushing victories well past the +-20 %
+# baseline band (a denser sky is also more contact opportunities) - see the calibration block in
+# `src/civ_timeline.py` for the full trade-off and the final measured numbers.
+BASE_CIV_CHANCE = 0.32
+
+# Share of the civilizations that are rolled already dead: their history ended before 1977 and
+# the game opens on the light of a corpse. It is the floor under the "extinct at first
+# observation" share of plan §7 - deaths on the timeline after 1977 only add to it - and T5
+# measured that floor against the target band (see the calibration block in `src/civ_timeline.py`).
+# Lowered from 0.25 to 0.15 during calibration: at 0.25 the pooled extinct-at-first-observation
+# share ran to 30-37 %, above the 20-30 % target.
+EXTINCT_AT_CREATION_CHANCE = 0.15
 
 # Habitability by spectral class. Longer-lived, more stable stars get a higher weight; evolved
 # stars (giants, white dwarfs) burned their old habitable zone and get none.
@@ -324,7 +339,7 @@ class StarSystem:
         self.civilization_stage = self._age_to_stage(civ_age)
         creation_stage = self.civilization_stage  # kept when extinction clears the field below
         
-        self.is_extinct = random.random() < 0.25
+        self.is_extinct = random.random() < EXTINCT_AT_CREATION_CHANCE
         if self.is_extinct:
             # We can't know about a death whose light hasn't reached us yet: the system is
             # `distance` light-years away, so its last living signal is at least that old.
