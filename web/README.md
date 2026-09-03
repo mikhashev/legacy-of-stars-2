@@ -19,7 +19,7 @@ Python 3.12+ must be on `PATH` as `python` (override with the `PYTHON` environme
 ## Where engine.zip comes from
 
 `web/public/engine.zip` is **generated, not committed**. `scripts/build_web_engine.py` (in the
-repository root) packs `src/*.py` and `data/**/*.json` - no tests, no `legacy/`, no
+repository root) packs `src/*.py` and `data/**/*.json` - no tests, no
 `__pycache__`, no saves or logs - keeping the repository layout, so the worker can unpack it
 into `/engine`, put `/engine` on `sys.path` and `from src.web_api import GameSession`.
 

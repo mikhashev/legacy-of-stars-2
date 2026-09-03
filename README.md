@@ -136,7 +136,6 @@ legacy-of-stars-2/
 ├── tests/                       # unittest suites
 ├── web/                         # browser front-end: Pyodide + Three.js + Preact (web/README.md)
 ├── docs/                        # design notes, plans, reference and history (docs/README.md)
-└── legacy/                      # earlier engine versions (historical)
 ```
 
 The engine is deliberately free of console I/O: it exposes the list of currently available

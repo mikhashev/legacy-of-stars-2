@@ -57,8 +57,6 @@ models (see each file's header note where present).
 | [history/swan_song_implementation_summary.md](history/swan_song_implementation_summary.md) | Implementation summary for the swan-song (extinct-civilization final message) feature. | Historical |
 | [history/swan_song_messages.md](history/swan_song_messages.md) | Full feature documentation for swan-song messages. | Historical |
 | [history/ai_advisor_implementation.md](history/ai_advisor_implementation.md) | AI strategic advisor implementation notes. | Historical |
-| [history/personal_context_guide.md](history/personal_context_guide.md) | Guide to using a personal-context JSON template with an AI assistant during development; the origin of this project. | Historical |
-| [history/game_development_context_template.json](history/game_development_context_template.json) | The personal-context JSON template referenced by `personal_context_guide.md`. | Historical |
 
 ## Conventions
 
