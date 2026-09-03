@@ -31,6 +31,9 @@ ACTIONS
   Defensive Actions Appear when a hostile fleet is inbound: Emergency Defense (-50% damage,
                     all AP), Evacuation (-30%, 1 AP), Diplomacy (1 AP, may turn back a
                     low-deception trap). Fleets travel far slower than light.
+  Genesis Seeding   Send an ark to a habitable world with nobody on it. Only systems you have
+                    studied to 20% knowledge can be targeted - until then you do not know
+                    whether that world is empty, and the program will not aim an ark blind.
 
 WHO IS OUT THERE
   Every civilization follows a hidden strategy. Some only listen and never answer. Some

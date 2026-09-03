@@ -7,7 +7,7 @@
  * refusal comes back as the engine's own message (a toast), exactly like the console.
  */
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../store";
 import type { ActionSpec, ViewState } from "../types";
 
@@ -205,10 +205,13 @@ export function DossierPickerDialog({ view, store }: { view: ViewState; store: S
 
 export function EventDialog({ view, store }: { view: ViewState; store: Store }) {
   const event = view.pending_event;
-  if (!event) {
-    store.closeDialog();
-    return null;
-  }
+  // The engine can drop the pending event while this dialog is open (answering it elsewhere,
+  // loading a save). Closing from the render body would re-enter the store mid-render, so the
+  // render just yields nothing and the close happens in an effect afterwards.
+  useEffect(() => {
+    if (!event) store.closeDialog();
+  }, [event, store]);
+  if (!event) return null;
   return (
     <DialogFrame title={event.name} onClose={() => store.closeDialog()}>
       <p class="dialog-hint">{event.description}</p>

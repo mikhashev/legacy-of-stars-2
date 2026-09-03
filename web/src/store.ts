@@ -78,6 +78,16 @@ export interface UIState {
 /** Where the effects toggle is remembered between sessions. */
 const REDUCE_EFFECTS_KEY = "los.reduceEffects";
 
+/** What a player is told when localStorage refuses a write (quota, private mode, disabled). */
+const STORAGE_FAILURE = "Could not save: browser storage is full or unavailable.";
+
+/** Actions whose whole answer is a modal of its own, so it must not also replace `message`. */
+const OWN_MODAL_ACTIONS: ReadonlySet<ActionId> = new Set<ActionId>([
+  "help",
+  "summary",
+  "compose_director_message",
+]);
+
 function loadReduceEffects(): boolean {
   try {
     return window.localStorage.getItem(REDUCE_EFFECTS_KEY) === "1";
@@ -121,6 +131,13 @@ export class Store {
   readonly bridge: EngineBridge;
 
   private readonly listeners = new Set<() => void>();
+
+  /** Whether the "storage is full" toast has already been shown for an autosave this session. */
+  private autosaveFailureReported = false;
+
+  /** Set when `view.game_over` turns true; cleared once the final report has been opened. */
+  private gameOverReportPending = false;
+  private gameOverReportSeen = false;
 
   constructor() {
     this.bridge = new EngineBridge({ onProgress: (bootProgress) => this.patch({ bootProgress }) });
@@ -174,6 +191,11 @@ export class Store {
   }
 
   private enterGame(view: ViewState): void {
+    this.autosaveFailureReported = false;
+    this.gameOverReportSeen = false;
+    // Loading a finished save is the other way `game_over` arrives - with no `game_over`
+    // event to dismiss first, so the report opens as soon as the map is up.
+    this.gameOverReportPending = view.game_over;
     this.patch({
       view,
       phase: view.wow.decided ? "main" : "opening",
@@ -191,41 +213,46 @@ export class Store {
       showSystemList: false,
       lastEvents: [],
     });
+    this.maybeOpenGameOverReport();
   }
 
   backToStart(): void {
+    this.autosaveFailureReported = false;
+    this.gameOverReportPending = false;
+    this.gameOverReportSeen = false;
     // The effects toggle is a display preference, not part of a game, so it survives.
     this.patch({ ...initialState, phase: "start", reduceEffects: this.state.reduceEffects });
   }
 
   /** Runs a bridge.perform() promise, applying its result and surfacing refusals as a toast. */
-  private async runPerform(promise: Promise<PerformResult>): Promise<PerformResult> {
+  private async runPerform(action: ActionId, promise: Promise<PerformResult>): Promise<PerformResult> {
     this.patch({ busy: true });
     try {
       const result = await promise;
-      this.applyResult(result);
+      this.applyResult(action, result);
       if (!result.ok) this.showToast(result.message);
       return result;
     } catch (error) {
       this.showToast(describe(error));
       throw error;
     } finally {
+      // Always, on every path: a stuck `busy` disables every button and hotkey for good.
       this.patch({ busy: false });
     }
   }
 
   async perform<A extends ActionId>(action: A, params?: ActionParams[A]): Promise<PerformResultOf<A>> {
-    return this.runPerform(this.bridge.perform(action, params)) as Promise<PerformResultOf<A>>;
+    return this.runPerform(action, this.bridge.perform(action, params)) as Promise<PerformResultOf<A>>;
   }
 
   /** Same as `perform`, but for call sites (dialogs) that only know the action id at run time. */
   private performDynamic(action: ActionId, params: Record<string, unknown>): Promise<PerformResult> {
     // The dialog was opened from `state.actions`, so `action` and `params` already match what
     // the engine asked for (ViewState.actions[].needs); TypeScript just cannot see that here.
-    return this.runPerform(this.bridge.perform(action, params as ActionParams[ActionId]));
+    return this.runPerform(action, this.bridge.perform(action, params as ActionParams[ActionId]));
   }
 
-  private applyResult(result: PerformResult): void {
+  private applyResult(action: ActionId, result: PerformResult): void {
     const events = [...this.state.events, ...result.events].slice(-JOURNAL_LIMIT);
     const modalQueue = [
       ...this.state.modalQueue,
@@ -243,14 +270,19 @@ export class Store {
         : null;
     this.patch({
       view,
-      message: result.message,
+      // help/summary/compose_director_message answer in their own modal - their whole text is
+      // the modal. Copying it into the left column's "Program message" panel as well only
+      // duplicates it there, and leaves the last help screen sitting under the map afterwards.
+      ...(OWN_MODAL_ACTIONS.has(action) ? {} : { message: result.message }),
       events,
       modalQueue,
       pendingDoctrine: result.needs && result.needs.kind === "doctrine" ? result.needs : null,
       selectedSystem,
       lastEvents: result.events,
     });
+    if (view?.game_over && !this.gameOverReportSeen) this.gameOverReportPending = true;
     this.popModal();
+    this.maybeOpenGameOverReport();
   }
 
   private popModal(): void {
@@ -259,9 +291,24 @@ export class Store {
     this.patch({ modalEvent: next ?? null, modalQueue: rest });
   }
 
+  /**
+   * The run is over: once the player has dismissed the `game_over` modal and nothing else is
+   * queued behind it, the final report opens on its own - the console prints
+   * it at the end of `play()`, and a browser player should not have to find it in the menu.
+   * Only ever once per game; `Close` on the report leaves the banner to reopen it.
+   */
+  private maybeOpenGameOverReport(): void {
+    if (!this.gameOverReportPending) return;
+    if (this.state.modalEvent || this.state.modalQueue.length > 0) return;
+    this.gameOverReportPending = false;
+    this.gameOverReportSeen = true;
+    void this.openSummary();
+  }
+
   dismissModal(): void {
     this.patch({ modalEvent: null });
     this.popModal();
+    this.maybeOpenGameOverReport();
   }
 
   /** From the `philosophical_event` modal: dismiss it and open the response dialog right away. */
@@ -459,7 +506,10 @@ export class Store {
   /** `help` works with no game in progress, so the Start screen's Help link can call it directly. */
   async fetchHelp(): Promise<{ message: string; ai: string }> {
     const result = await this.perform("help", {});
-    return { message: result.message, ai: result.data.ai };
+    // Defensive: an older engine build's no-game help answered without `data` at all, and
+    // reading `.ai` off it threw where the help text would have shown perfectly well.
+    const ai = typeof result.data?.ai === "string" ? result.data.ai : "";
+    return { message: result.message, ai };
   }
 
   async openSummary(): Promise<void> {
@@ -485,7 +535,14 @@ export class Store {
   async autosave(): Promise<void> {
     try {
       const text = await this.bridge.save();
-      saveToSlot("autosave", withLabel(text, "Autosave"));
+      if (!saveToSlot("autosave", withLabel(text, "Autosave"))) {
+        // Once per session: an autosave runs every generation, and a full quota does not
+        // heal itself, so repeating this would bury every other message under the same one.
+        if (!this.autosaveFailureReported) {
+          this.autosaveFailureReported = true;
+          this.showToast(STORAGE_FAILURE);
+        }
+      }
     } catch (error) {
       this.showToast(`Autosave failed: ${describe(error)}`);
     }
@@ -499,7 +556,12 @@ export class Store {
   async quickSave(): Promise<void> {
     try {
       const text = await this.bridge.save();
-      saveToSlot("quicksave", withLabel(text, "Quicksave"));
+      // saveToSlot/saveNew swallow the storage exception and report false: private mode, a
+      // disabled storage API or a full quota. Never claim a save that did not happen.
+      if (!saveToSlot("quicksave", withLabel(text, "Quicksave"))) {
+        this.showToast(STORAGE_FAILURE);
+        return;
+      }
       this.showToast('Saved to "Quicksave".');
     } catch (error) {
       this.showToast(`Could not save: ${describe(error)}`);
@@ -510,7 +572,10 @@ export class Store {
     try {
       const text = await this.bridge.save();
       const chosen = label || "save";
-      saveNew(withLabel(text, chosen));
+      if (saveNew(withLabel(text, chosen)) === null) {
+        this.showToast(STORAGE_FAILURE);
+        return;
+      }
       this.showToast(`Saved as "${chosen}".`);
     } catch (error) {
       this.showToast(`Could not save: ${describe(error)}`);

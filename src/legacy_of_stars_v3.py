@@ -18,7 +18,7 @@ from .swan_song_messages import SwanSongManager
 from .passive_leakage import PassiveLeakageSystem
 from .integration_progress import IntegrationProgress
 from .philosophical_events import PhilosophicalEvents
-from .genesis_project import GenesisProject
+from .genesis_project import GENESIS_KNOWLEDGE_REQUIRED, GenesisProject
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CATALOG_PATH = DATA_DIR / "star_catalog.json"
@@ -1759,9 +1759,16 @@ You have answered one of humanity's greatest questions.
         }
 
     def genesis_targets(self) -> List[str]:
-        """Systems an ark may be launched at: sterile, habitable, not yet seeded, not the WOW! source."""
+        """Systems an ark may be launched at: studied to 20 % knowledge, sterile, habitable,
+        not yet seeded, not the WOW! source.
+
+        The knowledge floor is not a cost, it is what keeps this list honest: without it the
+        list named every sterile system in the catalogue, which told the player where nobody
+        lives before a single telescope was pointed at it.
+        """
         return [s.name for s in self.star_systems.values()
-                if not s.has_civilization and not s.is_seeded and not s.is_wow_source
+                if s.knowledge >= GENESIS_KNOWLEDGE_REQUIRED
+                and not s.has_civilization and not s.is_seeded and not s.is_wow_source
                 and habitability_weight(s.spectral_type) > 0]
 
     # ------------------------------------------------------------------ discovery

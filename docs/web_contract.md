@@ -107,7 +107,7 @@ Integers may be sent as JSON numbers or as decimal strings.
 | `defend` | `{threat, defense}` | a defensive action was recorded or the threat was removed | `defense` ∈ `"emergency"` (all AP, −50 %), `"evacuate"` (1 AP, −30 %), `"diplomacy"` (1 AP, may abort a low-deception trap). Diplomacy is `ok: true` even when it fails: the attempt was made and paid for. |
 | `consult_advisor` | `{}` | the advisor ran this generation | Free, once per generation; needs the AI Strategic Advisor technology. |
 | `listen_swan_song` | `{system}` | 1 AP was spent | A scan that detects nothing is still `ok: true`. |
-| `genesis_seed` | `{system}` | `GenesisProject.seed_world` returned success | Costs 1 AP + 500 RP + 20 % funding; one world per generation. |
+| `genesis_seed` | `{system}` | `GenesisProject.seed_world` returned success | Costs 1 AP + 500 RP + 20 % funding; one world per generation; the target must be studied to 20 % knowledge (see `genesis.targets`). |
 | `respond_event` | `{choice}` | the choice was applied | `choice` indexes `state.pending_event.choices`. |
 | `wow_reply` | `{text}` | the 1977 decision was open | Opening scene. Empty/absent `text` sends the standard message; longer text is truncated at 500 characters. `data`: `{message, arrival_gen: 72, response_gen: 144, replied: true}`. |
 | `wow_silent` | `{}` | the 1977 decision was open | `data`: `{replied: false, attack_damage_reduction: 0.15}`. |
@@ -247,7 +247,7 @@ strategies, deception levels) ever appears here.
 | `philosophical_victory` | bool | Fermi answer reached |
 | `genesis.unlocked` | bool | the ark programme is available |
 | `genesis.summary` | str | multi-line status text |
-| `genesis.targets[]` | str[] | system names an ark may be launched at (sterile, habitable, unseeded, not the WOW! source) — the Genesis picker lists exactly these |
+| `genesis.targets[]` | str[] | system names an ark may be launched at: studied to **20 % knowledge or more**, sterile, habitable, unseeded, not the WOW! source — the Genesis picker lists exactly these. The knowledge floor is what keeps the list from revealing where nobody lives before the player has looked; `genesis_seed` refuses an unstudied system with *"Study the system first: 20% knowledge is needed before launching an ark."*, checked **before** the has-civilization refusal so that message cannot leak either |
 | `genesis.worlds[]` | `{system_name, seed_gen, arrival_gen, evolution_stage, is_hostile, is_destroyed, resolved, outcome}` | seeded worlds (`evolution_stage` 0 = in transit … 4 = spacefaring) |
 | `pending_event` | null \| `{id, name, description, choices: [{name, description}]}` | the philosophical crisis blocking `advance_generation` |
 | `wow` | `{decided: bool, replied: bool, outcome: null \| "silence" \| "friendly" \| "hostile"}` | the 1977 decision and its Generation 144 result |

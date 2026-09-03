@@ -1,13 +1,16 @@
+import { useEffect } from "preact/hooks";
 import type { Store } from "../store";
 import type { ViewState } from "../types";
 
 /** Mirrors `GameInterface._act_view_system`: full message/response history for one system. */
 export function DossierModal({ system, view, store }: { system: string; view: ViewState; store: Store }) {
   const s = view.systems.find((sys) => sys.name === system);
-  if (!s) {
-    store.closeDialog();
-    return null;
-  }
+  // A save loaded behind an open dossier can drop the system entirely. Calling into the store
+  // from the render body would update it mid-render; render nothing and close in an effect.
+  useEffect(() => {
+    if (!s) store.closeDialog();
+  }, [s, store]);
+  if (!s) return null;
   const threats = view.threats.filter((t) => t.source === s.name);
   return (
     <div class="modal-backdrop" onClick={() => store.closeDialog()}>

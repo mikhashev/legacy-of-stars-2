@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T04:59:00",
+  "saved_at": "2026-09-03T13:12:34",
   "label": "",
   "generation": 3,
   "year": 2027,
@@ -109,7 +109,7 @@
         "deception_level": 0,
         "civilization_type": null,
         "civilization_attitude": 0,
-        "knowledge": 0,
+        "knowledge": 20,
         "is_seeded": true,
         "has_detected_earth": false,
         "is_wow_source": false,

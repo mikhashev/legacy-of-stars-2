@@ -6,15 +6,18 @@
     <title>Legacy of Stars</title>
   </head>
   <body>
+    <p>Redirecting to <a id="home" href="/">Legacy of Stars</a>&hellip;</p>
     <script>
       // Legacy of Stars has no client-side routing - there is nothing a "real" 404 page needs
       // to route around - so this file exists only because GitHub Pages serves it for any URL
       // it does not recognise (a stray bookmark, a typo). A GitHub Pages *project* site is
-      // always served under /<repo>/, so the first path segment is the app's own base and
-      // bouncing back there re-lands on index.html with all of its relative asset URLs intact.
+      // always served under /<repo>/ (here /legacy-of-stars-2/), so the first path segment is
+      // the app's own base and bouncing back there re-lands on index.html with all of its
+      // relative asset URLs intact. Nothing here hard-codes the repository name.
       var base = location.pathname.split("/").slice(0, 2).join("/") + "/";
+      var link = document.getElementById("home");
+      if (link) link.setAttribute("href", base);
       location.replace(base);
     </script>
-    <p>Redirecting to <a href="/">Legacy of Stars</a>&hellip;</p>
   </body>
 </html>

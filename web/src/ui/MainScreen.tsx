@@ -51,8 +51,15 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
     const handler = (e: KeyboardEvent) => {
       const s = store.state;
       if (isTyping()) return;
+      // Ctrl+S saves the page, Cmd+1 switches browser tab, Alt+<n> is a menu accelerator:
+      // a modified key belongs to the browser or the OS, never to the game.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
+      // preventDefault only below, per key the game actually consumed - blanket-cancelling
+      // every keydown would break Tab, F5, F12 and browser find-as-you-type.
+      const claim = () => e.preventDefault();
       if (key === "escape") {
+        claim();
         // Closes whatever is currently on top; only clears the map selection when nothing
         // else is open. The doctrine choice cannot be escaped - it has no cancel path in the
         // engine either - so it is deliberately not in this list.
@@ -73,25 +80,36 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
       if (s.dialog || s.modalEvent || s.showHelp || s.summaryResult || s.pendingDoctrine || s.busy) return;
       if (key === "v") {
         // The dossier of whatever is selected on the map, or the picker if nothing is.
+        claim();
         if (s.selectedSystem) store.openDossier(s.selectedSystem);
         else store.openDossierPicker();
         return;
       }
       if (key === "s") {
+        claim();
         void store.quickSave();
         return;
       }
       if (key === "h" || key === "?") {
+        claim();
         store.toggleHelp(true);
         return;
       }
       if (key === "6") {
+        claim();
         store.openMenu();
         return;
       }
+      // Once the run is over the engine refuses every numbered action, so 1-5 and 7+ are
+      // dead keys; menu, help, dossier and quicksave above still work (ActionsPanel shows
+      // the same thing: a Game over banner where the action list was).
+      if (s.view?.game_over) return;
       const keyed = assignKeys(s.view?.actions ?? []);
       const match = keyed.find((k) => k.key === key);
-      if (match) store.openAction(match.spec);
+      if (match) {
+        claim();
+        store.openAction(match.spec);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

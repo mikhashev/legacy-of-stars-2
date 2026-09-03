@@ -199,7 +199,11 @@ class GameSession:
         if self.program is None:
             if action_id == "help":
                 # The only action that needs no game: the start screen shows the rules.
-                return _dumps({"ok": True, "message": HELP_TEXT, "events": [], "state": None, "needs": None})
+                # `data.ai` is empty rather than absent - `_do_help` always sends it, and the
+                # front-end reads `result.data.ai` on both paths, so leaving it out made the
+                # Start screen's Help link throw instead of opening.
+                return _dumps({"ok": True, "message": HELP_TEXT, "events": [], "state": None,
+                               "needs": None, "data": {"ai": ""}})
             return _dumps({"ok": False, "message": "no game in progress: call new_game() or load() first",
                            "events": [], "state": None, "needs": None})
         program = self.program

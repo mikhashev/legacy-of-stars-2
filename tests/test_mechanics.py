@@ -154,19 +154,23 @@ class GenesisTest(unittest.TestCase):
         self.assertTrue(p.genesis.unlocked)
         self.assertIn("genesis_seed", [a.id for a in p.available_actions()])
         target = next(iter(p.star_systems.values()))
+        target.knowledge = max(target.knowledge, 20)  # an ark only launches at a studied world
         p.research_points, p.funding, p.action_points = 1000, 80, 2
         ok, msg = p.genesis.seed_world(p, target)
         self.assertTrue(ok, msg)
         self.assertEqual(p.action_points, 1)
         self.assertEqual(p.research_points, 500)
         self.assertTrue(target.is_seeded)
-        ok2, msg2 = p.genesis.seed_world(p, list(p.star_systems.values())[1])
+        second = list(p.star_systems.values())[1]
+        second.knowledge = max(second.knowledge, 20)
+        ok2, msg2 = p.genesis.seed_world(p, second)
         self.assertFalse(ok2)
         self.assertIn("one world per generation", msg2)
 
     def test_ally_outcome_creates_contact(self):
         p = self._unlocked_program()
         target = next(iter(p.star_systems.values()))
+        target.knowledge = max(target.knowledge, 20)  # an ark only launches at a studied world
         p.research_points, p.funding, p.action_points = 1000, 80, 2
         p.genesis.seed_world(p, target)
         world = p.genesis.seeded_worlds[target.name]
@@ -184,6 +188,7 @@ class GenesisTest(unittest.TestCase):
     def test_hostile_outcome_schedules_attack(self):
         p = self._unlocked_program()
         target = next(iter(p.star_systems.values()))
+        target.knowledge = max(target.knowledge, 20)  # an ark only launches at a studied world
         p.research_points, p.funding, p.action_points = 1000, 80, 2
         p.genesis.seed_world(p, target)
         world = p.genesis.seeded_worlds[target.name]

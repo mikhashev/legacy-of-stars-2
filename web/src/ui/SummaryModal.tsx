@@ -13,8 +13,14 @@ export function SummaryModal({ store, result }: { store: Store; result: PerformR
   const generation = store.state.view?.generation ?? 0;
 
   const doExport = async () => {
-    const text = await store.exportSave();
-    exportSave(text, `legacy-of-stars-final-gen${generation}.json`);
+    // Same as the menu's export: nothing between this and the worker catches a failure, so
+    // without this the button would fail silently into an unhandled rejection.
+    try {
+      const text = await store.exportSave();
+      exportSave(text, `legacy-of-stars-final-gen${generation}.json`);
+    } catch (error) {
+      store.showToast(`Could not export the save: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   return (

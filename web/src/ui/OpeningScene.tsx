@@ -44,6 +44,10 @@ export function OpeningScene({ view, store }: { view: ViewState; store: Store })
       const text = await store.composeDirectorDraft();
       setDraft(text);
       setComposerStep("draft");
+    } catch (error) {
+      // `perform` already toasts the reason and then rethrows; without this catch the rethrow
+      // is an unhandled rejection and the composer silently stays on the choices step.
+      store.showToast(`Could not draft a message: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setDraftLoading(false);
     }

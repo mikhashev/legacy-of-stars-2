@@ -18,6 +18,10 @@ from typing import Dict, Optional, Tuple
 from .passive_leakage import FUSION_SPEED_C  # Project Daedalus fusion drive: what carries an ark
 
 STAGE_NAMES = ["In transit", "Colony founded", "Self-sustaining", "Industrial", "Spaceflight"]
+#: Knowledge a system must be studied to before an ark may be aimed at it - the same threshold
+#: `StarSystem.describe_civilization` reveals whether anyone lives there. Mirrors
+#: `ContactProgram.genesis_targets`, which filters the offered list by it.
+GENESIS_KNOWLEDGE_REQUIRED = 20
 SELF_SUSTAINING_AGE = 10   # generations after the ark lands
 INDUSTRIAL_AGE = 25
 SPACEFLIGHT_AGE = 40
@@ -106,6 +110,11 @@ class GenesisProject:
             return False, "Target is 1,800 light-years away: beyond any ark's range."
         if habitability_weight(system.spectral_type) <= 0:
             return False, f"No habitable planet: {system.spectral_type} star."
+        # Before the civilization check, deliberately: "already has a civilization" is a fact
+        # about the system, and answering it for an unstudied one would hand the player free
+        # reconnaissance. 20 % is the same threshold `describe_civilization` reveals it at.
+        if system.knowledge < GENESIS_KNOWLEDGE_REQUIRED:
+            return False, "Study the system first: 20% knowledge is needed before launching an ark."
         if system.has_civilization:
             return False, "Cannot seed a system that already has a civilization."
         if system.name in self.seeded_worlds or getattr(system, "is_seeded", False):

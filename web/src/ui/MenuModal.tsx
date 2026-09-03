@@ -23,8 +23,15 @@ export function MenuModal({ view, store }: { view: ViewState; store: Store }) {
   };
 
   const doExport = async () => {
-    const text = await store.exportSave();
-    exportSave(text, `legacy-of-stars-gen${view.generation}.json`);
+    // `store.exportSave()` goes straight to the bridge, with none of `runPerform`'s error
+    // handling behind it: an engine or worker failure here would otherwise surface only as
+    // an unhandled rejection in the console, with the button looking like it did nothing.
+    try {
+      const text = await store.exportSave();
+      exportSave(text, `legacy-of-stars-gen${view.generation}.json`);
+    } catch (error) {
+      store.showToast(`Could not export the save: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const doLoad = (meta: SaveMeta) => {

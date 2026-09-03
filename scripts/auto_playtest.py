@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 # The harness never talks to an LLM.
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import ContactProgram, habitability_weight  # noqa: E402
+from src.legacy_of_stars_v3 import ContactProgram  # noqa: E402
 
 STRATEGIES = ("balanced", "aggressive", "cautious", "integration", "neglect")
 
@@ -80,10 +80,10 @@ class AutoPlayer:
         # 2. Genesis seeding when rich.
         if p.genesis.unlocked and len(p.genesis.seeded_worlds) < 2 \
                 and p.research_points > 600 and p.funding > 40:
-            sterile = [s for s in p.star_systems.values()
-                       if not s.has_civilization and not getattr(s, "is_seeded", False)
-                       and not getattr(s, "is_wow_source", False)
-                       and habitability_weight(s.spectral_type) > 0]
+            # `genesis_targets()`'s own conditions: an ark only launches at a world the
+            # program has actually studied (20% knowledge), which is also all the player
+            # is offered in the console and web pickers.
+            sterile = [p.star_systems[name] for name in p.genesis_targets()]
             if sterile:
                 target = random.choice(sterile)
                 success, _ = p.genesis.seed_world(p, target)

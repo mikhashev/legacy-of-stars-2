@@ -15,7 +15,7 @@ August 15, 1977 - the night of the WOW! signal - and asks whether Earth should r
 
 ## Play in the browser
 
-`https://mikhashev.github.io/legacy-of-stars/` - live once the `.github/workflows/web.yml`
+`https://mikhashev.github.io/legacy-of-stars-2/` - live once the `.github/workflows/web.yml`
 Pages workflow has run against `main`.
 
 The web version is the same game and the same Python engine (`src/`), run in the browser
@@ -44,8 +44,8 @@ npm test            # Playwright: full playthroughs, the 3D map, animations, lay
 Requirements: Python 3.9 or newer. No packages to install; the game uses only the standard library.
 
 ```bash
-git clone https://github.com/mikhashev/legacy-of-stars.git
-cd legacy-of-stars
+git clone https://github.com/mikhashev/legacy-of-stars-2.git
+cd legacy-of-stars-2
 python run_game.py
 ```
 
@@ -104,7 +104,7 @@ python scripts/auto_playtest.py --runs 5 --seed 1     # headless playtest report
 ```
 
 ```
-legacy-of-stars/
+legacy-of-stars-2/
 ├── run_game.py                  # launcher: start menu, logging, console setup
 ├── src/
 │   ├── legacy_of_stars_v3.py    # game engine (no I/O): state, actions, generation processing,

@@ -28,6 +28,25 @@ export interface BridgeOptions {
   onProgress?: (progress: ProgressMessage) => void;
 }
 
+/**
+ * How long one engine call may take before the bridge stops waiting for it. Nothing in the
+ * worker can time itself out - Pyodide runs Python synchronously, so a wedged call never
+ * posts anything back - and a pending promise that never settles leaves the store `busy`
+ * forever, which disables every button and hotkey with no way out but a reload. These are
+ * watchdogs, not budgets: a healthy call is orders of magnitude under them.
+ */
+const CALL_TIMEOUT_MS = 30_000;
+/** `new_game` builds the star catalogue and `load` rebuilds a whole program from JSON. */
+const SLOW_CALL_TIMEOUT_MS = 60_000;
+const SLOW_METHODS: ReadonlySet<EngineMethod> = new Set<EngineMethod>(["new_game", "load"]);
+
+interface PendingCall {
+  method: EngineMethod;
+  resolve: (value: string) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class EngineBridge {
   /** Resolves when the engine can take calls; rejects if startup failed. */
   readonly ready: Promise<ReadyMessage>;
@@ -36,8 +55,10 @@ export class EngineBridge {
   onProgress: ((progress: ProgressMessage) => void) | undefined;
 
   private readonly worker: Worker;
-  private readonly pending = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void }>();
+  private readonly pending = new Map<number, PendingCall>();
   private nextId = 1;
+  /** Set by `terminate()`: the worker is gone, so no new call can ever be answered. */
+  private disposed = false;
 
   constructor(options: BridgeOptions = {}) {
     this.onProgress = options.onProgress;
@@ -47,7 +68,7 @@ export class EngineBridge {
     });
 
     this.ready = new Promise<ReadyMessage>((resolve, reject) => {
-      this.worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+      this.worker.addEventListener("message", (event: MessageEvent<WorkerMessage>) => {
         const message = event.data;
         if ("type" in message) {
           if (message.type === "progress") this.onProgress?.(message);
@@ -56,15 +77,19 @@ export class EngineBridge {
           return;
         }
         this.settle(message);
-      };
-      this.worker.onerror = (event: ErrorEvent) => {
+      });
+      this.worker.addEventListener("error", (event: ErrorEvent) => {
         const error = new Error(event.message || "engine worker failed");
         reject(error);
-        for (const [id, entry] of this.pending) {
-          entry.reject(error);
-          this.pending.delete(id);
-        }
-      };
+        this.rejectAll(error);
+      });
+      // A structured-clone failure on the way in: the message is lost, so whatever call it
+      // was answering will never settle on its own.
+      this.worker.addEventListener("messageerror", () => {
+        const error = new Error("the engine sent a message the browser could not read");
+        reject(error);
+        this.rejectAll(error);
+      });
     });
 
     this.worker.postMessage({ type: "init", baseUrl: baseUrl() });
@@ -103,19 +128,32 @@ export class EngineBridge {
 
   /** Stop the worker; the session is gone with it. */
   terminate(): void {
+    this.disposed = true;
     this.worker.terminate();
-    for (const [id, entry] of this.pending) {
-      entry.reject(new Error("engine terminated"));
-      this.pending.delete(id);
-    }
+    this.rejectAll(new Error("engine terminated"));
   }
 
   /* ------------------------------------------------------------ plumbing */
 
   private send(method: EngineMethod, ...args: string[]): Promise<string> {
+    if (this.disposed) {
+      return Promise.reject(new Error("the engine has been shut down; reload the page to start again"));
+    }
     const id = this.nextId++;
     return new Promise<string>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const limit = SLOW_METHODS.has(method) ? SLOW_CALL_TIMEOUT_MS : CALL_TIMEOUT_MS;
+      const timer = setTimeout(() => {
+        // `delete` returning false means `settle` already took this one; the timer just lost
+        // the race and must not reject an already-resolved promise.
+        if (!this.pending.delete(id)) return;
+        reject(
+          new Error(
+            `the engine did not answer "${method}" within ${Math.round(limit / 1000)}s; ` +
+              "reload the page to restart it",
+          ),
+        );
+      }, limit);
+      this.pending.set(id, { method, resolve, reject, timer });
       this.worker.postMessage({ id, method, args });
     });
   }
@@ -124,8 +162,19 @@ export class EngineBridge {
     const entry = this.pending.get(message.id);
     if (!entry) return;
     this.pending.delete(message.id);
+    clearTimeout(entry.timer);
     if (message.error !== undefined) entry.reject(new Error(message.error));
     else entry.resolve(message.result ?? "");
+  }
+
+  /** Fails every call still waiting: the worker died, or is no longer trusted to answer. */
+  private rejectAll(error: Error): void {
+    const outstanding = [...this.pending.values()];
+    this.pending.clear();
+    for (const entry of outstanding) {
+      clearTimeout(entry.timer);
+      entry.reject(error);
+    }
   }
 
   private json<T>(text: string): T {

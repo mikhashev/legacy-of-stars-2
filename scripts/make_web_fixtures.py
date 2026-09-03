@@ -15,6 +15,7 @@ methods (`send_message`, `genesis.seed_world`, `advance_generation`). The three 
     threat.json   a hostile fleet is inbound, ETA >= 3 generations
     reply.json    a system has a reply in flight (`pending_responses` populated)
     genesis.json  a Genesis ark has landed (`evolution_stage` >= 1)
+    gameover.json the run has ended (`game_over`), so loading it opens the final report
 
 Usage: python scripts/make_web_fixtures.py
 """
@@ -134,6 +135,9 @@ def make_genesis() -> None:
         )
         if target is None:
             continue  # this seed's five starting systems left no sterile habitable world; try another
+        # An ark only launches at a system the program has studied to 20% - the same thing
+        # `focus_research` would have raised over a few generations, set directly here.
+        target.knowledge = max(target.knowledge, 20)
 
         ok, message = program.genesis.seed_world(program, target)
         if not ok:
@@ -157,10 +161,37 @@ def make_genesis() -> None:
     raise SystemExit("make_genesis: no sterile habitable world was found/landed within the seed budget")
 
 
+# --------------------------------------------------------------------------- gameover.json
+def make_gameover() -> None:
+    """A finished run: support collapsed and the program was defunded (`game_over`).
+
+    Nothing is forced but the support figure the engine itself checks - drop it under the 10%
+    floor `advance_generation` tests and let the engine end the run and write its own
+    `game_over_reason`, exactly as a losing playthrough would.
+    """
+    for seed in range(1, MAX_SEED_ATTEMPTS):
+        program = _new_program(seed)
+        program.public_support = 5
+        for _ in range(10):
+            if program.game_over:
+                break
+            if program.pending_philosophical_event is not None:
+                program.handle_philosophical_event_choice(0)
+            program.public_support = min(program.public_support, 5)
+            program.advance_generation()
+            program.drain_events()
+
+        if program.game_over:
+            _write(program, "gameover.json")
+            return
+    raise SystemExit("make_gameover: the program never ended within the seed budget")
+
+
 def main() -> None:
     make_threat()
     make_reply()
     make_genesis()
+    make_gameover()
 
 
 if __name__ == "__main__":

@@ -288,16 +288,24 @@ is the way to keep them.
 **Offline cache.** A hand-written service worker (no plugin) - `vite.config.ts`'s
 `serviceWorker()` plugin runs in a `closeBundle` hook after `vite build` writes `dist/`, walks
 the finished output (the hashed JS/CSS, `engine.zip`, the Pyodide runtime, `index.html`),
-hashes that file list into a version, writes `dist/version.json`, and generates `dist/sw.js`:
-cache-first for exactly those precached files, cleans up any `los-cache-*` that is not the
-current version on activate, and never touches anything else - saves are in `localStorage`, not
-behind a fetchable URL, so there is nothing there for a service worker to catch. `main.tsx`
-registers it only when `import.meta.env.PROD` and `"serviceWorker" in navigator` are both true.
+hashes every one of those files' *name and contents* into a version, writes
+`dist/version.json`, and generates `dist/sw.js`: cache-first for exactly those precached files,
+cleans up any `los-cache-*` that is not the current version on activate, and never touches
+anything else - saves are in `localStorage`, not behind a fetchable URL, so there is nothing
+there for a service worker to catch. `main.tsx` registers it only when `import.meta.env.PROD`
+and `"serviceWorker" in navigator` are both true.
+
+The contents have to be in the hash: `engine.zip`, `index.html`, `404.html` and the Pyodide
+runtime all keep the same path across builds, so hashing the file list alone left an edited
+engine sharing a cache name with the old one and returning players stuck on the stale copy.
+The worker also precaches the scope root (`./`) alongside `index.html` and answers every
+navigation to either URL from those two entries, so an offline reload of the bookmarked
+directory URL is served from the cache instead of falling through to a dead network.
 
 **GitHub Pages.** `.github/workflows/web.yml` builds (`npm ci`, `npm run build`, `npm run
 unit`) and deploys `web/dist` on every push to `main` (and by hand, via `workflow_dispatch`).
-Pages serves a project site under `/legacy-of-stars/`, not the domain root, so the workflow sets
-`VITE_BASE=/legacy-of-stars/`; `vite.config.ts`'s `base` reads `VITE_BASE` with a `/` default
+Pages serves a project site under `/legacy-of-stars-2/`, not the domain root, so the workflow sets
+`VITE_BASE=/legacy-of-stars-2/`; `vite.config.ts`'s `base` reads `VITE_BASE` with a `/` default
 for local dev/preview, and everything that fetches `engine.zip` or the Pyodide runtime already
 went through `import.meta.env.BASE_URL` since W1 (`bridge.ts`, `worker.ts`). `public/404.html`
 exists only because GitHub Pages serves it for any URL it does not recognise; the game has no
@@ -305,12 +313,14 @@ client-side routing to fall back to, so it just bounces back to the app's own ba
 
 **Showcase fixtures.** `scripts/make_web_fixtures.py` (repository root) uses the Python engine
 directly - `ContactProgram(seed=1, offline=True)`, then `send_message`/`genesis.seed_world`/
-`advance_generation` - to build three saves already in situations a seed-1 playthrough rarely
+`advance_generation` - to build four saves already in situations a seed-1 playthrough rarely
 reaches in a test-sized number of generations: `threat.json` (a hostile fleet inbound, ETA >= 3
 generations), `reply.json` (a reply already in flight), `genesis.json` (a landed Genesis
-colony). `tests/showcase.spec.ts` loads each one through the real Load screen ("Import JSON
-file") and checks the matching effect reached `window.__losMap` - `arks()` was added to the
-debug hook for this (`spheres()`/`fleets()` already existed from W4).
+colony) and `gameover.json` (a defunded, finished run). `tests/showcase.spec.ts` loads each one
+through the real Load screen ("Import JSON file") and checks the matching effect reached
+`window.__losMap` - `arks()` was added to the debug hook for this (`spheres()`/`fleets()`
+already existed from W4); `gameover.json` instead checks that the final report opens by itself
+and that the action list is replaced by the Game over banner.
 
 ## What's covered vs. intentionally missing
 

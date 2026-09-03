@@ -37,7 +37,37 @@ export function assignKeys(actions: ActionSpec[]): KeyedAction[] {
   return keyed;
 }
 
+/**
+ * The run has ended: the engine refuses every action but `summary`/`help`, so offering the
+ * numbered buttons would only produce refusal toasts. The two things still worth doing take
+ * their place - and the menu stays, since load/import is how a player gets back into a game.
+ */
+function GameOverPanel({ view, store }: { view: ViewState; store: Store }) {
+  return (
+    <Collapsible id="actions" title="Actions" extraClass="actions-panel actions-panel-over">
+      <div class="actions-gameover">
+        <p class="actions-gameover-title">Game over</p>
+        {view.game_over_reason && <p class="actions-gameover-reason">{view.game_over_reason}</p>}
+        <div class="action-buttons">
+          <button class="action-button" disabled={store.state.busy} onClick={() => void store.openSummary()}>
+            <span class="action-label">Final report</span>
+          </button>
+          <button class="action-button" disabled={store.state.busy} onClick={() => store.backToStart()}>
+            <span class="action-label">New game</span>
+          </button>
+          <button class="action-button" disabled={store.state.busy} onClick={() => store.openMenu()}>
+            <span class="action-key">6</span>
+            <span class="action-label">Menu</span>
+            <span class="action-cost">save / load / help</span>
+          </button>
+        </div>
+      </div>
+    </Collapsible>
+  );
+}
+
 export function ActionsPanel({ view, store }: { view: ViewState; store: Store }) {
+  if (view.game_over) return <GameOverPanel view={view} store={store} />;
   const keyed = assignKeys(view.actions);
   const disabled = store.state.busy || store.state.pendingDoctrine !== null;
   return (

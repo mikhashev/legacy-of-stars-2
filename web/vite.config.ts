@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
@@ -56,11 +56,32 @@ function listOutputFiles(dir: string, prefix = ""): string[] {
 }
 
 /**
+ * Hashes what will actually be served: for every precached file, its path *and* its bytes.
+ *
+ * Hashing the file list alone (what this used to do) misses every change that keeps the same
+ * names - `engine.zip`, `index.html`, `404.html` and the Pyodide runtime are all unhashed
+ * paths in `public/`, so an engine edit produced a byte-different build under an identical
+ * cache name and returning players kept the stale copy forever. The name part stays in the
+ * digest so a pure rename still rolls the cache.
+ */
+function precacheVersion(outDir: string, files: string[]): string {
+  const digest = createHash("sha1");
+  for (const rel of files) {
+    // The path, its byte length and its bytes: no two different builds can collide by
+    // running one file's content into the next one's name.
+    const bytes = readFileSync(join(outDir, rel));
+    digest.update(`${rel}:${bytes.length};`);
+    digest.update(bytes);
+  }
+  return digest.digest("hex").slice(0, 12);
+}
+
+/**
  * Hand-written offline cache (web_version_plan.md W5 - no plugin): after `vite build` writes
  * `dist/`, this walks the finished output (Vite's hashed JS/CSS, `engine.zip`, the Pyodide
  * runtime, index.html) and writes `dist/version.json` plus `dist/sw.js`, a cache-first service
- * worker whose cache name embeds a hash of that file list, so a new build's differently-hashed
- * assets get a fresh cache and the old one is dropped on activate. It never touches saves -
+ * worker whose cache name embeds a hash of those files' names *and contents*, so any changed
+ * build gets a fresh cache and the old one is dropped on activate. It never touches saves -
  * those live in localStorage, not behind any URL a service worker could intercept.
  */
 function serviceWorker(): Plugin {
@@ -75,7 +96,7 @@ function serviceWorker(): Plugin {
       const outDir = join(import.meta.dirname, config.build.outDir);
       if (!existsSync(outDir)) return;
       const files = listOutputFiles(outDir).sort();
-      const version = createHash("sha1").update(files.join("\n")).digest("hex").slice(0, 12);
+      const version = precacheVersion(outDir, files);
 
       writeFileSync(
         join(outDir, "version.json"),
@@ -95,15 +116,27 @@ function scopePath() {
 
 function relativePath(url) {
   const scope = scopePath();
-  let path = url.pathname.startsWith(scope) ? url.pathname.slice(scope.length) : url.pathname;
+  const path = url.pathname.startsWith(scope) ? url.pathname.slice(scope.length) : url.pathname;
   return path === "" ? "index.html" : path;
+}
+
+/** True for a request for the app document itself, under either of the two URLs it answers to. */
+function isAppDocument(request, url) {
+  if (request.mode !== "navigate") return false;
+  const scope = scopePath();
+  return url.pathname === scope || url.pathname === scope + "index.html";
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => Promise.all(PRECACHE.map((path) => cache.add(path).catch(() => {}))))
+      .then((cache) =>
+        // "./" is the scope root itself: the URL a player actually has bookmarked. It serves
+        // the same bytes as index.html but is a separate cache entry, so precache both or an
+        // offline reload of the bare directory URL finds nothing.
+        Promise.all(["./", ...PRECACHE].map((path) => cache.add(path).catch(() => {}))),
+      )
       .then(() => self.skipWaiting()),
   );
 });
@@ -122,6 +155,25 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // A navigation carries the browser's own headers and cache mode, so \`cache.match(request)\`
+  // can miss the entry install() put there under a plain URL - and a reload of the bare
+  // directory URL would then fall through to the network and fail offline. Normalise every
+  // navigation to the app to the same two cache keys, whichever URL form it arrived as.
+  if (isAppDocument(request, url)) {
+    const scope = scopePath();
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = (await cache.match(scope)) || (await cache.match(scope + "index.html"));
+        if (cached) return cached;
+        const response = await fetch(request);
+        if (response.ok) cache.put(scope, response.clone());
+        return response;
+      }),
+    );
+    return;
+  }
+
   if (!PRECACHE.includes(relativePath(url))) return;
 
   event.respondWith(
@@ -141,7 +193,7 @@ self.addEventListener("fetch", (event) => {
   };
 }
 
-// GitHub Pages serves this project under /legacy-of-stars/, not the domain root; the workflow
+// GitHub Pages serves this project under /legacy-of-stars-2/, not the domain root; the workflow
 // (.github/workflows/web.yml) sets VITE_BASE accordingly. Local dev/preview default to "/".
 // Everything that reaches the Pyodide runtime or engine.zip resolves against
 // `import.meta.env.BASE_URL` (bridge.ts / worker.ts), so this one setting is enough.

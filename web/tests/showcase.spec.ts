@@ -1,7 +1,8 @@
 /**
  * W5 acceptance: the W4 animations (fleets, reply spheres, Genesis arks/colonies) that a plain
- * seed-1 game rarely reaches within the length of a test. `scripts/make_web_fixtures.py` builds
- * three saves already in those situations; this test loads each one through the real Load
+ * seed-1 game rarely reaches within the length of a test, plus the end-of-run screen.
+ * `scripts/make_web_fixtures.py` builds four saves already in those situations; this test
+ * loads each one through the real Load
  * screen ("Import JSON file"), same path a player would use, and checks the star map picked the
  * effect up - via `window.__losMap`, the debug hook `?debug=1` publishes (Playwright runs
  * against `vite preview`, a production build, so the flag has to be in the URL).
@@ -108,6 +109,35 @@ test("reply.json: a reply sphere is in flight", async ({ page }) => {
   await expect(page.locator(".header-gen")).toContainText(`Generation ${fixture.generation + 1}`);
   await page.waitForTimeout(400);
   await page.screenshot({ path: "test-results/showcase-reply-generation.png", fullPage: true });
+
+  expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
+});
+
+test("gameover.json: a finished run opens the final report by itself", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
+  page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message}`));
+
+  await loadFixture(page, "gameover.json");
+
+  // Nothing is clicked: `game_over` in the loaded state opens the report on its own.
+  const report = page.locator(".summary-modal");
+  await expect(report).toBeVisible();
+  await expect(report.locator("h2")).toHaveText("Final report");
+
+  await page.screenshot({ path: "test-results/showcase-gameover.png", fullPage: true });
+
+  // Closing it leaves the banner that reopens it - and no action list to press.
+  await report.getByRole("button", { name: "Close" }).click();
+  await expect(report).toBeHidden();
+  await expect(page.locator(".actions-gameover-title")).toHaveText("Game over");
+  await expect(page.getByRole("button", { name: "Advance to Next Generation" })).toHaveCount(0);
+
+  // The numbered hotkeys are dead here; the report button is the way back in.
+  await page.keyboard.press("5");
+  await expect(report).toBeHidden();
+  await page.getByRole("button", { name: "Final report" }).click();
+  await expect(report).toBeVisible();
 
   expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);
 });

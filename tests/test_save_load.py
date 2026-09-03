@@ -50,6 +50,7 @@ def busy_program(seed=21) -> ContactProgram:
     p.genesis.unlocked = True
     p.research_points, p.funding, p.action_points = 2000, 80, 3
     sterile = next(s for s in p.star_systems.values() if not s.has_civilization)
+    sterile.knowledge = max(sterile.knowledge, 20)  # an ark needs a studied target
     ok, msg = p.genesis.seed_world(p, sterile)
     assert ok, msg
     p.add_star_system(p._next_catalog_entry(), announce=False)

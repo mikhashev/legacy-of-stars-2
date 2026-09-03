@@ -372,6 +372,17 @@ class SituationalActionsTest(unittest.TestCase):
                       if not s.has_civilization and not s.is_wow_source
                       and (s.spectral_type or "G")[:1] in "GKMF")
 
+        # An unstudied system is refused before the civilization check, so neither the refusal
+        # nor the picker list can say whether anyone lives there.
+        target.knowledge = 0
+        unstudied = call(session, "genesis_seed", system=target.name)
+        self.assertFalse(unstudied["ok"])
+        self.assertIn("Study the system first", unstudied["message"])
+        self.assertNotIn(target.name, unstudied["state"]["genesis"]["targets"])
+
+        target.knowledge = 20
+        self.assertIn(target.name, call(session, "help")["state"]["genesis"]["targets"])
+
         ok = call(session, "genesis_seed", system=target.name)
         self.assertTrue(ok["ok"], ok["message"])
         self.assertTrue(any(w["system_name"] == target.name for w in ok["state"]["genesis"]["worlds"]))
@@ -610,6 +621,10 @@ class StartScreenAndViewStateTest(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("HOW TO PLAY", payload["message"])
         self.assertIsNone(payload["state"])
+        # The front-end reads result.data.ai on both help paths, so the no-game one carries it too.
+        self.assertIn("data", payload)
+        self.assertIn("ai", payload["data"])
+        self.assertIsInstance(payload["data"]["ai"], str)
 
     def test_view_state_exposes_year_context_and_genesis_targets(self):
         import json as _json

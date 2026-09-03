@@ -24,10 +24,10 @@ jobs:
       run:
         working-directory: web
     env:
-      # The repository is served at https://mikhashev.github.io/legacy-of-stars/ (a GitHub Pages
+      # The repository is served at https://mikhashev.github.io/legacy-of-stars-2/ (a GitHub Pages
       # *project* site, not a user/org site), so every built asset URL needs the repo name as
       # its base path. Local dev/preview keep vite.config.ts's default of "/".
-      VITE_BASE: /legacy-of-stars/
+      VITE_BASE: /legacy-of-stars-2/
     steps:
       - uses: actions/checkout@v4
 

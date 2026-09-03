@@ -207,6 +207,16 @@ input[type="text"], input[type="number"], textarea {
 .action-cost { color: var(--text-dim); font-size: 0.8rem; }
 .actions-hint { margin-top: 0.6rem; color: var(--warning); font-size: 0.85rem; }
 
+/* The run has ended: the action list is replaced by the two things still worth doing. */
+.actions-gameover-title {
+  margin: 0 0 0.2rem;
+  color: var(--danger);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.actions-gameover-reason { margin: 0 0 0.7rem; color: var(--text-dim); font-size: 0.85rem; }
+
 .program-message pre { color: var(--text); }
 
 /* ---------------------------------------------------------------- collapsible panels (W5) */

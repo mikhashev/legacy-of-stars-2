@@ -2,31 +2,31 @@
   "format_version": 1,
   "saved_at": "2026-09-03T13:12:34",
   "label": "",
-  "generation": 1,
-  "year": 1977,
-  "director": "Dr. Noah Lewis",
-  "game_over": false,
+  "generation": 2,
+  "year": 2002,
+  "director": "Dr. Benjamin Wilson",
+  "game_over": true,
   "program": {
     "seed": 1,
     "state": {
-      "generation": 1,
+      "generation": 2,
       "start_year": 1977,
-      "funding": 50,
-      "research_points": 100,
-      "message_quality": 1.0,
-      "public_support": 65,
+      "funding": 49.35353118198374,
+      "research_points": 143.0,
+      "message_quality": 1.2000000000000002,
+      "public_support": 5,
       "knowledge_base": 10,
-      "game_over": false,
-      "game_over_reason": "",
+      "game_over": true,
+      "game_over_reason": "The contact program was defunded: public support collapsed.",
       "victory": false,
       "philosophical_victory": false,
-      "self_destruct_risk": 0.0,
-      "ecological_risk": 0.0,
-      "action_points": 2,
+      "self_destruct_risk": 0.0005,
+      "ecological_risk": 0.004,
+      "action_points": 3,
       "max_action_points": 3,
       "ap_modifier": 0,
       "advisor_consulted_this_gen": false,
-      "broadcast_radius": 0.0,
+      "broadcast_radius": 67.0,
       "leakage_multiplier": 1.0
     },
     "flags": {
@@ -101,32 +101,22 @@
         "spectral_type": "M5.5V",
         "ra": 217.43,
         "dec": -62.68,
-        "has_civilization": true,
-        "civilization_age": 100.0,
+        "has_civilization": false,
+        "civilization_age": 0,
         "is_extinct": false,
         "has_swan_song": false,
-        "true_strategy": "LB",
-        "deception_level": 0.1,
-        "civilization_type": "biological_pure",
-        "civilization_attitude": 0.5,
-        "knowledge": 30,
+        "true_strategy": null,
+        "deception_level": 0,
+        "civilization_type": null,
+        "civilization_attitude": 0,
+        "knowledge": 0,
         "is_seeded": false,
         "has_detected_earth": false,
         "is_wow_source": false,
-        "civilization_stage": "DIGITAL",
+        "civilization_stage": null,
         "extinct_years_ago": null,
-        "messages_sent": [
-          [
-            "hello",
-            1
-          ]
-        ],
-        "pending_responses": [
-          [
-            "Earth! We have kept a fire burning for strangers for eleven hundred generations, and no one ever came to sit by it. Then your message. We are a biological people; we age, we grieve, we plant orchards we will never taste. That is why your patience across 4.2 light-years moves us. Tell us what you eat, what you fear, what you name your storms. We will tell you everything.",
-            2
-          ]
-        ],
+        "messages_sent": [],
+        "pending_responses": [],
         "received_messages": []
       },
       {
@@ -263,6 +253,18 @@
           "Patient"
         ],
         "generation": 1
+      },
+      {
+        "name": "Dr. Benjamin Wilson",
+        "skills": {
+          "diplomacy": 0.8384242699249872,
+          "science": 0.8804738687709103,
+          "administration": 0.9761222276455969
+        },
+        "traits": [
+          "Patient"
+        ],
+        "generation": 2
       }
     ],
     "technologies": {
@@ -348,7 +350,7 @@
       "worlds": []
     },
     "stats": {
-      "messages_sent": 1,
+      "messages_sent": 0,
       "responses_received": 0,
       "attacks_scheduled": 0,
       "attacks_survived": 0,
