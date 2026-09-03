@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T21:02:44",
+  "saved_at": "2026-09-03T23:19:10",
   "label": "",
   "generation": 1,
   "year": 1977,
@@ -180,21 +180,54 @@
         "spectral_type": "M4V",
         "ra": 269.45,
         "dec": 4.69,
-        "has_civilization": false,
-        "civilization_age": 0,
+        "has_civilization": true,
+        "civilization_age": 54818.33161265955,
         "is_extinct": false,
         "has_swan_song": false,
-        "true_strategy": null,
-        "deception_level": 0,
-        "civilization_type": null,
-        "civilization_attitude": 0,
+        "true_strategy": "L",
+        "deception_level": 0.35295798434165854,
+        "civilization_type": "biological_pure",
+        "civilization_attitude": 0.730477762411307,
         "knowledge": 0,
         "is_seeded": false,
         "has_detected_earth": false,
         "is_wow_source": false,
-        "civilization_stage": null,
+        "civilization_stage": "INTERSTELLAR",
         "extinct_years_ago": null,
-        "timeline": null,
+        "timeline": {
+          "origin_year": -52841,
+          "initial": {
+            "alive": true,
+            "stage": "INTERSTELLAR",
+            "strategy": "L",
+            "attitude": 0.730477762411307,
+            "civ_type": "biological_pure",
+            "deception": 0.35295798434165854,
+            "died_year": null
+          },
+          "events": [
+            {
+              "year": 2459,
+              "kind": "strategy",
+              "value": "LR"
+            },
+            {
+              "year": 2459,
+              "kind": "attitude",
+              "value": 0.630477762411307
+            },
+            {
+              "year": 3159,
+              "kind": "strategy",
+              "value": "L"
+            },
+            {
+              "year": 3159,
+              "kind": "attitude",
+              "value": 0.730477762411307
+            }
+          ]
+        },
         "observations": [],
         "messages_sent": [],
         "pending_responses": [],
@@ -259,33 +292,38 @@
         "ra": 282.45,
         "dec": -23.84,
         "has_civilization": true,
-        "civilization_age": 4203.460754011368,
+        "civilization_age": 407.3813283608672,
         "is_extinct": false,
         "has_swan_song": false,
         "true_strategy": "L",
-        "deception_level": 0.611771035838361,
-        "civilization_type": "digital_ascended",
-        "civilization_attitude": 0.33725733276227166,
+        "deception_level": 0.9538697269025829,
+        "civilization_type": "biological_pure",
+        "civilization_attitude": 0.717055736120902,
         "knowledge": 0,
         "is_seeded": false,
         "has_detected_earth": false,
         "is_wow_source": false,
-        "civilization_stage": "INTERPLANETARY",
+        "civilization_stage": "DIGITAL",
         "extinct_years_ago": null,
         "timeline": {
-          "origin_year": -2226,
+          "origin_year": 1570,
           "initial": {
             "alive": true,
-            "stage": "INTERPLANETARY",
+            "stage": "DIGITAL",
             "strategy": "L",
-            "attitude": 0.33725733276227166,
-            "civ_type": "digital_ascended",
-            "deception": 0.611771035838361,
+            "attitude": 0.717055736120902,
+            "civ_type": "biological_pure",
+            "deception": 0.9538697269025829,
             "died_year": null
           },
           "events": [
             {
-              "year": 4189,
+              "year": 2570,
+              "kind": "stage",
+              "value": "INTERPLANETARY"
+            },
+            {
+              "year": 4185,
               "kind": "extinct",
               "value": {
                 "has_swan_song": true

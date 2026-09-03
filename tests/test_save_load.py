@@ -35,6 +35,12 @@ def busy_program(seed=21) -> ContactProgram:
         system.true_strategy = strategy
         system.civilization_stage = CivilizationStage.DIGITAL
         system.civilization_type = "hybrid_integrated"
+        # `send_message` (T2, the receipt frame) decides from `system.timeline_state(...)`, not
+        # from these cached fields directly - without a matching timeline the forced LA strategy
+        # above is invisible to it, and whether "Hello foe" schedules an attack below would
+        # depend on whatever profile this system's own roll happened to produce. Give it a
+        # timeline that actually matches the forced profile, the same way Genesis colonies do.
+        system.set_static_timeline(p.start_year)
     p.action_points = 5
     p.send_message(friend.name, "Hello friend")
     friend.pending_responses.append(("We hear you", p.generation + 1))

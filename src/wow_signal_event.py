@@ -47,7 +47,7 @@ def create_wow_source_system(program):
     # chosen because a signal came from it.
     system.has_civilization = random.random() < WOW_SOURCE_CIV_CHANCE
     if system.has_civilization:
-        system._roll_civilization()
+        system._roll_civilization(random)
     else:
         system._clear_civilization()
 

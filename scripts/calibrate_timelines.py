@@ -53,6 +53,9 @@ TARGETS = {
     # (g), (h): team-review targets, floors rather than ranges - see calibration_metrics().
     "first_sky_change_by_10": (0.60, 1.0),
     "non_death_first_three": (0.50, 1.0),
+    # T5.2 (decision 1a, the "silence ends" starting-selection guarantee): the gameplay-level
+    # check of `_selection_has_early_sky_promise` - see calibration_metrics() for the distinction.
+    "first_sky_change_by_30": (0.90, 1.0),
 }
 
 # The baseline this repo ships (deliverable of the T5 calibration instrument fixes): the
@@ -84,7 +87,7 @@ def print_report(metrics_by_profile: dict, baseline_by_profile: dict = None) -> 
     print("\n=== T5 CALIBRATION (plan section 7) ===")
     header = (f"{'Profile':<12}{'Games':<7}{'Extinct':<9}{'<=20':<8}{'20-60':<8}{'60-160':<9}"
               f"{'Sky/40':<8}{'Differ':<9}{'Wins':<7}{'Reply':<8}{'Stage3':<8}{'Sky<=10':<9}"
-              f"{'NonDth3':<9}")
+              f"{'NonDth3':<9}{'Sky<=30':<9}")
     print(header)
     print("-" * len(header))
     for profile, m in metrics_by_profile.items():
@@ -96,12 +99,14 @@ def print_report(metrics_by_profile: dict, baseline_by_profile: dict = None) -> 
               f"{m['sky_changes_per_40']:<8.2f}{_pct(m['differing_outcomes']):<9}"
               f"{m['victory_rate']:<7.0%}{(f'{reply:.0f}' if reply is not None else '-'):<8}"
               f"{_pct(m['stage_up_first_three']):<8}{_pct(m['first_sky_change_by_10']):<9}"
-              f"{_pct(m['non_death_first_three']):<9}")
+              f"{_pct(m['non_death_first_three']):<9}{_pct(m['first_sky_change_by_30']):<9}")
     print("\nTargets: extinct 20-30 %; sky changes 3-6 per 40 gens (observer); "
           "differing outcomes 10-20 %; a stage advance among the first three sky changes in "
           "most games (f, 'Stage3'); (g) first sky-change by generation 10 >= 60 % ('Sky<=10'); "
           "(h) (f) reformulated - at least one of the first three sky changes is not an "
-          "extinction/silence, >= 50 % ('NonDth3').")
+          "extinction/silence, >= 50 % ('NonDth3'); T5.2 first sky-change by generation 30 "
+          ">= 90 % ('Sky<=30', the gameplay-level check of the starting-selection guarantee, "
+          "decision 1a - the 'observer' profile is the instrument).")
     for profile, m in metrics_by_profile.items():
         print(f"  {profile}: {m['civilizations_observed']} civilizations observed; "
               f"{m['messages_to_inhabited']} message(s) to inhabited targets; "

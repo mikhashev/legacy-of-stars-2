@@ -21,7 +21,8 @@ os.environ.setdefault("LOS_OFFLINE", "1")
 from src.civ_timeline import (  # noqa: E402
     EXTINCTION_HAZARD_PER_CENTURY, STAGE_AGE_THRESHOLDS, TIMELINE_HORIZON_YEARS, CivEvent, CivState,
     CivilizationStage, CivTimeline, generate_timeline, stage_for_age, static_timeline)
-from src.legacy_of_stars_v3 import START_YEAR, ContactProgram, StarSystem  # noqa: E402
+from src.legacy_of_stars_v3 import (  # noqa: E402
+    START_YEAR, ContactProgram, StarSystem, _selection_has_early_sky_promise)
 
 import auto_playtest  # noqa: E402
 
@@ -312,26 +313,59 @@ class EngineWiringTest(unittest.TestCase):
         self.assertTrue(target.timeline_state(program.start_year + (program.generation - 1) * 25).alive)
 
 
+class SkyChangeGuaranteeTest(unittest.TestCase):
+    """T5.2 (decision 1a): most new games promise an early, observable stage advance.
+
+    Cheap by construction - `_selection_has_early_sky_promise` only walks each of the (at most
+    five) known systems' already-generated timeline events, and `ContactProgram(...)` itself is
+    fast (see the constant's comment in `legacy_of_stars_v3.py`); 50 seeded games and their checks
+    run in well under a second.
+    """
+
+    def test_at_least_eighty_percent_of_new_games_satisfy_the_guarantee(self):
+        satisfied = 0
+        seeds = range(1, 51)
+        for seed in seeds:
+            program = ContactProgram(seed=seed, offline=True)
+            if _selection_has_early_sky_promise(program.star_systems):
+                satisfied += 1
+        share = satisfied / len(seeds)
+        self.assertGreaterEqual(share, 0.80, f"{satisfied}/{len(seeds)} = {share:.1%}")
+
+
 # --- Recorded from the engine before timelines existed, re-recorded after T5 calibration ---
 # (2026-09-03, plan §7) changed BASE_CIV_CHANCE, EXTINCT_AT_CREATION_CHANCE and the hazard/drift
 # tables in a way that shows up in this 30-generation run (a different star hosts a civilization,
 # a different knowledge threshold is reached) - see the calibration block in src/civ_timeline.py.
 # The point this test still guards is narrower than its T0 name: the RNG stream itself is
 # deterministic and stable under the *current* constants, not that the constants never move.
+#
+# Re-recorded again for T5.2 (2026-09-03, decision 1a's "silence ends" guarantee,
+# `_selection_has_early_sky_promise` in src/legacy_of_stars_v3.py): `_start_new_game` now
+# re-rolls one system at a time from the starting five-system selection - on an isolated, salted
+# stream that never touches the shared global `random` (`StarSystem.reroll_civilization`) -
+# whenever the first draw does not already put an observable stage advance in a Gen 8-30 window;
+# seed 1 and seed 2 both needed one re-roll. Because the global stream itself is untouched, only
+# the re-rolled system's own profile differs from the pre-T5.2 numbers - everything downstream
+# (director, tech order, ...) would still match exactly *if* the re-rolled system had never been
+# targeted by a scripted action; the numbers below differ from pre-T5.2 only insofar as the
+# 30-generation playtest policy happens to interact with that one changed system (e.g. messaging
+# it now gets a real fate instead of "nobody"). See `_start_new_game`'s docstring for what this
+# does and why (including why an earlier, whole-selection-redraw version was rejected).
 SEED1_STATS = {
     "messages_sent": 59, "responses_received": 5, "attacks_scheduled": 0, "attacks_survived": 0,
     "attacks_landed": 0, "info_attacks": 0, "swan_songs_found": 0, "systems_discovered": 28,
     "events_resolved": 2, "techs_researched": 21, "worlds_seeded": 0, "passive_detections": 0,
     # T2 added the per-message fates. The counters above are unchanged, which is the point:
     # the receipt frame reads a different year, it does not draw a different random number.
-    "messages_replied": 5, "messages_nobody": 44, "messages_died_in_flight": 3, "messages_silent": 7,
+    "messages_replied": 5, "messages_nobody": 39, "messages_died_in_flight": 3, "messages_silent": 12,
 }
 SEED1_DESCRIPTIONS = [
     ("Proxima Centauri", "No signs of civilization detected."),
-    ("Barnard's Star", "No signs of civilization detected."),
+    ("Barnard's Star", "Possible artificial signals detected."),
     ("Lalande 21185", "No signs of civilization detected."),
     ("Sirius", "No signs of civilization detected."),
-    ("Ross 154", "INTERPLANETARY civilization. Attitude: potentially hostile."),
+    ("Ross 154", "INTERPLANETARY civilization. Attitude: seemingly friendly."),
     ("Alpha Centauri", "No signs of civilization detected."),
     ("Wolf 359", "Interplanetary civilization spanning multiple worlds in their system."),
     ("Luyten 726-8", ""),
@@ -362,14 +396,17 @@ SEED1_DESCRIPTIONS = [
     ("Gliese 687", ""),
 ]
 # name, has_civilization, is_extinct, true_strategy - the hidden profile of a fresh game.
+# Re-recorded for T5.2 (see the comment above SEED1_STATS): the starting selection for seed 1 and
+# seed 2 both changed because their first draw did not satisfy the Gen 8-30 sky-change guarantee -
+# in each case exactly one system (the first in nearest-first order) was re-rolled to get one.
 SEED_PROFILES = {
-    1: [("Barnard's Star", False, False, None),
+    1: [("Barnard's Star", True, False, "L"),
         ("Lalande 21185", False, False, None),
         ("Proxima Centauri", False, False, None),
         ("Ross 154", True, False, "L"),
         ("Sirius", False, False, None)],
     2: [("Alpha Centauri", False, False, None),
-        ("Barnard's Star", False, False, None),
+        ("Barnard's Star", True, False, "LR"),
         ("Luyten 726-8", False, False, None),
         ("Proxima Centauri", False, False, None),
         ("Ross 154", False, False, None)],

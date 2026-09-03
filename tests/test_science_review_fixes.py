@@ -1,5 +1,6 @@
 """Regressions for the issues found in the review of the scientific-accuracy changes."""
 import os
+import random
 import sys
 import unittest
 from unittest import mock
@@ -21,7 +22,7 @@ class WowSourceIsolationTest(unittest.TestCase):
         p.wow_signal.reply("")
         source = p.wow_signal.wow_source_system
         source.has_civilization = True
-        source._roll_civilization()
+        source._roll_civilization(random)
         source.timeline = None   # hand-written: static, so every frame reads these fields
         source.is_extinct = False
         source.true_strategy = "LA"
@@ -50,7 +51,7 @@ class WowSourceIsolationTest(unittest.TestCase):
         p.wow_signal.reply("")
         source = p.wow_signal.wow_source_system
         source.has_civilization = True
-        source._roll_civilization()
+        source._roll_civilization(random)
         source.timeline = None   # hand-written: static, so every frame reads these fields
         source.is_extinct = False
         source.true_strategy = "LA"
@@ -122,7 +123,7 @@ class StaleInfoAttackTest(unittest.TestCase):
         p = program()
         target = next(iter(p.star_systems.values()))
         target.has_civilization = True
-        target._roll_civilization()
+        target._roll_civilization(random)
         target.timeline = None   # hand-written: static, so every frame reads these fields
         target.is_extinct = False
         target.true_strategy = "LB"

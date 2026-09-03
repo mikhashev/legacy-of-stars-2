@@ -100,11 +100,17 @@ class CalibrationTest(unittest.TestCase):
         # time-box: pushing the rate that high required either an extinction hazard or a
         # BASE_CIV_CHANCE far above what kept `extinct_share`, `differing_outcomes` and victories
         # on their own targets (see the calibration block in src/civ_timeline.py for the numbers
-        # and the trade-off). This band brackets the measured rate (~1.0-1.2) as a regression
-        # floor/ceiling rather than the unmet plan target, so a knob change that moves it further
-        # away still fails a test.
+        # and the trade-off).
+        #
+        # T5.2 (2026-09-03, the "silence ends" starting-selection guarantee, decision 1a) raised
+        # the measured rate from ~1.0-1.2 to ~2.0-2.3 as a side effect: most new games now start
+        # with a system whose next stage crossing is guaranteed to land early, which is itself a
+        # sky change. This is a welcome move toward the plan's still-unmet 3-6 target, not a
+        # re-tuning - no hazard/density constant moved - so the band below is widened to bracket
+        # the newly-measured rate (with headroom) as a regression floor/ceiling, honestly still
+        # short of the plan's own target.
         rate = self.metrics["sky_changes_per_40"]
-        self.assertTrue(0.5 <= rate <= 2.0, rate)
+        self.assertTrue(0.5 <= rate <= 3.5, rate)
 
     def test_stage_up_among_first_three_sky_changes(self):
         share = self.metrics["stage_up_first_three"]

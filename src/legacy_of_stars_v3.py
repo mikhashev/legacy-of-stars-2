@@ -215,6 +215,118 @@ def habitability_weight(spectral_type: Optional[str]) -> float:
     return _HABITABILITY_BY_CLASS.get(core[0], _UNKNOWN_CLASS_WEIGHT)
 
 
+# ---------------------------------------------------------------------- T5.1 far-band density (decision 2b)
+# Beyond ~60 LY our actual knowledge of exoplanets falls off with distance - fewer confirmed
+# detections, coarser characterization, and for the T4 catalogue's 60-160 LY band, stars picked
+# mostly for being real and well-placed rather than for a well-characterized planetary system. A
+# lower civilization-roll prior on distant stars encodes that honestly: it says less about those
+# stars, not that they are less hospitable. `BASE_CIV_CHANCE` and the near field (<=60 LY) are
+# untouched by this - only the far tail of the roll changes.
+#
+# The curve is 1.0 out to `_FAR_BAND_NEAR_LY` and ramps down to `_FAR_BAND_FAR_PRIOR` at
+# `_FAR_BAND_FAR_LY`, linearly in *log*-distance rather than in plain distance. A log ramp was
+# picked over a straight linear-in-LY one because the catalogue's far stars are themselves
+# log-spaced (60, 80, 100, 127, 159 LY, roughly doubling): a linear-in-LY ramp would spend most of
+# its decline on the first handful of stars past 60 LY and go nearly flat over the last third of
+# the band, while the log ramp keeps the per-star step comparable across the whole tail.
+_FAR_BAND_NEAR_LY = 60.0
+_FAR_BAND_FAR_LY = 160.0
+_FAR_BAND_FAR_PRIOR = 0.35
+
+
+def distance_prior(distance_ly: float) -> float:
+    """Civilization-roll prior by distance: 1.0 to 60 LY, ramping to ~0.35 by 160 LY.
+
+    Monotonically non-increasing; unity everywhere inside the near field the plan says not to
+    touch (`distance_ly <= 60`), so `EXTINCT_AT_CREATION_CHANCE`/`BASE_CIV_CHANCE`/near-field
+    statistics are unaffected. Multiplied into the civilization roll next to
+    `habitability_weight` - see `StarSystem.__init__`.
+    """
+    distance_ly = float(distance_ly)
+    if distance_ly <= _FAR_BAND_NEAR_LY:
+        return 1.0
+    if distance_ly >= _FAR_BAND_FAR_LY:
+        return _FAR_BAND_FAR_PRIOR
+    log_near = math.log(_FAR_BAND_NEAR_LY)
+    log_far = math.log(_FAR_BAND_FAR_LY)
+    t = (math.log(distance_ly) - log_near) / (log_far - log_near)
+    return 1.0 + t * (_FAR_BAND_FAR_PRIOR - 1.0)
+
+
+# ---------------------------------------------------------------------- T5.2 the promise that silence ends (decision 1a)
+# The plan's design guarantee: a new game's five known systems should include at least one
+# observable *stage advancement* - not a scripted event, but a genuine roll of the existing
+# timeline model - whose light reaches Earth early enough that a director who starts watching
+# actually sees the sky change within a normal game's opening act (Generation 8-30). Without this,
+# whether the first sky change a player ever sees happens at all is buried three rolls deep (does
+# a nearby star host a civilization? is it already past its next threshold? does that threshold
+# land in this ~550-year window?), and most games never surface it there - see the T5.1 report for
+# the measured share.
+#
+# The fix keeps the starting *selection* fixed - still whichever five of the nearest eight
+# catalogued stars `generate_star_systems` drew - and, if it does not already keep the promise,
+# re-rolls one of those five systems' whole civilization profile at a time (cycling through them)
+# on an isolated, per-attempt salted `random.Random`, never the shared global `random` stream that
+# every other roll in the game draws from (`StarSystem.reroll_civilization`). Every system a
+# satisfying selection ends up with is still an ordinary roll of the same generator every other
+# civilization uses - nothing is hand-placed, no civilization is created that would not otherwise
+# exist on that star - and a game whose nearest eight stars cannot satisfy the guarantee within
+# `GEN8_30_GUARANTEE_ATTEMPTS` tries starts anyway (logged at INFO) rather than falling back to a
+# scripted event, per the plan's own "proceed without it" clause.
+#
+# An earlier version of this re-rolled the *selection* instead - repeating `generate_star_systems(5)`,
+# which re-samples from the global stream. Simpler, but measurement showed it moved victory rates
+# and reply timing across the *whole* calibration instrument seed range, not just the seeds that
+# needed a re-roll: every game after the point a selection was redrawn was effectively a different
+# random game, an outsized and undocumented side effect for a narrow guarantee (see the T5.2
+# report). The per-system salted re-roll below leaves the global stream untouched no matter how
+# many attempts a game needs - at the cost of a slower search, since only one of five systems
+# changes per attempt rather than all five, so `GEN8_30_GUARANTEE_ATTEMPTS` had to be raised well
+# above what the whole-selection version needed for the same success rate.
+#
+# Limits: this can only find an arrangement the RNG stream already contains within the attempt
+# budget - it is a filter over re-rolls, not a search that can conjure a qualifying system out of
+# a catalogue that has none nearby (which is why the test below tolerates an 80 % floor, not
+# 100 %, over seeds 1-50). Because the global stream is untouched, nothing downstream of it
+# (director, technologies, later discoveries, ...) moves for *any* seed; only the re-rolled
+# system(s)' own profile does, which is why `tests/test_civ_timeline.py`'s
+# `SEED_PROFILES`/`SEED1_STATS`/`SEED1_DESCRIPTIONS` still needed re-recording for the seeds this
+# guarantee actually touched - see that file's comment.
+#
+# 100 was picked empirically over seeds 1-50 (the test below): 12 attempts reached only 30 %, 40
+# reached 64 %, 60 reached 76 %, 80 reached 82 % and 100 reached 88 %. Each attempt is cheap (one
+# system's civilization + timeline, not a whole game), so 100 buys comfortable headroom over the
+# 80 % floor without meaningfully slowing game start (200 seeded games start in ~0.15s at this
+# budget).
+GEN8_30_GUARANTEE_ATTEMPTS = 100
+_GUARANTEE_MIN_YEAR = START_YEAR + 7 * 25    # the light of Generation 8: 2152
+_GUARANTEE_MAX_YEAR = START_YEAR + 29 * 25   # the light of Generation 30: 2702
+_GUARANTEE_MAX_DISTANCE_LY = 20.0            # "plausibly study": within the starting near field
+
+
+def _selection_has_early_sky_promise(systems: Dict[str, "StarSystem"]) -> bool:
+    """Whether this starting selection already keeps the "silence ends" promise (decision 1a).
+
+    True when at least one known, currently-living, plausibly-studyable (<=20 LY) system has a
+    `stage` event on its timeline whose light reaches Earth (`event.year + round(distance)`)
+    between Generation 8 and Generation 30.
+    """
+    for system in systems.values():
+        if (not system.has_civilization or system.is_extinct
+                or system.distance > _GUARANTEE_MAX_DISTANCE_LY):
+            continue
+        timeline = getattr(system, "timeline", None)
+        if timeline is None:
+            continue
+        for event in timeline.events:
+            if event.kind != "stage":
+                continue
+            arrival = event.year + round(system.distance)
+            if _GUARANTEE_MIN_YEAR <= arrival <= _GUARANTEE_MAX_YEAR:
+                return True
+    return False
+
+
 def format_year(year: int) -> str:
     """A calendar year for display, with years at or before 0 written as BC.
 
@@ -300,15 +412,7 @@ class StarSystem:
         self.spectral_type = spectral_type
         self.ra = ra    # J2000 right ascension, degrees (for star maps)
         self.dec = dec  # J2000 declination, degrees
-        # The Fermi paradox made concrete: most stars are silent. With ~50 catalogued stars this
-        # yields a handful of civilizations per game, a quarter of them already extinct. The
-        # spectral class weights the roll: a red giant or white dwarf never hosts anyone.
-        self.has_civilization = random.random() < BASE_CIV_CHANCE * habitability_weight(spectral_type)
-
-        if self.has_civilization:
-            self._roll_civilization()
-        else:
-            self._clear_civilization()
+        self._roll_profile(random)
 
         self.knowledge = 0
         self.messages_sent = []
@@ -321,44 +425,73 @@ class StarSystem:
         self.has_detected_earth = False  # hostile civ already found us (no double attacks)
         self.is_wow_source = False
 
-    def _roll_civilization(self) -> None:
-        """Roll the hidden profile of a civilization living in this system."""
+    def _roll_profile(self, rng) -> None:
+        """Roll (or re-roll) this system's whole civilization profile and timeline from `rng`.
+
+        `rng` is either the `random` module itself (construction, the shared global stream every
+        other roll in the engine draws from) or an isolated `random.Random` instance (the
+        "silence ends" guarantee's targeted re-roll, T5.2 decision 1a - see `reroll_civilization`
+        and `_start_new_game`); both expose the same method names, so one code path serves both.
+        """
+        self.has_civilization = (rng.random() < BASE_CIV_CHANCE
+                                 * habitability_weight(self.spectral_type) * distance_prior(self.distance))
+        if self.has_civilization:
+            self._roll_civilization(rng)
+        else:
+            self._clear_civilization()
+
+    def reroll_civilization(self, salt: str) -> None:
+        """Re-roll this system's whole civilization profile from an isolated, salted stream.
+
+        Used only by the pre-game "silence ends" guarantee (T5.2, decision 1a) before anything
+        else has touched this system (no knowledge gathered, no message sent) - see
+        `_start_new_game`. The salted `random.Random` here is entirely separate from the shared
+        global `random` stream the rest of the engine draws from, so this never changes how many
+        draws any *other* system or subsystem consumes - only this system's own profile changes,
+        and only when the guarantee actually needs another attempt. It stays deterministic for a
+        given game seed because the salt is built from `civ_seed_base`, this system's own name
+        and the attempt number - see `_start_new_game`'s call site.
+        """
+        self._roll_profile(random.Random(salt))
+
+    def _roll_civilization(self, rng) -> None:
+        """Roll the hidden profile of a civilization living in this system, from `rng`."""
         distance = self.distance
         # === PHASE 1: Statistical Realism ===
         human_age = 100
 
-        if random.random() < 0.75:
-            civ_age = human_age * random.uniform(1.5, 50)
+        if rng.random() < 0.75:
+            civ_age = human_age * rng.uniform(1.5, 50)
         else:
-            civ_age = human_age * random.uniform(0.1, 0.9)
-        
-        if random.random() < 0.10:
-            civ_age = human_age * random.uniform(10, 1000)
-        
+            civ_age = human_age * rng.uniform(0.1, 0.9)
+
+        if rng.random() < 0.10:
+            civ_age = human_age * rng.uniform(10, 1000)
+
         self.civilization_age = civ_age
         self.civilization_stage = self._age_to_stage(civ_age)
         creation_stage = self.civilization_stage  # kept when extinction clears the field below
-        
-        self.is_extinct = random.random() < EXTINCT_AT_CREATION_CHANCE
+
+        self.is_extinct = rng.random() < EXTINCT_AT_CREATION_CHANCE
         if self.is_extinct:
             # We can't know about a death whose light hasn't reached us yet: the system is
             # `distance` light-years away, so its last living signal is at least that old.
-            self.extinct_years_ago = random.randint(min(max(50, int(distance)), 5000), 5000)
-            self.has_swan_song = random.random() < 0.8
+            self.extinct_years_ago = rng.randint(min(max(50, int(distance)), 5000), 5000)
+            self.has_swan_song = rng.random() < 0.8
             self.civilization_stage = None
-        
+
         if not self.is_extinct:
             strategy_weights = {"L": 10, "LB": 30, "LR": 40, "LA": 15, "LBA": 5}
-            self.true_strategy = random.choices(list(strategy_weights.keys()), weights=list(strategy_weights.values()))[0]
-            
+            self.true_strategy = rng.choices(list(strategy_weights.keys()), weights=list(strategy_weights.values()))[0]
+
             if self.civilization_age > human_age * 2:
-                self.deception_level = random.uniform(0.3, 1.0)
+                self.deception_level = rng.uniform(0.3, 1.0)
             else:
-                self.deception_level = random.uniform(0, 0.5)
+                self.deception_level = rng.uniform(0, 0.5)
         else:
             self.true_strategy = None
             self.deception_level = 0
-        
+
         # === PHASE 3A.2: Civilization Type (How they solved Dual DNA problem) ===
         if not self.is_extinct:
             # Living civilizations - successfully solved the integration crisis
@@ -367,24 +500,25 @@ class StarSystem:
                 "digital_ascended": 15,     # Uploaded consciousness
                 "hybrid_integrated": 10     # Successfully merged
             }
-            self.civilization_type = random.choices(
+            self.civilization_type = rng.choices(
                 list(civ_type_weights.keys()),
                 weights=list(civ_type_weights.values())
             )[0]
         else:
             # Extinct civilizations - 70% failed the transition
-            if random.random() < 0.7:
+            if rng.random() < 0.7:
                 self.civilization_type = "failed_transition"
             else:
                 # Some died for other reasons (war, asteroid, etc.)
-                self.civilization_type = random.choice([
+                self.civilization_type = rng.choice([
                     "biological_pure", "digital_ascended", "hybrid_integrated"
                 ])
-        
-        self.civilization_attitude = random.uniform(0.2, 0.8)
 
-        # Everything above is unchanged and draws from the global `random` in the same order as
-        # before; the timeline is rolled afterwards, from this system's own stream.
+        self.civilization_attitude = rng.uniform(0.2, 0.8)
+
+        # Everything above draws from `rng` (the global stream at construction, an isolated
+        # salted stream on a guarantee re-roll) in the same order as before; the timeline is
+        # rolled afterwards, from this system's own name-keyed stream (unaffected by `rng`).
         self.timeline = self._build_timeline(creation_stage)
 
     def _build_timeline(self, creation_stage: Optional[CivilizationStage]) -> CivTimeline:
@@ -896,6 +1030,28 @@ class ContactProgram:
     def _start_new_game(self) -> None:
         """Roll the initial neighbourhood, the first director and pre-1977 knowledge."""
         self.star_systems = self.generate_star_systems(5)
+        # The "silence ends" guarantee (decision 1a, T5.2): if the selection `generate_star_systems`
+        # just drew does not already keep the promise, re-roll one of its five systems at a time
+        # (cycling through them) on an isolated, salted stream - never the shared global `random`
+        # stream - until it does or the attempt budget runs out. This was tried first as a re-draw
+        # of the *whole* selection (more `generate_star_systems(5)` calls, i.e. more global-stream
+        # draws); measurement showed that shifted the global stream enough to visibly move
+        # victory rates and reply timing across the calibration instrument's whole seed range, not
+        # just the seeds that needed a re-draw - a large, undocumented side effect for a narrow
+        # guarantee. The targeted per-system re-roll below leaves the global stream, and so every
+        # other roll in the game (director, technologies, later discoveries, ...), completely
+        # untouched; see `reroll_civilization` and `_selection_has_early_sky_promise`.
+        attempts = 1
+        known = list(self.star_systems.values())
+        while (not _selection_has_early_sky_promise(self.star_systems)
+               and attempts < GEN8_30_GUARANTEE_ATTEMPTS):
+            target = known[(attempts - 1) % len(known)]
+            target.reroll_civilization(f"gen8_30_guarantee:{self.civ_seed_base}:{attempts}:{target.name}")
+            attempts += 1
+        if not _selection_has_early_sky_promise(self.star_systems):
+            logging.info(
+                f"Sky-change guarantee (decision 1a) not met after {attempts} attempt(s) "
+                f"(seed={self.seed}); starting without it.")
         logging.debug("")
         logging.debug("=" * 60)
         logging.debug("GALAXY OVERVIEW - Hidden Civilization Details")
@@ -1101,6 +1257,18 @@ class ContactProgram:
             logging.debug(f"    Died: {system.extinct_years_ago} years ago")
             logging.debug(f"    Swan Song: {'YES' if system.has_swan_song else 'NO'}")
             logging.debug(f"    Type: {system.civilization_type}")
+        elif system.civilization_stage is None:
+            # Pre-existing edge case, surfaced by `add_star_system` calling `_observe_system`
+            # (which refreshes `is_extinct` to the *observed* frame) before this debug log runs:
+            # a civilization rolled extinct at creation has `civilization_stage = None` cached
+            # from roll time (`_roll_civilization`), but `refresh_observation` correctly reports
+            # `is_extinct = False` when the light we are looking at predates even this
+            # civilization's own origin - we have not observed them at all yet, dead or alive.
+            # `civilization_stage` is never refreshed (only `describe_civilization`/`observed()`
+            # are, via the timeline), so it stays a roll-time cache and can legitimately be None
+            # here. Debug-only: nothing player-facing reads this branch.
+            logging.debug(f"  {name} ({system.distance:.1f} LY) - NOT YET OBSERVABLE "
+                          "(rolled extinct at creation; our light predates their origin)")
         else:
             strategy_desc = {
                 "L": "Listen Only - Will NEVER respond",

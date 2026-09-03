@@ -385,6 +385,14 @@ def calibration_metrics(results) -> dict:
     * ``first_sky_change_by_10`` - metric (g): the share of games whose *first* sky-change event
       happens at generation <= 10 (target >= 60 %) - a game with no sky change at all does not
       count;
+    * ``first_sky_change_by_30`` - T5.2 (decision 1a, the "silence ends" starting-selection
+      guarantee): the share of games whose *first* sky-change event happens at generation <= 30
+      (target >= 90 % for the "observer" profile). This is the gameplay-level check of the
+      guarantee `_selection_has_early_sky_promise` builds into the starting selection - the
+      guarantee only promises a *qualifying timeline event* exists; this metric asks whether an
+      actually-playing "observer" (the profile that studies the sky every generation) goes on to
+      see it as a `sky_change` before Generation 30, which additionally requires knowledge on
+      that system to reach `OBSERVATION_KNOWLEDGE_REQUIRED` in time;
     * ``non_death_first_three`` - metric (h): (f) reformulated - the share of games (of those
       with >= 3 sky changes) whose first three sky changes contain at least one that is *not*
       an extinction or a silence, i.e. is not a death (target >= 50 %). Broader than
@@ -425,6 +433,9 @@ def calibration_metrics(results) -> dict:
     early_sky_change = sum(
         1 for r in results
         if r.get("first_sky_change_gen") is not None and r["first_sky_change_gen"] <= 10)
+    early_sky_change_30 = sum(
+        1 for r in results
+        if r.get("first_sky_change_gen") is not None and r["first_sky_change_gen"] <= 30)
 
     return {
         "games": games,
@@ -450,6 +461,7 @@ def calibration_metrics(results) -> dict:
         "games_with_three_sky_changes": len(with_three),
         "games_below_three_sky_changes": games - len(with_three),
         "first_sky_change_by_10": (early_sky_change / games) if games else None,
+        "first_sky_change_by_30": (early_sky_change_30 / games) if games else None,
         "games_with_a_sky_change": sum(1 for r in results if r.get("first_sky_change_gen") is not None),
     }
 

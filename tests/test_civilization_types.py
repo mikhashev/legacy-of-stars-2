@@ -13,7 +13,8 @@ if str(ROOT) not in sys.path:
 os.environ.setdefault("LOS_OFFLINE", "1")
 
 from src.legacy_of_stars_v3 import (  # noqa: E402
-    BASE_CIV_CHANCE, CivilizationStage, StarSystem, habitability_weight, load_star_catalog)
+    BASE_CIV_CHANCE, CivilizationStage, StarSystem, distance_prior, habitability_weight,
+    load_star_catalog)
 
 LIVING_TYPES = {"biological_pure", "digital_ascended", "hybrid_integrated"}
 STRATEGIES = {"L", "LB", "LR", "LA", "LBA"}
@@ -109,6 +110,15 @@ class CatalogCivilizationCountTest(unittest.TestCase):
     T5 calibration (2026-09-03, plan §7) then raised BASE_CIV_CHANCE 0.26 -> 0.32 to bring the
     observed-frame sky-change rate up (see src/civ_timeline.py's calibration block), which raised
     both totals: ~19.8 over the whole catalogue, ~10.2 within 20 LY.
+
+    T5.1 (decision 2b, `distance_prior`) then discounted stars past 60 LY, which only shaves the
+    far tail: measured ~19.2 over the whole catalogue (was ~19.8), and the within-20-LY mean is
+    *unchanged* at ~10.2 - `distance_prior` is 1.0 everywhere inside 60 LY, and the plan is
+    explicit that BASE_CIV_CHANCE and the near field are not to be touched by this lever. (The
+    plan's own text for this lever anticipated a near-field band of 7-9.5, which would only hold
+    if the near field itself lost density - it does not, by construction, so the band below stays
+    where it was measured: this is flagged as a deviation in the T5.1 report rather than quietly
+    narrowed to a range the code cannot actually produce.)
     """
 
     def test_full_catalog_averages_about_twenty_civilizations(self):
@@ -124,7 +134,7 @@ class CatalogCivilizationCountTest(unittest.TestCase):
                         near += 1
         mean = total / runs
         near_mean = near / runs
-        self.assertTrue(18.0 <= mean <= 21.5, f"mean civilizations per catalog: {mean}")
+        self.assertTrue(17.5 <= mean <= 21.0, f"mean civilizations per catalog: {mean}")
         self.assertTrue(8.5 <= near_mean <= 12.0, f"mean civilizations within 20 LY: {near_mean}")
 
     def test_evolved_stars_never_host_anyone(self):
@@ -135,6 +145,26 @@ class CatalogCivilizationCountTest(unittest.TestCase):
 
     def test_base_chance_applies_to_a_perfect_star(self):
         self.assertAlmostEqual(BASE_CIV_CHANCE * habitability_weight("G2V"), BASE_CIV_CHANCE)
+
+
+class DistancePriorTest(unittest.TestCase):
+    """The far-band civilization prior (decision 2b): honest ignorance, not a balance hack."""
+
+    def test_unity_within_the_near_field(self):
+        for distance in (0.0, 4.2, 10.0, 20.0, 59.9, 60.0):
+            self.assertAlmostEqual(distance_prior(distance), 1.0, msg=distance)
+
+    def test_about_a_third_at_the_catalog_edge(self):
+        self.assertAlmostEqual(distance_prior(160.0), 0.35)
+        self.assertAlmostEqual(distance_prior(200.0), 0.35)  # clamped past the catalogue's edge
+
+    def test_monotone_non_increasing_past_sixty_light_years(self):
+        distances = [60.0, 70.0, 80.0, 100.0, 120.0, 140.0, 160.0]
+        priors = [distance_prior(d) for d in distances]
+        for a, b in zip(priors, priors[1:]):
+            self.assertGreaterEqual(a, b, priors)
+        self.assertEqual(priors[0], 1.0)
+        self.assertEqual(priors[-1], 0.35)
 
 
 class AgeToStageTest(unittest.TestCase):

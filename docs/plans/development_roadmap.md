@@ -177,6 +177,124 @@ frame, replies evaluated at send time as before) was **not implemented**; T2's r
 replies stay as shipped. This is the owner's call to make, not something to decide unilaterally
 under a time-box.
 
+**T5.1/T5.2 - two further calibration levers (2026-09-03).** Applied one at a time with a full
+measurement between them, using `python scripts/calibrate_timelines.py --runs 30 --max-gen 60`
+over all seven measurement profiles (seeds 500-529). All three tables below share the same
+columns: `Extinct` = extinct-at-first-observation share; `Sky/40` = sky changes per 40
+generations (observer is the metric's own instrument, §7); `Differ` = differing message outcomes;
+`Wins` = victory rate, with the relative delta against the pre-timelines baseline for the five
+shared profiles in parentheses (target: within ±20 %); `Reply` = median generation of the first
+reply; `Sky≤10`/`Sky≤30` = share of games whose first sky-change lands by generation 10 / 30.
+
+*Before (Step 0):*
+
+| Profile | Games | Extinct | Sky/40 | Differ | Wins (Δ vs baseline) | Reply | Sky≤10 | Sky≤30 |
+|---|---|---|---|---|---|---|---|---|
+| observer | 30 | 20.6 % | 0.99 | 25.7 % | 60.0 % | 20.5 | 13.3 % | n/a |
+| talker | 30 | 21.1 % | 0.50 | 19.9 % | 66.7 % | 8.5 | 6.7 % | n/a |
+| balanced | 30 | 20.3 % | 0.42 | 22.2 % | 70.0 % (+5.0 %) | 10.0 | 6.7 % | n/a |
+| aggressive | 30 | 19.3 % | 0.57 | 22.9 % | 76.7 % (+0.0 %) | 9.0 | 13.3 % | n/a |
+| cautious | 30 | 18.9 % | 0.50 | 21.1 % | 60.0 % (+38.5 %) | 12.5 | 10.0 % | n/a |
+| integration | 30 | 20.5 % | 0.57 | 18.7 % | 90.0 % (+22.7 %) | 14.0 | 6.7 % | n/a |
+| neglect | 30 | 18.2 % | 0.61 | 18.9 % | 53.3 % (+99.6 %) | 12.0 | 6.7 % | n/a |
+
+(`Sky≤30` did not exist yet as a metric - added for T5.2, see below.)
+
+**Lever 1 - far-band civilization density (decision 2b).** `distance_prior(distance_ly)` in
+`src/legacy_of_stars_v3.py`: 1.0 out to 60 LY (the near field, deliberately untouched), then a
+ramp linear in *log*-distance down to 0.35 at 160 LY, multiplied into the civilization roll next
+to `habitability_weight`. Rationale: beyond ~60 LY our actual knowledge of exoplanets falls off
+with distance, so a lower prior there is an honest model of our own ignorance about the T4
+catalogue's far tail, not a balance hack; `BASE_CIV_CHANCE` and the near field are untouched by
+construction. Measured effect on the direct catalogue-density test
+(`tests/test_civilization_types.py`): the full-catalogue mean civilization count drops modestly
+(~19.8 → ~19.2 over 300 samples), the within-20-LY mean is unchanged (~10.2, exactly as
+designed).
+
+*After lever 1 - the calibration instrument's table is byte-for-byte identical to "before".* This
+is an honest, load-bearing finding, not an oversight: across all 210 games in the sample (seeds
+500-529, max 60 generations), no run's farthest discovery ever passed ~51 LY (detection reach did
+open past 100 LY in several runs, but the *rate* stars are actually resolved at, given nearest-first
+discovery order and the reach-gated reveal chance, never got that far within 60 generations). Since
+`distance_prior` is exactly 1.0 up to 60 LY, its far-band branch was never exercised by a single
+roll in this sample - confirmed by comparing the raw per-seed run JSON, not just the aggregated
+metrics. Lever 1's effect is real (see the catalogue-density numbers above and the dedicated
+`DistancePriorTest` unit tests) but is invisible to this instrument at a 60-generation cap; a
+longer-horizon instrument (or a catalogue-density test, which is what actually caught it) is
+needed to see it. Neglect's baseline deviation is unchanged by lever 1: still +99.6 % against the
+±20 % target, i.e. **not met**, and lever 1 cannot be expected to move it since it never fires in
+this sample.
+
+**Lever 2 - the promise that silence ends (decision 1a).** `_start_new_game` now checks
+`_selection_has_early_sky_promise`: at least one of the five known systems, alive and within 20 LY,
+must have a `stage` event whose light reaches Earth between Generation 8 and Generation 30. If the
+first draw does not qualify, one of the five known systems is re-rolled at a time (cycling through
+them, up to `GEN8_30_GUARANTEE_ATTEMPTS = 100` attempts) from an **isolated, salted**
+`random.Random`, never the shared global `random` stream every other roll in the game draws from
+(`StarSystem.reroll_civilization`); a game that still fails after the budget starts anyway
+(logged at INFO) rather than falling back to a scripted event. An earlier version re-rolled the
+whole starting *selection* instead (repeating `generate_star_systems(5)`, which re-samples from
+the global stream); measurement showed that shifted the global stream enough to move victory
+rates and reply timing for essentially every seed in the calibration sample, not just the ones
+that needed a re-roll - an outsized, undocumented side effect for a narrow guarantee, so it was
+replaced with the per-system salted version before this table was produced. See the constant's
+comment in `src/legacy_of_stars_v3.py` for the full account, including why the per-system version
+still ends up touching most of a game's five known systems when the search runs long (the target
+condition is rare per system-roll, so a game needing many attempts cycles through - and
+overwrites - most or all five before it succeeds).
+
+*After lever 2:*
+
+| Profile | Games | Extinct | Sky/40 | Differ | Wins (Δ vs baseline) | Reply | Sky≤10 | Sky≤30 |
+|---|---|---|---|---|---|---|---|---|
+| observer | 30 | 17.7 % | 2.26 | 21.3 % | 66.7 % | 9.5 | 53.3 % | **90.0 %** |
+| talker | 30 | 22.0 % | 1.25 | 16.2 % | 86.7 % | 4.0 | 40.0 % | 76.7 % |
+| balanced | 30 | 17.5 % | 1.34 | 17.2 % | 93.3 % (+39.9 %) | 4.5 | 30.0 % | 63.3 % |
+| aggressive | 30 | 19.9 % | 1.30 | 21.5 % | 83.3 % (+8.6 %) | 4.0 | 30.0 % | 73.3 % |
+| cautious | 30 | 18.3 % | 1.21 | 15.0 % | 76.7 % (+77.1 %) | 10.0 | 30.0 % | 66.7 % |
+| integration | 30 | 23.4 % | 1.14 | 22.1 % | 76.7 % (+4.6 %) | 6.0 | 30.0 % | 70.0 % |
+| neglect | 30 | 17.9 % | 1.35 | 20.8 % | 63.3 % (+137.1 %) | 5.0 | 33.3 % | 70.0 % |
+
+Lever 2's own target - **met**: the `observer` profile's `first_sky_change_by_30` (T5.2's new
+gameplay-level check of the guarantee, alongside the existing `first_sky_change_by_10`) lands at
+exactly 90.0 %, hitting the ≥90 % target; `first_sky_change_by_10` also rose sharply (13.3 % →
+53.3 %) and `sky_changes_per_40` more than doubled (0.99 → 2.26), still short of the plan's
+original 3-6 target but a real move toward it, entirely as a side effect of guaranteeing an early
+stage advance rather than any hazard/density re-tuning.
+
+The unit-test guarantee (`tests/test_civ_timeline.py::SkyChangeGuaranteeTest`, seeds 1-50, checked
+against the raw timeline data rather than gameplay) succeeds in **43/50 (86.0 %)** games, above the
+80 % floor with a comfortable margin.
+
+**Neglect vs. the ±20 % baseline band - not met, and lever 2 makes it worse.** Baseline neglect
+victory rate is 26.7 % (8/30). Before and after lever 1: 53.3 % (+99.6 % relative - not met).
+After lever 2: 63.3 % (+137.1 % relative - **worse, not better**). This is the honest, disclosed
+cost of lever 2's implementation: because the target condition is rare, a game whose starting
+selection needs the guarantee typically has several of its five systems re-rolled by the time a
+qualifying one is found (see the per-system-reroll account above), which tends to add
+civilizations/contact opportunities to games that previously had few - and "neglect" is exactly
+the profile whose only path to victory is contact rather than the integration tech tree, so it
+benefits disproportionately. Of the five shared profiles, only `aggressive` (+8.6 %) and
+`integration` (+4.6 %) land inside ±20 % after lever 2; `balanced` moved from inside the band
+(+5.0 %) to outside it (+39.9 %) as a direct consequence of lever 2. This is a real trade-off, not
+a bug: lever 2 was scoped to the starting-selection sky-change guarantee only, and reaching its
+90 % target while also holding every profile's victory rate within ±20 % of baseline was not
+attempted within this task's scope - the owner should decide whether the guarantee is worth this
+cost, per the same "owner's call, not a unilateral time-box decision" principle T5's own report
+applied to its escape hatch.
+
+**Two dormant bugs surfaced and fixed while implementing lever 2** (both pre-existing, exposed by
+the RNG-stream and civilization-profile shifts the guarantee introduces for some seeds, not
+introduced by either lever): (1) `ContactProgram._log_system_profile`, a debug-only logger, could
+crash when a civilization rolled extinct at creation was discovered by `add_star_system` before
+its own timeline origin came into observable range - `refresh_observation` correctly reports
+"not observably extinct" in that case, but the legacy `civilization_stage` cache stays `None`,
+which the logger did not handle; (2) `tests/test_save_load.py`'s `busy_program()` forced a
+system's cached `true_strategy` to `"LA"` without giving it a matching timeline, so
+`send_message` (which reads `system.timeline_state`, not the cached fields) was silently
+evaluating whatever civilization that system's own roll happened to produce - fixed by also
+calling `system.set_static_timeline(...)` so the forced profile is the one actually read.
+
 The sections below are the historical development notes of Phases 1-3. Some figures in them
 (27 technologies, 8 star systems, Gemini AI) describe earlier builds.
 
