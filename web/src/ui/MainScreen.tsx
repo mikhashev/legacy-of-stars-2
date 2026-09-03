@@ -135,7 +135,7 @@ export function MainScreen({ view, store }: { view: ViewState; store: Store }) {
 
       {/* Dialogs driven by ActionSpec.needs (web_contract.md 2/3). */}
       {state.dialog?.kind === "system" && <SystemDialog view={view} spec={state.dialog.spec} store={store} />}
-      {state.dialog?.kind === "text" && <TextDialog system={state.dialog.system} store={store} />}
+      {state.dialog?.kind === "text" && <TextDialog view={view} system={state.dialog.system} store={store} />}
       {state.dialog?.kind === "tech" && <TechDialog view={view} store={store} />}
       {state.dialog?.kind === "threat" && <ThreatDialog view={view} store={store} />}
       {state.dialog?.kind === "defense" && <DefenseDialog store={store} />}

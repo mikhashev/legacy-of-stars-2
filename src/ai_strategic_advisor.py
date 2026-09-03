@@ -199,7 +199,11 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         if support < 50:
             recs.append("Public Outreach to restore support.")
         if program.swan_song_targets():
-            recs.append("Study extinct systems to 30%+ knowledge, then listen for their swan songs.")
+            # The threshold is the engine's, not a round number: a scan needs
+            # SWAN_SONG_KNOWLEDGE_REQUIRED % knowledge, and the briefing must not name a higher one.
+            from .legacy_of_stars_v3 import SWAN_SONG_KNOWLEDGE_REQUIRED  # local: avoids a circular import
+            recs.append(f"Study extinct systems to {SWAN_SONG_KNOWLEDGE_REQUIRED}%+ knowledge, "
+                        "then listen for their swan songs.")
         unknown = [n for n, s in program.star_systems.items() if s.knowledge < 20]
         if unknown:
             recs.append(f"Focus Research on unstudied systems ({unknown[0]} first).")

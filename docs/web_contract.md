@@ -109,7 +109,7 @@ Integers may be sent as JSON numbers or as decimal strings.
 | `listen_swan_song` | `{system}` | 1 AP was spent | A scan that detects nothing is still `ok: true`. The target must be studied to 20 % knowledge (see `swan_song_targets`); an unstudied system is refused for free with *"Study the system first: 20% knowledge is needed before a deep scan."*, checked **before** the extinction refusal so that message cannot leak either. |
 | `genesis_seed` | `{system}` | `GenesisProject.seed_world` returned success | Costs 1 AP + 500 RP + 20 % funding; one world per generation; the target must be studied to 20 % knowledge (see `genesis.targets`). |
 | `respond_event` | `{choice}` | the choice was applied | `choice` indexes `state.pending_event.choices`. |
-| `wow_reply` | `{text}` | the 1977 decision was open | Opening scene. Empty/absent `text` sends the standard message; longer text is truncated at 500 characters. `data`: `{message, arrival_gen: 72, response_gen: 144, replied: true}`. |
+| `wow_reply` | `{text}` | the 1977 decision was open | Opening scene. Empty/absent `text` sends the standard message; longer text is truncated at 500 characters. `data`: `{message, message_full, excerpt, arrival_gen: 72, response_gen: 144, replied: true}` — `message` and `message_full` are both the whole stored reply (at most 500 characters), `excerpt` its first 100 characters plus `...`, which is what the console prints. |
 | `wow_silent` | `{}` | the 1977 decision was open | `data`: `{replied: false, attack_damage_reduction: 0.15}`. |
 | `compose_director_message` | `{}` | always | Returns the director's draft in `message`; decides nothing. `data`: `{draft}`. Feed it back as `wow_reply`'s `text`. |
 | `summary` | `{}` | always | `message`: `build_summary()` text. `data`: `{score, score_breakdown: {label: points}}`. Works after game over. |
@@ -166,6 +166,7 @@ the generation the event was emitted in. `data` keys per kind:
 | `attack_resolved` | `system` (str), `support_loss` (int), `funding_loss` (int), `severity` (str) | a fleet strikes Earth |
 | `info_attack` | `system` (str), `attack_type` (`corrupted_technology` \| `societal_manipulation` \| `false_hope_signal` \| `philosophical_weapon`) | an information weapon lands |
 | `philosophical_event` | `event_id` (str) | a crisis needs an answer |
+| `briefing` | `idle_generations` (int) | the mission analyst volunteers a briefing after 2, 4, 6 … generations in which the player took no action; the text is the advisor's rule-based briefing under one "Mission analyst's briefing (the program has been idle for N generations):" line. Needs neither the AI Strategic Advisor technology nor the once-per-generation consultation, and changes no rule |
 | `fermi_evidence` | `kind` (str), `amount` (int), `total` (int), `reason` (str) | evidence gained (announced ones only) |
 | `achievement` | `name` (str) | achievement unlocked |
 | `genesis` | `system` (str), and either `stage` (str) or `outcome` (`ally` \| `hostile`) | a seeded world progresses or decides |
@@ -177,7 +178,7 @@ the generation the event was emitted in. `data` keys per kind:
 `mirror_fleet` (labels in `state.threats[].type_label`).
 
 Suggested UI weight: modal for `wow`, `victory`, `game_over`, `attack_warning`,
-`philosophical_event`, `attack_resolved`; journal line for the rest.
+`philosophical_event`, `attack_resolved`, `briefing`; journal line for the rest.
 
 ---
 
@@ -209,6 +210,7 @@ strategies, deception levels) ever appears here.
 | `status.integration_level` | float | 0–1; tier 5 research needs 0.40 |
 | `status.integration_status` | str | human-readable integration label |
 | `active_doctrines` | list[str] | doctrine names in force |
+| `active_effects` | list[str] | every permanent modifier currently in force, as short display lines (`ContactProgram.active_effects()`): the 1977 silence, the defensive/warning/survival technologies, leakage mitigation, propulsion and contact unlocks, the integration penalties or bonus in force, and one line per active doctrine. Derived from engine state only, empty at the start of a game; render it as a list, never parse it |
 | `systems[]` | list | known star systems, in discovery order |
 | `systems[].index` | int | 1-based position (the console's menu number) |
 | `systems[].name` | str | the id used in action parameters |

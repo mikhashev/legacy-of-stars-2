@@ -333,5 +333,76 @@ class InterfaceTest(unittest.TestCase):
         self.assertTrue(p2.wow_signal.wow_reply_message)
 
 
+class ActiveEffectsTest(unittest.TestCase):
+    """`active_effects()` reports permanent modifiers the player otherwise never sees."""
+
+    def test_empty_at_the_start_of_a_game(self):
+        self.assertEqual(make_program(seed=11).active_effects(), [])
+
+    def test_the_1977_silence_is_listed(self):
+        p = make_program(seed=11)
+        p.wow_signal.stay_silent()
+        self.assertIn("Defensive mindset: -15% attack damage", p.active_effects())
+
+    def test_orbital_defense_grid_is_listed(self):
+        p = make_program(seed=11)
+        p._apply_tech_special_effect(p.technologies["orbital_defense_grid"])
+        self.assertIn("Orbital Defense Grid: -40% attack damage", p.active_effects())
+
+    def test_doctrines_and_leakage_are_listed(self):
+        p = make_program(seed=11)
+        p.leakage_multiplier = 0.5
+        p.active_doctrines.append("Total Pacification")
+        effects = p.active_effects()
+        self.assertIn("Leakage reduced by 50%", effects)
+        self.assertIn("Doctrine: Total Pacification", effects)
+        p.leakage_multiplier = 0.0
+        self.assertIn("Dark Forest Protocol: total silence", p.active_effects())
+
+    def test_view_state_carries_the_list(self):
+        p = make_program(seed=11)
+        p.wow_signal.stay_silent()
+        self.assertEqual(p.view_state()["active_effects"], p.active_effects())
+
+
+class IdleBriefingTest(unittest.TestCase):
+    """The anti-stagnation briefing: rule-based, unasked, and free of any balance effect."""
+
+    @staticmethod
+    def _advance(program):
+        with mock.patch(RANDOM, return_value=0.99):
+            program.advance_generation()
+        return program.drain_events()
+
+    def test_two_idle_generations_emit_exactly_one_briefing(self):
+        p = make_program(seed=12)
+        p.drain_events()
+        self.assertEqual([e for e in self._advance(p) if e.kind == "briefing"], [])
+        briefings = [e for e in self._advance(p) if e.kind == "briefing"]
+        self.assertEqual(len(briefings), 1)
+        self.assertIn("idle for 2 generations", briefings[0].text)
+        self.assertIn("THREAT ASSESSMENT", briefings[0].text)
+        self.assertEqual(briefings[0].data, {"idle_generations": 2})
+        # It is not the manual consultation and does not need the technology.
+        self.assertFalse(p.ai_advisor_unlocked)
+        self.assertFalse(p.advisor_consulted_this_gen)
+
+    def test_acting_every_generation_emits_none(self):
+        p = make_program(seed=12)
+        p.drain_events()
+        for _ in range(4):
+            p.action_points = max(p.action_points, 1)
+            p.public_outreach()
+            self.assertEqual([e for e in self._advance(p) if e.kind == "briefing"], [])
+        self.assertEqual(p.idle_generations, 0)
+
+    def test_idle_generations_survive_a_save_round_trip(self):
+        p = make_program(seed=12)
+        self._advance(p)
+        self.assertEqual(p.idle_generations, 1)
+        restored = ContactProgram.from_dict(p.to_dict(), offline=True)
+        self.assertEqual(restored.idle_generations, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

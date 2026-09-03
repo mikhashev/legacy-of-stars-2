@@ -29,6 +29,7 @@ function writeOpen(id: string, open: boolean): void {
 export function Collapsible({
   id,
   title,
+  badge,
   extraClass,
   defaultOpen = true,
   children,
@@ -36,6 +37,8 @@ export function Collapsible({
   /** localStorage key suffix; stable across sessions, e.g. "status", "actions". */
   id: string;
   title: string;
+  /** Shown next to the title, inside the header button: a live counter such as "AP 2/3". */
+  badge?: ComponentChildren;
   /** Extra class(es) on the outer `<section>`, e.g. for a panel with its own layout rules. */
   extraClass?: string;
   defaultOpen?: boolean;
@@ -53,6 +56,7 @@ export function Collapsible({
     <section class={`panel collapsible${extraClass ? ` ${extraClass}` : ""}`} data-open={open}>
       <button class="collapsible-head" onClick={toggle} aria-expanded={open}>
         <h2>{title}</h2>
+        {badge !== undefined && <span class="collapsible-badge">{badge}</span>}
         <span class="collapsible-chevron" aria-hidden="true">
           {open ? "−" : "+"}
         </span>

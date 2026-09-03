@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T15:13:26",
+  "saved_at": "2026-09-03T16:16:50",
   "label": "",
   "generation": 2,
   "year": 2002,
@@ -27,7 +27,9 @@
       "ap_modifier": 0,
       "advisor_consulted_this_gen": false,
       "broadcast_radius": 67.0,
-      "leakage_multiplier": 1.0
+      "leakage_multiplier": 1.0,
+      "actions_this_generation": 0,
+      "idle_generations": 1
     },
     "flags": {
       "passive_defense_bonus": 1.0,

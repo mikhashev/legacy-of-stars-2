@@ -92,6 +92,7 @@ export type GameEventKind =
   | "attack_resolved"
   | "info_attack"
   | "philosophical_event"
+  | "briefing"
   | "fermi_evidence"
   | "achievement"
   | "genesis"
@@ -124,6 +125,8 @@ export type GameEvent =
     >
   | GameEventBase<"info_attack", { system: string; attack_type: InfoAttackType }>
   | GameEventBase<"philosophical_event", { event_id: string }>
+  /** The mission analyst's unasked briefing after 2, 4, 6 ... generations with no player action. */
+  | GameEventBase<"briefing", { idle_generations: number }>
   | GameEventBase<"fermi_evidence", { kind: string; amount: number; total: number; reason: string }>
   | GameEventBase<"achievement", { name: string }>
   | GameEventBase<"genesis", { system: string; stage?: string; outcome?: "ally" | "hostile" }>
@@ -139,6 +142,7 @@ export const MODAL_EVENT_KINDS: readonly GameEventKind[] = [
   "attack_warning",
   "philosophical_event",
   "attack_resolved",
+  "briefing",
 ];
 
 /* -------------------------------------------------------------- view state */
@@ -306,6 +310,11 @@ export interface ViewState {
   director: Director;
   status: ProgramStatus;
   active_doctrines: string[];
+  /**
+   * Every permanent modifier in force, as short display lines the engine wrote
+   * (`ContactProgram.active_effects()`). Display only - never parse these.
+   */
+  active_effects: string[];
   /** Known star systems, in discovery order. */
   systems: StarSystem[];
   catalog: CatalogInfo;
@@ -356,7 +365,16 @@ export type PerformNeeds = DoctrineNeeds;
 
 /** The `data` payloads of the actions that carry one (web_contract.md 3). */
 export interface PerformData {
-  wow_reply: { message: string; arrival_gen: number; response_gen: number; replied: true };
+  wow_reply: {
+    /** The whole stored reply (<= 500 characters); `message_full` is the same text. */
+    message: string;
+    message_full: string;
+    /** The first 100 characters plus "...", as the console prints it. */
+    excerpt: string;
+    arrival_gen: number;
+    response_gen: number;
+    replied: true;
+  };
   wow_silent: { replied: false; attack_damage_reduction: number };
   compose_director_message: { draft: string };
   summary: { score: number; score_breakdown: Record<string, number> };

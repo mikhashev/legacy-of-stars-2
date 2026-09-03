@@ -8,6 +8,7 @@ const TITLES: Partial<Record<GameEventKind, string>> = {
   attack_warning: "Incoming Attack",
   attack_resolved: "Attack Resolved",
   philosophical_event: "Philosophical Crisis",
+  briefing: "Mission Analyst's Briefing",
 };
 
 /** The modal weight for `MODAL_EVENT_KINDS` (web_contract.md 5): big beats, one at a time. */
@@ -27,7 +28,7 @@ export function EventModal({ event, store }: { event: GameEvent; store: Store })
             </>
           ) : (
             <button class="primary" onClick={() => store.dismissModal()}>
-              Continue
+              {event.kind === "briefing" ? "Got it" : "Continue"}
             </button>
           )}
         </div>

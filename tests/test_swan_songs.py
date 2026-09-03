@@ -164,7 +164,11 @@ class SwanSongActionTest(unittest.TestCase):
         silent.has_civilization, silent.is_extinct = True, False
         silent.knowledge = 50
         label = next(a.label for a in p.available_actions() if a.id == "listen_swan_song")
-        self.assertEqual(label, "Listen for Swan Song (1 candidate systems)")
+        self.assertEqual(label, "Listen for Swan Song (1 candidate system)")
+        # ...and pluralizes once a second extinct system is studied
+        silent.is_extinct = True
+        label = next(a.label for a in p.available_actions() if a.id == "listen_swan_song")
+        self.assertEqual(label, "Listen for Swan Song (2 candidate systems)")
 
     def test_scanned_systems_survive_a_save_round_trip(self):
         p, system = self._extinct_program()

@@ -34,6 +34,9 @@ const HINTS = {
     "Civilizations that have answered us. Three replies is the contact victory: only a reply counts, not a message sent.",
   fermi_evidence:
     "Evidence toward an answer to the Fermi paradox: extinctions found, hostile encounters survived, peaceful contacts and great-filter discoveries. 15 points is the philosophical victory.",
+  achievements: "Milestones this run has unlocked: see Menu for the list.",
+  active_effects:
+    "The permanent modifiers in force right now - the 1977 decision, researched technologies, doctrines and the integration bonus or penalty. The engine writes these lines; each one is a rule it is applying.",
 } as const;
 
 /** The console's "Program Status" block, plus win-condition counters and doctrines. */
@@ -82,12 +85,21 @@ export function StatusPanel({ view }: { view: ViewState }) {
         <dd title={HINTS.fermi_evidence}>
           {evidence.total} / {evidence.goal}
         </dd>
+        <dt title={HINTS.achievements}>Achievements</dt>
+        <dd title={HINTS.achievements}>{view.achievements.length}</dd>
       </dl>
-      {view.active_doctrines.length > 0 && (
-        <p class="status-doctrines">
-          <strong>Active doctrines:</strong> {view.active_doctrines.join(", ")}
-        </p>
-      )}
+      <div class="status-effects" title={HINTS.active_effects}>
+        <p class="status-effects-title">Active effects</p>
+        {view.active_effects.length === 0 ? (
+          <p class="status-effects-empty">None yet</p>
+        ) : (
+          <ul class="status-effects-list">
+            {view.active_effects.map((effect) => (
+              <li key={effect}>{effect}</li>
+            ))}
+          </ul>
+        )}
+      </div>
       {view.genesis.unlocked && <p class="status-genesis">{view.genesis.summary}</p>}
     </Collapsible>
   );

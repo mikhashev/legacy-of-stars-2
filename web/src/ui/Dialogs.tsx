@@ -11,7 +11,22 @@ import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../store";
 import type { ActionSpec, ViewState } from "../types";
 
-function DialogFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ComponentChildren }) {
+/**
+ * `resources` is the line of counters the choice in this dialog spends (AP, RP). A dialog
+ * covers the status panel, so without it a player picks a target or a technology with the
+ * numbers that decide the answer off screen; it is display only, straight from `ViewState`.
+ */
+function DialogFrame({
+  title,
+  resources,
+  onClose,
+  children,
+}: {
+  title: string;
+  resources?: ComponentChildren;
+  onClose: () => void;
+  children: ComponentChildren;
+}) {
   return (
     <div class="modal-backdrop" onClick={onClose}>
       <div class="modal dialog-modal" onClick={(e) => e.stopPropagation()}>
@@ -19,10 +34,16 @@ function DialogFrame({ title, onClose, children }: { title: string; onClose: () 
           ×
         </button>
         <h2>{title}</h2>
+        {resources !== undefined && <p class="dialog-resources">{resources}</p>}
         {children}
       </div>
     </div>
   );
+}
+
+/** "AP 2/3" from the engine's own counters - the same pair the status panel shows. */
+function apLine(view: ViewState): string {
+  return `AP ${view.status.action_points}/${view.status.max_action_points}`;
 }
 
 export function SystemDialog({ view, spec, store }: { view: ViewState; spec: ActionSpec; store: Store }) {
@@ -49,7 +70,11 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
   const preselected = store.state.selectedSystem;
   const preselectedIsEligible = eligible.some((s) => s.name === preselected);
   return (
-    <DialogFrame title={`${spec.label}: choose a system`} onClose={() => store.closeDialog()}>
+    <DialogFrame
+      title={`${spec.label}: choose a system`}
+      resources={apLine(view)}
+      onClose={() => store.closeDialog()}
+    >
       {preselected && preselectedIsEligible && (
         <button class="primary picker-preselected" onClick={() => store.pickSystem(preselected)}>
           Continue with {preselected} (selected on the map)
@@ -79,13 +104,13 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
   );
 }
 
-export function TextDialog({ system, store }: { system: string; store: Store }) {
+export function TextDialog({ view, system, store }: { view: ViewState; system: string; store: Store }) {
   // useState (not a plain closure variable): MainScreen re-renders on every store change
   // (e.g. a toast elsewhere auto-dismissing), which would otherwise reset an unstated
   // local variable and silently drop whatever the player had typed.
   const [text, setText] = useState("");
   return (
-    <DialogFrame title={`Message to ${system}`} onClose={() => store.closeDialog()}>
+    <DialogFrame title={`Message to ${system}`} resources={apLine(view)} onClose={() => store.closeDialog()}>
       <textarea
         class="message-textarea"
         rows={5}
@@ -111,8 +136,13 @@ export function TechDialog({ view, store }: { view: ViewState; store: Store }) {
     byTier.set(tech.tier, list);
   }
   const tiers = [...byTier.keys()].sort((a, b) => a - b);
+  const rp = view.status.research_points;
   return (
-    <DialogFrame title="Research a technology" onClose={() => store.closeDialog()}>
+    <DialogFrame
+      title="Research a technology"
+      resources={`Research Points: ${rp} (+${view.status.passive_rp.toFixed(1)}/gen)`}
+      onClose={() => store.closeDialog()}
+    >
       {tiers.length === 0 ? (
         <p class="empty">No new technologies available to research.</p>
       ) : (
@@ -122,12 +152,18 @@ export function TechDialog({ view, store }: { view: ViewState; store: Store }) {
             <ul class="picker-list">
               {(byTier.get(tier) ?? []).map((tech) => (
                 <li key={tech.id}>
+                  {/* Never disabled: the engine decides what may be researched, and the real
+                      cost moves with the director's science skill and any swan-song discount,
+                      so this hint is an approximation of the listed cost and nothing more. */}
                   <button class="picker-row tech-row" onClick={() => store.pickTech(tech.id)}>
                     <span class="picker-name">
                       {tech.name} ({tech.cost} RP)
                     </span>
                     <span class="picker-meta">{tech.description}</span>
                     {tech.year_context && <span class="picker-meta tech-year">{tech.year_context}</span>}
+                    {tech.cost > rp && (
+                      <span class="tech-unaffordable">needs approx. {tech.cost - rp} more RP</span>
+                    )}
                     {tech.locked && <span class="tech-locked">LOCKED: {tech.locked}</span>}
                   </button>
                 </li>

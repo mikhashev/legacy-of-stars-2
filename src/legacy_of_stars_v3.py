@@ -441,6 +441,11 @@ class ContactProgram:
         self.action_points = 0
         self.max_action_points = 0
         self.ap_modifier = 0  # permanent bonus/penalty from events
+        # Anti-stagnation bookkeeping: player actions taken in the current generation, and the
+        # number of consecutive generations that ended with none. Neither changes any rule;
+        # they only decide when the mission analyst volunteers a briefing (advance_generation).
+        self.actions_this_generation = 0
+        self.idle_generations = 0
 
         # --- optional AI and the written content bank
         self.ai = AIManager(offline=self.offline)
@@ -529,6 +534,7 @@ class ContactProgram:
         "knowledge_base", "game_over", "game_over_reason", "victory", "philosophical_victory",
         "self_destruct_risk", "ecological_risk", "action_points", "max_action_points", "ap_modifier",
         "advisor_consulted_this_gen", "broadcast_radius", "leakage_multiplier",
+        "actions_this_generation", "idle_generations",
     )
     _FLAG_STATE = (
         "passive_defense_bonus", "warning_time_bonus", "has_backup_colonies", "cloaking_active",
@@ -741,6 +747,15 @@ class ContactProgram:
         if len(self.events) > 500:
             del self.events[:-500]
         return event
+
+    def note_player_action(self) -> None:
+        """Record that the player did something this generation (anti-stagnation only).
+
+        Called by the actions that actually went through - never by a refusal, and never by
+        a read-only query - so `advance_generation` can tell a generation the player played
+        from one they only clicked past. It changes no rule and costs nothing.
+        """
+        self.actions_this_generation += 1
 
     def drain_events(self) -> List[GameEvent]:
         events, self.events = self.events, []
@@ -978,6 +993,7 @@ class ContactProgram:
         # Research complete
         self.research_points -= final_cost
         tech.researched = True
+        self.note_player_action()
         self.stats["techs_researched"] += 1
         self.message = f"Researched {tech.name}!{discount_msg}\nDirector Efficiency Saved {tech.cost - effective_cost} RP."
         logging.info(f"Researched Technology: {tech.name} (Tier {tech.tier}, Gen {self.generation})")
@@ -1278,6 +1294,14 @@ YOUR CHOICE:
     # ------------------------------------------------------------------ generation processing
     def advance_generation(self):
         """End the current generation: decay, risks, arrivals, attacks, income, victory checks."""
+        # Anti-stagnation bookkeeping, before anything can return early: a generation the
+        # player spent no action in extends the idle streak, any action at all breaks it.
+        if self.actions_this_generation == 0:
+            self.idle_generations += 1
+        else:
+            self.idle_generations = 0
+        self.actions_this_generation = 0
+
         self.generation += 1
         year = self.start_year + (self.generation - 1) * 25
         logging.info(f"--- Advanced to Generation {self.generation} (Year {year}) ---")
@@ -1372,6 +1396,16 @@ YOUR CHOICE:
         self.directors.append(self.current_director)
         self.calculate_ap()
         self.advisor_consulted_this_gen = False
+
+        # A player who has stopped acting gets the analyst's read of the board, unasked. It is
+        # the same rule-based briefing the AI Strategic Advisor prints, so it needs neither
+        # that technology nor the once-per-generation consultation - and it changes no rule.
+        if self.idle_generations >= 2 and self.idle_generations % 2 == 0:
+            briefing = self.ai_advisor._rule_based_briefing(self)
+            self.emit("briefing",
+                      f"Mission analyst's briefing (the program has been idle for "
+                      f"{self.idle_generations} generations):{briefing}",
+                      idle_generations=self.idle_generations)
 
         # Genesis Project worlds evolve
         self.genesis.advance_generation(self)
@@ -1680,6 +1714,57 @@ You have answered one of humanity's greatest questions.
                 f"Hostile fleet ETA: Generation {warning.arrival_gen}.")
 
     # ------------------------------------------------------------------ public state
+    def active_effects(self) -> List[str]:
+        """Every permanent modifier currently in force, as short player-facing lines.
+
+        Derived only from engine state, so a line can never promise a rule the engine does
+        not apply: the flags below are exactly the ones `_apply_tech_special_effect`, the
+        1977 decision and the doctrine choices set. Playtesters could see the numbers move
+        and not say why; this is the list that answers that, and `view_state()` carries it.
+        """
+        lines: List[str] = []
+
+        if self.wow_signal.attack_damage_reduction > 0:
+            lines.append(f"Defensive mindset: -{self.wow_signal.attack_damage_reduction:.0%} attack damage")
+        if self.passive_defense_bonus < 1.0:
+            lines.append(f"Orbital Defense Grid: -{1 - self.passive_defense_bonus:.0%} attack damage")
+        if self.warning_time_bonus:
+            lines.append(f"Early Warning Network: +{self.warning_time_bonus} generations of warning")
+        if self.has_backup_colonies:
+            lines.append("Distributed Backup Colonies: Earth is no longer humanity's only home")
+        if self.ultimate_survival:
+            lines.append("Emergency Evacuation Infrastructure: humanity survives any attack")
+
+        if self.leakage_multiplier == 0:
+            lines.append("Dark Forest Protocol: total silence")
+        elif self.leakage_multiplier < 1.0:
+            lines.append(f"Leakage reduced by {1 - self.leakage_multiplier:.0%}")
+
+        if self.has_laser_sails:
+            lines.append("Laser sails: +10% response chance")
+        if self.von_neumann_defense_bonus < 1.0:
+            lines.append(f"Von Neumann Defense: -{1 - self.von_neumann_defense_bonus:.0%} probe attack damage")
+        if self.has_fusion_propulsion:
+            lines.append("Fusion Propulsion: heavy payloads can be delivered")
+        if self.can_contact_post_biological:
+            lines.append("Post-Biological Transition: post-biological minds can be addressed")
+        if self.genesis.unlocked:
+            lines.append("Genesis Ark Program: sterile worlds can be seeded")
+        if self.ai_advisor_unlocked:
+            lines.append("AI Strategic Advisor: a free briefing once per generation")
+
+        integration = self.integration.get_integration_status(self.generation)
+        if integration["status"].startswith("CRISIS") and self.generation > 30:
+            lines.append("Integration crisis: -10% public support per generation")
+            lines.append("Integration crisis: +20% self-destruct risk")
+            lines.append("Integration crisis: -15% research income")
+        elif integration["status"] == "INTEGRATED":
+            lines.append("High integration: -30% self-destruct risk")
+
+        for doctrine in self.active_doctrines:
+            lines.append(f"Doctrine: {doctrine}")
+        return lines
+
     def view_state(self) -> Dict[str, Any]:
         """Everything the player may see, as plain data. Hidden strategies never appear here."""
         year = self.start_year + (self.generation - 1) * 25
@@ -1750,6 +1835,7 @@ You have answered one of humanity's greatest questions.
                 "integration_status": integration["status"],
             },
             "active_doctrines": list(self.active_doctrines),
+            "active_effects": self.active_effects(),
             "systems": systems,
             "catalog": {"known": len(self.star_systems), "total": max(len(self.catalog), len(self.star_systems)),
                         "undiscovered": len(self.undiscovered), "discovery_chance": round(self.discovery_chance(), 2)},
@@ -1895,8 +1981,9 @@ You have answered one of humanity's greatest questions.
         # are extinct, never the (hidden) systems that actually hold a swan song.
         candidates = self.swan_song_targets()
         if candidates:
+            plural = "" if len(candidates) == 1 else "s"
             actions.append(ActionSpec("listen_swan_song",
-                                      f"Listen for Swan Song ({len(candidates)} candidate systems)",
+                                      f"Listen for Swan Song ({len(candidates)} candidate system{plural})",
                                       "1 AP", ("system",)))
         if self.genesis.unlocked:
             actions.append(ActionSpec("genesis_seed", "Genesis Ark Program (Launch Ark)",
@@ -1938,6 +2025,7 @@ You have answered one of humanity's greatest questions.
         logging.info(f"Message Sent to {system_name} (Dir. Skill: {diplomacy_skill:.2f}, Quality Multiplier: {quality_multiplier:.2f})")
         
         self.action_points -= 1
+        self.note_player_action()
 
         # The WOW! source is 1,800 light-years away: whatever is there answers, if at all, in the
         # scripted response window, and nothing we learn before then reveals its nature.
@@ -2064,6 +2152,7 @@ Use Defensive Actions in the menu to prepare.
         
         # Deduct AP
         self.action_points -= 1
+        self.note_player_action()
         
         # Research effectiveness based on science skill
         science_factor = self.current_director.get_effective_skill("science")
@@ -2100,6 +2189,7 @@ Use Defensive Actions in the menu to prepare.
             
         # Deduct AP
         self.action_points -= 1
+        self.note_player_action()
 
         admin_skill = self.current_director.get_effective_skill("administration")
         support_gain = 10 + (20 * admin_skill)
@@ -2205,12 +2295,14 @@ Use Defensive Actions in the menu to prepare.
 No data archives detected. This civilization left no final transmission.
 Their ending remains a mystery."""
             self.action_points -= 1
+            self.note_player_action()
             self.scanned_for_swan_song.add(system_name)
             logging.info(f"Swan song scan of {system_name}: None found")
             return
 
         # Consume action point
         self.action_points -= 1
+        self.note_player_action()
         
         # Attempt discovery
         
@@ -2305,6 +2397,7 @@ REWARDS: {' | '.join(reward_msgs)}
         
         # Consume all AP
         self.action_points = 0
+        self.note_player_action()
         
         # Apply defense
         warning.apply_emergency_defense()
@@ -2343,6 +2436,7 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         
         # Consume 1 AP
         self.action_points -= 1
+        self.note_player_action()
         
         # Apply evacuation
         warning.apply_evacuation()
@@ -2381,6 +2475,7 @@ Fleet from {warning.source.name} ETA: {warning.get_etas_remaining(self.generatio
         
         # Consume 1 AP
         self.action_points -= 1
+        self.note_player_action()
         
         # Apply diplomatic attempt
         warning.apply_diplomatic_attempt()

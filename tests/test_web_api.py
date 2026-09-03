@@ -123,6 +123,16 @@ class OpeningScenarioTest(unittest.TestCase):
         result = call(session, "wow_reply", text="x" * 900)
         self.assertEqual(len(result["data"]["message"]), 500)
 
+    def test_wow_reply_carries_both_the_full_text_and_the_excerpt(self):
+        session = new_session(decided=False)
+        result = call(session, "wow_reply", text="y" * 300)
+        data = result["data"]
+        self.assertEqual(data["message_full"], session.program.wow_signal.wow_reply_message)
+        self.assertEqual(len(data["message_full"]), 300)
+        self.assertEqual(data["excerpt"], "y" * 100 + "...")
+        # The console-style text keeps the 100-character excerpt, not the whole message.
+        self.assertIn(data["excerpt"], result["message"])
+
     def test_wow_silent_and_second_decision_refused(self):
         session = new_session(decided=False)
         result = call(session, "wow_silent")
@@ -376,7 +386,7 @@ class SituationalActionsTest(unittest.TestCase):
         state = call(session, "help")["state"]
         self.assertEqual(state["swan_song_targets"], [studied.name])
         label = next(a["label"] for a in state["actions"] if a["id"] == "listen_swan_song")
-        self.assertIn("1 candidate systems", label)
+        self.assertIn("1 candidate system", label)
 
         # The refusal costs nothing and says nothing about what is (or is not) out there.
         refused = call(session, "listen_swan_song", system=unstudied.name)

@@ -322,6 +322,30 @@ through the real Load screen ("Import JSON file") and checks the matching effect
 already existed from W4); `gameover.json` instead checks that the final report opens by itself
 and that the action list is replaced by the Game over banner.
 
+## Legibility round (post-W5)
+
+Five things playtesters could not see, now on screen. None of them changes a rule; every number
+and line comes from the engine.
+
+- **Active effects.** `StatusPanel` ends with an "Active effects" list (`state.active_effects`,
+  new in `docs/web_contract.md` §6): the 1977 silence, each defensive/warning/survival/leakage/
+  propulsion technology in force, the integration penalty or bonus, and one line per doctrine.
+  "None yet" until something applies. The doctrines paragraph that used to sit there is gone -
+  the list already names them. An **Achievements** count joins the status rows (the names stay
+  in the Menu).
+- **Resources where they are spent.** The Actions panel header carries `AP n/m`; the system and
+  message dialogs repeat it, and the tech dialog leads with `Research Points: N (+X/gen)` and
+  marks anything the player cannot currently afford "needs approx. N more RP". The hint is
+  display only and never disables a button: the real cost moves with the director's science
+  skill and any swan-song discount, so only the engine can refuse.
+- **The whole transmitted message.** After the 1977 reply the result panel shows the full text
+  Earth sent (`data.message_full`) in a scrolling block under the console-style summary, and the
+  composer counts characters live against the engine's 500-character limit.
+- **The idle briefing.** Two generations with no player action and the engine emits a
+  `briefing` event (`data: {idle_generations}`) - the advisor's rule-based read of the board,
+  free, needing neither the AI Strategic Advisor technology nor the manual consultation. It
+  arrives as a big-kind modal ("Got it") and stays in the journal under a clipboard icon.
+
 ## What's covered vs. intentionally missing
 
 Covered: the full action set (`send_message`, `focus_research`, `public_outreach`,

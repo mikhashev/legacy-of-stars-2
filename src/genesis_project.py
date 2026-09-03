@@ -135,6 +135,9 @@ class GenesisProject:
         self.seeded_worlds[system.name] = world
         system.is_seeded = True
         self.seeds_this_gen += 1
+        note = getattr(game, "note_player_action", None)
+        if callable(note):  # anti-stagnation bookkeeping on the program; older saves lack it
+            note()
         stats = getattr(game, "stats", None)
         if stats is not None:
             stats["worlds_seeded"] = stats.get("worlds_seeded", 0) + 1

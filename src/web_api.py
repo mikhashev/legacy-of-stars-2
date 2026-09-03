@@ -412,7 +412,11 @@ class GameSession:
             "The die is cast. Future generations will learn the truth.\n"
             "+100 Research Points\n+10% Public Support"
         )
-        data = {"message": sent, "arrival_gen": WOW_ARRIVAL_GENERATION,
+        # `message`/`message_full` are the whole stored reply; `excerpt` is the 100-character
+        # form the console prints. A front-end that wants to show the player what Earth
+        # actually said must have the full text - it is theirs, and it is 500 characters at most.
+        data = {"message": sent, "message_full": sent, "excerpt": excerpt,
+                "arrival_gen": WOW_ARRIVAL_GENERATION,
                 "response_gen": wow.wow_response_gen, "replied": True}
         return _Result(True, data=data, message=message)
 

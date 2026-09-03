@@ -4,6 +4,9 @@ import type { ViewState } from "../types";
 
 type ComposerStep = "choices" | "custom" | "draft";
 
+/** The engine truncates a custom reply here (`web_api.WOW_MESSAGE_LIMIT`). */
+const MESSAGE_LIMIT = 500;
+
 /**
  * The 1977 WOW! decision (`GameInterface.run_opening_scenario` / `_compose_wow_reply`),
  * shown while `state.wow.decided` is false, then the transmitted/silent result panel.
@@ -18,11 +21,22 @@ export function OpeningScene({ view, store }: { view: ViewState; store: Store })
   if (view.wow.decided && store.state.wowResult) {
     const result = store.state.wowResult;
     const replied = view.wow.replied;
+    // The console prints a 100-character excerpt; a player who wrote 500 characters and never
+    // saw them again cannot check what Earth actually said, so the whole stored reply is shown
+    // (`data.message_full`) in its own scrolling block. Older results without it fall back to
+    // the console text alone.
+    const sent = typeof result.data?.message_full === "string" ? result.data.message_full : "";
     return (
       <main class="opening-scene">
         <div class="opening-panel">
           <h1>{replied ? "November 1977 - Reply Transmitted" : "November 1977 - Silence Maintained"}</h1>
           <pre class="opening-result-text">{result.message}</pre>
+          {replied && sent && (
+            <>
+              <h2>Message transmitted, in full</h2>
+              <pre class="opening-full-message">{sent}</pre>
+            </>
+          )}
           <button class="primary" onClick={() => store.enterMain()}>
             Begin your mission
           </button>
@@ -142,11 +156,14 @@ export function OpeningScene({ view, store }: { view: ViewState; store: Store })
               <div class="composer-custom">
                 <textarea
                   rows={5}
-                  maxLength={500}
-                  placeholder="Earth's message (max 500 characters)"
+                  maxLength={MESSAGE_LIMIT}
+                  placeholder={`Earth's message (max ${MESSAGE_LIMIT} characters)`}
                   value={customText}
                   onInput={(e) => setCustomText((e.target as HTMLTextAreaElement).value)}
                 />
+                <p class="composer-counter">
+                  {customText.length} / {MESSAGE_LIMIT}
+                </p>
                 <div class="modal-actions">
                   <button onClick={() => setComposerStep("choices")}>Back</button>
                   <button

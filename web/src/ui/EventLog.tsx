@@ -11,6 +11,7 @@ const KIND_ICON: Record<GameEventKind, string> = {
   attack_resolved: "\u{1F4A5}",
   info_attack: "\u{1F9E0}",
   philosophical_event: "\u{1F914}",
+  briefing: "\u{1F4CB}", // clipboard: the mission analyst's unasked read of the board
   fermi_evidence: "\u{1F9E9}",
   achievement: "\u{1F3C6}",
   genesis: "\u{1F331}",

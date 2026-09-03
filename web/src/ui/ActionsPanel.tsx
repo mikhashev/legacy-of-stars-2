@@ -70,8 +70,11 @@ export function ActionsPanel({ view, store }: { view: ViewState; store: Store })
   if (view.game_over) return <GameOverPanel view={view} store={store} />;
   const keyed = assignKeys(view.actions);
   const disabled = store.state.busy || store.state.pendingDoctrine !== null;
+  // The AP counter sits with the buttons that spend it: the status panel is collapsible and
+  // may be closed (or scrolled away) exactly when the player is choosing what to spend on.
+  const ap = `AP ${view.status.action_points}/${view.status.max_action_points}`;
   return (
-    <Collapsible id="actions" title="Actions" extraClass="actions-panel">
+    <Collapsible id="actions" title="Actions" badge={ap} extraClass="actions-panel">
       <div class="action-buttons">
         {keyed.map(({ spec, key }) => (
           <button
