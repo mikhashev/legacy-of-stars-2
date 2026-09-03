@@ -206,4 +206,31 @@ This section explores the deep existential questions that underpin the game's na
 * Public support mechanics tied to fulfilling this deep instinct
 * Non-biological civilizations (AI, uploaded consciousness) may lack this drive—different behavior patterns
 
+## 12. Survival Is Half the Game (owner note, 2026-09-03)
 
+**Owner's point (Mike, team chat 2026-09-03):** contact is only one half of the premise. Humanity
+first has to *survive* — on Earth, and later across the Solar System — and that is not background
+flavour but a major part of the gameplay in its own right. Any balance or calibration argument
+that treats "the player did nothing about survival" as a neutral strategy misreads the game: a
+program that reaches its aliens but loses its civilization has lost.
+
+**What already embodies this** (v1.2): the self-destruct risk that grows while biological and
+technological integration lag (§6, §11.3); ecological risk; the Great Filter grace period ending at
+Generation 30; Transcendence technologies as the only way to bring the risk down; backup colonies,
+evacuation infrastructure and orbital defence as survival insurance against fleets; the calibration
+finding that the `neglect` profile (plays everything except Transcendence) wins only by contact
+before ~Generation 35 and then destroys itself.
+
+**To think about later** (not decided):
+- Survival as a *visible* second axis next to contact: a "civilization health" readout that combines
+  self-destruct, ecological and integration state, so the player sees the two halves of the premise
+  side by side.
+- Solar-System expansion as a survival stage of its own (Mars, Europa, Titan already exist as the
+  Backup Colonies technology; could become a track with its own risks and its own light-time —
+  minutes to hours — as a teaching contrast to interstellar delays).
+- Existential events from `cosmic_game_theory_analysis.md` §6 (asteroids, pandemics, AI alignment)
+  as concrete survival tests rather than a single abstract risk number.
+- Whether a contact victory should require the program to still be alive N generations later
+  ("legacy" in the title), so a contact that arrives to a dead civilization is not a win.
+- Calibration consequence: the ±20 % victory target per profile must be read together with the
+  end reasons; a profile that wins more often *and* dies more often is not "too easy".
