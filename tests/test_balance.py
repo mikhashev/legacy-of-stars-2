@@ -4,6 +4,7 @@ statistical cases only run with LOS_SLOW=1; a single quick sanity game always ru
 
     LOS_SLOW=1 python -m unittest tests.test_balance -v
 """
+import json
 import os
 import sys
 import unittest
@@ -25,6 +26,27 @@ class QuickBalanceTest(unittest.TestCase):
         result = run_headless(seed=2024, strategy="integration", max_gen=120)
         self.assertIsNone(result["exception"])
         self.assertGreater(result["generations"], 30)
+
+    def test_t5_baseline_json_loads_with_five_profiles_of_thirty_runs(self):
+        """The T5 calibration baseline (`scripts/calibration/baseline_2a4e0ec.json`, the
+        pre-timelines engine at commit 2a4e0ec) is what `calibrate_timelines.py --baseline`
+        compares against by default; a corrupted or partial file would silently weaken that
+        comparison, so check its shape here rather than only when someone happens to run the
+        instrument.
+        """
+        path = ROOT / "scripts" / "calibration" / "baseline_2a4e0ec.json"
+        if not path.exists():
+            self.skipTest(f"{path} not present")
+        with open(path, encoding="utf-8") as handle:
+            baseline = json.load(handle)
+        expected_profiles = {"balanced", "aggressive", "cautious", "integration", "neglect"}
+        self.assertEqual(set(baseline.keys()), expected_profiles)
+        for profile, runs in baseline.items():
+            self.assertEqual(len(runs), 30, f"{profile} has {len(runs)} run(s), expected 30")
+            for run in runs:
+                self.assertIn("first_reply_gen", run, f"{profile} run missing first_reply_gen")
+                self.assertIn("victory", run)
+                self.assertIn("generations", run)
 
 
 @unittest.skipUnless(SLOW, "set LOS_SLOW=1 to run the statistical balance checks")

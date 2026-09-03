@@ -89,6 +89,9 @@ class AutoPlayer:
         # the first-impression metric asks whether one of the first three is a stage advance
         # rather than a death, so the order matters and the count alone does not.
         self.sky_change_kinds = []
+        # The generation of the *first* sky-change event, for metric (g) - "first sky-change by
+        # generation 10" - which is about how soon the sky reads as alive, not how often.
+        self.first_sky_change_gen = None
         # The generation the first alien reply landed: the other first-impression metric.
         self.first_reply_gen = None
         # One entry per catalogued civilization, taken the generation its star is first
@@ -281,6 +284,8 @@ class AutoPlayer:
                 if event.kind == "sky_change":
                     self.sky_changes += 1
                     self.sky_change_kinds.append(event.data.get("change", "?"))
+                    if self.first_sky_change_gen is None:
+                        self.first_sky_change_gen = p.generation
                 elif event.kind == "response_received" and self.first_reply_gen is None:
                     self.first_reply_gen = p.generation
                 elif (event.kind == "system_discovered" and self.first_far_system_gen is None
@@ -325,6 +330,7 @@ class AutoPlayer:
             "swan_songs_found": swan_found,
             "sky_changes": self.sky_changes,
             "sky_change_kinds": list(self.sky_change_kinds),
+            "first_sky_change_gen": self.first_sky_change_gen,
             "first_reply_gen": self.first_reply_gen,
             "first_observations": list(self.first_observations),
             "first_far_system_gen": self.first_far_system_gen,
@@ -375,7 +381,15 @@ def calibration_metrics(results) -> dict:
     * ``first_reply_median`` - the median generation of the first reply (target: no later than
       the baseline);
     * ``stage_up_first_three`` - the share of games whose first three sky changes contain a
-      stage advance rather than only deaths (the "the galaxy is alive" first impression).
+      stage advance rather than only deaths (the "the galaxy is alive" first impression);
+    * ``first_sky_change_by_10`` - metric (g): the share of games whose *first* sky-change event
+      happens at generation <= 10 (target >= 60 %) - a game with no sky change at all does not
+      count;
+    * ``non_death_first_three`` - metric (h): (f) reformulated - the share of games (of those
+      with >= 3 sky changes) whose first three sky changes contain at least one that is *not*
+      an extinction or a silence, i.e. is not a death (target >= 50 %). Broader than
+      ``stage_up_first_three``: an "activity" change (new signals where the sky was quiet) also
+      counts here, not only a stage advance.
     """
     results = [r for r in results if not r.get("exception")]
     games = len(results)
@@ -404,6 +418,13 @@ def calibration_metrics(results) -> dict:
 
     with_three = [r for r in results if len(r.get("sky_change_kinds") or []) >= 3]
     stage_up = sum(1 for r in with_three if "stage_up" in (r["sky_change_kinds"] or [])[:3])
+    death_kinds = {"extinction", "silence"}
+    non_death = sum(1 for r in with_three
+                     if any(kind not in death_kinds for kind in (r["sky_change_kinds"] or [])[:3]))
+
+    early_sky_change = sum(
+        1 for r in results
+        if r.get("first_sky_change_gen") is not None and r["first_sky_change_gen"] <= 10)
 
     return {
         "games": games,
@@ -425,8 +446,11 @@ def calibration_metrics(results) -> dict:
         "first_reply_median": _median(replies),
         "games_with_a_reply": len(replies),
         "stage_up_first_three": (stage_up / len(with_three)) if with_three else None,
+        "non_death_first_three": (non_death / len(with_three)) if with_three else None,
         "games_with_three_sky_changes": len(with_three),
         "games_below_three_sky_changes": games - len(with_three),
+        "first_sky_change_by_10": (early_sky_change / games) if games else None,
+        "games_with_a_sky_change": sum(1 for r in results if r.get("first_sky_change_gen") is not None),
     }
 
 
@@ -480,7 +504,8 @@ def main(argv=None) -> int:
                 "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
                 "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "sky_changes": 0,
-                "sky_change_kinds": [], "first_reply_gen": None, "first_observations": [],
+                "sky_change_kinds": [], "first_sky_change_gen": None,
+                "first_reply_gen": None, "first_observations": [],
                 "systems_known": 0, "messages_sent": 0, "message_fates": {},
                 "first_far_system_gen": None, "detection_reach_ly": 0.0, "farthest_known_ly": 0.0,
                 "passive_detections": 0, "info_attacks": 0,

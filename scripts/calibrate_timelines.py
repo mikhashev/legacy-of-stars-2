@@ -11,6 +11,9 @@ puts a target on, so a re-run reproduces the same numbers instead of eyeballing 
     d) victories (contact or philosophical) per profile
     e) median generation of the first successful reply
     f) whether at least one of the first three sky changes is a stage advance
+    g) share of observer games whose first sky-change event happens at generation <= 10
+    h) (f) reformulated: among the first three sky changes, at least one is not an
+       extinction/silence (i.e. not a death) - reported alongside the original (f)
 
 Usage:
 
@@ -47,7 +50,16 @@ TARGETS = {
     "extinct_share": (0.20, 0.30),
     "sky_changes_per_40": (3.0, 6.0),      # the "observer" profile is the instrument
     "differing_outcomes": (0.10, 0.20),
+    # (g), (h): team-review targets, floors rather than ranges - see calibration_metrics().
+    "first_sky_change_by_10": (0.60, 1.0),
+    "non_death_first_three": (0.50, 1.0),
 }
+
+# The baseline this repo ships (deliverable of the T5 calibration instrument fixes): the
+# pre-timelines engine (commit 2a4e0ec), same seeds, run with `scripts/calibration/README.md`'s
+# command. Used as `--baseline`'s default when the file is present, so a plain
+# `calibrate_timelines.py --runs 30 --max-gen 60` always compares against it without extra flags.
+DEFAULT_BASELINE_PATH = ROOT / "scripts" / "calibration" / "baseline_2a4e0ec.json"
 
 
 def _pct(value):
@@ -71,7 +83,8 @@ def print_report(metrics_by_profile: dict, baseline_by_profile: dict = None) -> 
     baseline_by_profile = baseline_by_profile or {}
     print("\n=== T5 CALIBRATION (plan section 7) ===")
     header = (f"{'Profile':<12}{'Games':<7}{'Extinct':<9}{'<=20':<8}{'20-60':<8}{'60-160':<9}"
-              f"{'Sky/40':<8}{'Differ':<9}{'Wins':<7}{'Reply':<8}{'Stage3':<8}")
+              f"{'Sky/40':<8}{'Differ':<9}{'Wins':<7}{'Reply':<8}{'Stage3':<8}{'Sky<=10':<9}"
+              f"{'NonDth3':<9}")
     print(header)
     print("-" * len(header))
     for profile, m in metrics_by_profile.items():
@@ -82,32 +95,43 @@ def print_report(metrics_by_profile: dict, baseline_by_profile: dict = None) -> 
               f"{_pct(bands['60-160 LY']['share']):<9}"
               f"{m['sky_changes_per_40']:<8.2f}{_pct(m['differing_outcomes']):<9}"
               f"{m['victory_rate']:<7.0%}{(f'{reply:.0f}' if reply is not None else '-'):<8}"
-              f"{_pct(m['stage_up_first_three']):<8}")
+              f"{_pct(m['stage_up_first_three']):<8}{_pct(m['first_sky_change_by_10']):<9}"
+              f"{_pct(m['non_death_first_three']):<9}")
     print("\nTargets: extinct 20-30 %; sky changes 3-6 per 40 gens (observer); "
           "differing outcomes 10-20 %; a stage advance among the first three sky changes in "
-          "most games.")
+          "most games (f, 'Stage3'); (g) first sky-change by generation 10 >= 60 % ('Sky<=10'); "
+          "(h) (f) reformulated - at least one of the first three sky changes is not an "
+          "extinction/silence, >= 50 % ('NonDth3').")
     for profile, m in metrics_by_profile.items():
         print(f"  {profile}: {m['civilizations_observed']} civilizations observed; "
               f"{m['messages_to_inhabited']} message(s) to inhabited targets; "
               f"{m['games_with_three_sky_changes']} game(s) with >= 3 sky changes, "
               f"{m['games_below_three_sky_changes']} with fewer; "
-              f"{m['games_with_a_reply']} game(s) got a reply.")
+              f"{m['games_with_a_reply']} game(s) got a reply; "
+              f"{m['games_with_a_sky_change']}/{m['games']} game(s) had a sky change at all.")
         for _, _, label in DISTANCE_BANDS:
             band = m["extinct_by_band"][label]
             print(f"      {label}: {band['extinct']}/{band['civs']} extinct at first sight")
 
     if baseline_by_profile:
         print("\n--- baseline (pre-T1 engine, commit 2a4e0ec, same seeds) ---")
-        print(f"{'Profile':<12}{'Wins now':<11}{'Wins base':<12}{'Reply now':<11}{'Reply base':<11}")
+        print(f"{'Profile':<12}{'Wins now':<11}{'Wins base':<12}{'d Wins':<9}"
+              f"{'Reply now':<11}{'Reply base':<12}{'d Reply':<9}")
         for profile, m in metrics_by_profile.items():
             base = baseline_by_profile.get(profile)
             if not base:
                 continue
             base_m = calibration_metrics(base)
             reply, base_reply = m["first_reply_median"], base_m["first_reply_median"]
+            win_delta = f"{m['victory_rate'] - base_m['victory_rate']:+.0%}"
+            if reply is not None and base_reply is not None:
+                reply_delta = f"{reply - base_reply:+.1f}"
+            else:
+                reply_delta = "n/a"
             print(f"{profile:<12}{m['victory_rate']:<11.0%}{base_m['victory_rate']:<12.0%}"
+                  f"{win_delta:<9}"
                   f"{(f'{reply:.0f}' if reply is not None else '-'):<11}"
-                  f"{(f'{base_reply:.0f}' if base_reply is not None else '-'):<11}")
+                  f"{(f'{base_reply:.0f}' if base_reply is not None else '-'):<12}{reply_delta:<9}")
 
 
 def main(argv=None) -> int:
@@ -119,7 +143,11 @@ def main(argv=None) -> int:
     parser.add_argument("--profiles", default=",".join(DEFAULT_PROFILES),
                         help=f"comma-separated, from {STRATEGIES}")
     parser.add_argument("--json", help="write the raw run summaries and metrics to this file")
-    parser.add_argument("--baseline", help="baseline JSON ({profile: [run, ...]}) to compare (d) and (e)")
+    default_baseline = str(DEFAULT_BASELINE_PATH) if DEFAULT_BASELINE_PATH.exists() else None
+    parser.add_argument("--baseline", default=default_baseline,
+                        help="baseline JSON ({profile: [run, ...]}) to compare (d) and (e) "
+                             f"(default: {DEFAULT_BASELINE_PATH.relative_to(ROOT)} if present; "
+                             "pass '' to disable)")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 

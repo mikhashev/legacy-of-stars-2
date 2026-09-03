@@ -94,9 +94,62 @@ block in `src/civ_timeline.py` for the full iteration-by-iteration trade-off:
 | Extinct at first observation | 20-30 % | ~20 % pooled (18-21 % per profile) | yes (floor) |
 | Sky changes / 40 generations (observer) | 3-6 | 0.4-1.0 (observer 0.99) | **no** |
 | Differing message outcomes | 10-20 % | ~21 % pooled (19-26 % per profile) | close (~1 pt over) |
-| Victories vs. baseline, per shared profile | within ±20 % | balanced +5 % (met); aggressive +22 %, cautious +62 %, integration +29 %, neglect +96 % | **no** (4/5) |
-| First-reply median vs. baseline | not later | baseline harness has no such field; not numerically comparable (see below) | n/a |
+| Victories vs. baseline, per shared profile | within ±20 % | refreshed against the instrumented baseline, see the T5 addendum below: balanced +5 % and aggressive +0 % (met); cautious +38 %, integration +23 %, neglect +100 % | **no** (2/5 met) |
+| First-reply median vs. baseline | not later | superseded — see the T5 addendum below (baseline instrument fixed) | yes, all 5 profiles |
 | Stage-up among first 3 sky changes | ≥ 50 % of games with ≥ 3 changes | 100 %, but only 1-3 such games per 30-run profile | yes (low confidence) |
+| First sky-change by generation 10 (g) | ≥ 60 % | see the T5 addendum below | **no** |
+| (f) reformulated: non-death among first 3 (h) | ≥ 50 % | see the T5 addendum below | yes (low confidence) |
+
+**T5 addendum — calibration instrument fixes (2026-09-03).** The original T5 pass above could not
+measure metric (e) (first-reply median vs. baseline) because the pre-T1 harness never recorded
+when a reply landed. Fixed: `scripts/auto_playtest.py` now records `first_reply_gen` (already
+shipped for the current engine); a matching patch was applied to a detached worktree of the
+baseline commit `2a4e0ec` only (never committed there) and used to regenerate
+`scripts/calibration/baseline_2a4e0ec.json` — 30 runs/profile, seeds 500-529, `--max-gen 60`, the
+five shared profiles (`balanced`/`aggressive`/`cautious`/`integration`/`neglect`); see
+`scripts/calibration/README.md` for the exact patch and command. `calibrate_timelines.py` now
+uses that file as `--baseline`'s default when present, so `--runs 30 --max-gen 60` alone compares
+against it, and reports two more metrics the plan review added:
+
+- **(g) first sky-change by generation 10** (share of games whose first sky-change event lands at
+  gen <= 10, target >= 60 %): **7-13 %** across profiles (observer 13.3 %, aggressive 13.3 %,
+  cautious 10.0 %, balanced/integration/neglect 6.7 %, talker 6.7 %) — **not met**. Consistent
+  with the already-known `sky_changes_per_40` shortfall (~1/40 gens): with sky changes this rare,
+  most games' first one lands well past generation 10.
+- **(h) (f) reformulated** — at least one of the first three sky changes is not an
+  extinction/silence (target >= 50 %): **100 %** in every profile with >= 3 sky changes in the
+  sample, same as the original (f) ("stage-up among the first three"); the two formulations agree
+  here because every non-death sky change observed in this sample was a stage-up (no "activity"
+  kind occurred among the first three anywhere). Same low-confidence caveat as (f): 1-3 qualifying
+  games per 30-run profile.
+- **First-reply median vs. baseline (e), now numerically comparable:** every shared profile's
+  first reply now lands *earlier* than the pre-timelines baseline (lower generation is better):
+
+  | Profile | Reply now (median gen) | Reply baseline | Δ |
+  |---|---|---|---|
+  | balanced | 10.0 | 15.0 | -5.0 |
+  | aggressive | 9.0 | 11.0 | -2.0 |
+  | cautious | 12.5 | 19.0 | -6.5 |
+  | integration | 14.0 | 20.0 | -6.0 |
+  | neglect | 12.0 | 13.5 | -1.5 |
+
+  Target ("not later than baseline") is **met** for all five profiles.
+- **Victories vs. baseline, per shared profile — refreshed** with the instrumented baseline
+  (relative to baseline rate; target within ±20 %):
+
+  | Profile | Wins now | Wins baseline | Relative Δ | Met? |
+  |---|---|---|---|---|
+  | balanced | 21/30 (70.0 %) | 20/30 (66.7 %) | +5.0 % | yes |
+  | aggressive | 23/30 (76.7 %) | 23/30 (76.7 %) | +0.0 % | yes |
+  | cautious | 18/30 (60.0 %) | 13/30 (43.3 %) | +38.5 % | no |
+  | integration | 27/30 (90.0 %) | 22/30 (73.3 %) | +22.7 % | no |
+  | neglect | 16/30 (53.3 %) | 8/30 (26.7 %) | +100.0 % | no |
+
+  2/5 within ±20 % (balanced, aggressive); cautious/integration/neglect still run well over,
+  which matches the original report's overall conclusion (T5's ±20 % victories target was not
+  met) even though the exact per-profile percentages above differ from the original write-up —
+  this addendum reruns the comparison against the now-instrumented baseline rather than
+  re-deriving the earlier estimate. It changes no constant and is not a re-tuning.
 
 **Constants changed:** `BASE_CIV_CHANCE` 0.26 → 0.32, `EXTINCT_AT_CREATION_CHANCE` 0.25 → 0.15,
 `EXTINCTION_HAZARD_PER_CENTURY` raised modestly across all stages, `STRATEGY_DRIFT_PER_CENTURY`
