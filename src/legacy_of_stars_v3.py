@@ -3,7 +3,6 @@ import random
 import time
 import os
 import json
-from enum import Enum
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pathlib import Path
@@ -19,11 +18,36 @@ from .passive_leakage import PassiveLeakageSystem
 from .integration_progress import IntegrationProgress
 from .philosophical_events import PhilosophicalEvents
 from .genesis_project import GENESIS_KNOWLEDGE_REQUIRED, GenesisProject
+from .civ_timeline import (  # the timeline model; CivilizationStage lives there so the
+    CivEvent, CivState, CivTimeline, CivilizationStage,  # stage thresholds cannot diverge
+    TIMELINE_HORIZON_YEARS, generate_timeline, no_civilization, stage_for_age, static_timeline)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CATALOG_PATH = DATA_DIR / "star_catalog.json"
 
 START_YEAR = 1977  # WOW! Signal era; base year for Technology.year_context calculations
+
+# Base of the per-system civilization-timeline RNG. `ContactProgram.__init__` sets it from the
+# game seed before any system is generated, so a replayed or reloaded game rolls the same
+# histories; a system's own stream is `random.Random(f"{CIV_SEED_BASE}:{name}")`. It is kept
+# separate from the global `random` the rest of the engine draws from, so adding timelines
+# cannot shift a single existing roll.
+CIV_SEED_BASE: int = 0
+
+
+def set_civ_seed_base(seed: Optional[int]) -> int:
+    """Point the timeline RNG at this game's seed (a fresh random base when there is none)."""
+    global CIV_SEED_BASE
+    # A fresh Random() instead of the module-level one: seeding from entropy must not consume a
+    # draw from the global stream that every existing roll depends on.
+    CIV_SEED_BASE = int(seed) if seed is not None else random.Random().getrandbits(32)
+    return CIV_SEED_BASE
+
+
+def civ_rng(name: str) -> random.Random:
+    """The deterministic timeline stream of one star system."""
+    return random.Random(f"{CIV_SEED_BASE}:{name}")
+
 
 # Knowledge a system must have before the player may point a deep scan at it. It is the same
 # threshold `StarSystem.describe_civilization` reveals extinction at: below it, offering (or
@@ -84,14 +108,6 @@ def load_star_catalog(path: Path = CATALOG_PATH) -> List[Dict[str, Any]]:
         return []
     return sorted(stars, key=lambda s: s["distance"])
 
-
-class CivilizationStage(Enum):
-    PRE_RADIO = 0
-    EARLY_RADIO = 1
-    DIGITAL = 2
-    INTERPLANETARY = 3
-    INTERSTELLAR = 4
-    POST_BIOLOGICAL = 5
 
 @dataclass(frozen=True)
 class ActionSpec:
@@ -182,6 +198,7 @@ class StarSystem:
         
         self.civilization_age = civ_age
         self.civilization_stage = self._age_to_stage(civ_age)
+        creation_stage = self.civilization_stage  # kept when extinction clears the field below
         
         self.is_extinct = random.random() < 0.25
         if self.is_extinct:
@@ -227,6 +244,71 @@ class StarSystem:
         
         self.civilization_attitude = random.uniform(0.2, 0.8)
 
+        # Everything above is unchanged and draws from the global `random` in the same order as
+        # before; the timeline is rolled afterwards, from this system's own stream.
+        self.timeline = self._build_timeline(creation_stage)
+
+    def _build_timeline(self, creation_stage: Optional[CivilizationStage]) -> CivTimeline:
+        """The history behind the profile `_roll_civilization` just rolled.
+
+        The rolled fields become the state at creation: the timeline starts from them at
+        `origin_year = START_YEAR - civilization_age` and, for a living civilization, is rolled
+        forward from 1977 to the horizon (stage crossings, extinction hazard, strategy drift).
+        Holding the hazard back until 1977 is what keeps T0 free of behaviour change: a timeline
+        can never kill a civilization the game already presents as alive.
+
+        For a civilization the roll marks extinct the timeline is static, with a single `extinct`
+        event at `START_YEAR - extinct_years_ago`. That is today's semantics kept verbatim - the
+        engine defines `extinct_years_ago` as "silent for N years as seen from Earth" and folds
+        the light-time into the `max(50, distance)` lower bound of the roll - so the death can
+        land before `origin_year` for a young civilization that has been silent a long time. T1
+        re-derives `extinct_years_ago` from the timeline and retires that inconsistency.
+        """
+        origin_year = int(round(START_YEAR - self.civilization_age))
+        initial = CivState(alive=True, stage=creation_stage, strategy=self.true_strategy,
+                           attitude=self.civilization_attitude, civ_type=self.civilization_type,
+                           deception=self.deception_level, died_year=None)
+        if self.is_extinct:
+            died_year = START_YEAR - int(self.extinct_years_ago)
+            return CivTimeline(origin_year, initial,
+                               [CivEvent(died_year, "extinct", {"has_swan_song": bool(self.has_swan_song)})])
+        return generate_timeline(civ_rng(self.name), origin_year, initial,
+                                 START_YEAR + TIMELINE_HORIZON_YEARS, first_change_year=START_YEAR)
+
+    def set_static_timeline(self, origin_year: int) -> CivTimeline:
+        """Give this system a timeline that never changes, starting from its current profile.
+
+        For civilizations the engine writes by hand (Genesis colonies, the mirror civilization)
+        rather than rolls.
+        """
+        self.timeline = static_timeline(origin_year, self._state_from_fields())
+        return self.timeline
+
+    def _state_from_fields(self) -> CivState:
+        """The cached fields as a `CivState` (what a system without a timeline looks like)."""
+        if not self.has_civilization:
+            return no_civilization()
+        if self.is_extinct:
+            silent = getattr(self, "extinct_years_ago", None)
+            return CivState(alive=False, stage=None, strategy=None,
+                            attitude=self.civilization_attitude, civ_type=self.civilization_type,
+                            deception=self.deception_level,
+                            died_year=START_YEAR - int(silent) if silent is not None else None)
+        return CivState(alive=True, stage=self.civilization_stage, strategy=self.true_strategy,
+                        attitude=self.civilization_attitude, civ_type=self.civilization_type,
+                        deception=self.deception_level, died_year=None)
+
+    def timeline_state(self, year: int) -> CivState:
+        """This civilization as it is in `year`.
+
+        A system without a timeline (an old save, or one written by a test) is static: it reports
+        its cached fields for every year, exactly as the engine has always behaved.
+        """
+        timeline = getattr(self, "timeline", None)
+        if timeline is None:
+            return self._state_from_fields()
+        return timeline.state_at(year)
+
     def _clear_civilization(self) -> None:
         """Reset the civilization fields to the 'nobody lives here' defaults."""
         self.civilization_age = 0
@@ -238,6 +320,7 @@ class StarSystem:
         self.true_strategy = None
         self.deception_level = 0
         self.civilization_type = None  # No civilization, no type
+        self.timeline = None
 
     _SCALAR_FIELDS = ("name", "distance", "spectral_type", "ra", "dec", "has_civilization", "civilization_age",
                       "is_extinct", "has_swan_song", "true_strategy", "deception_level", "civilization_type",
@@ -247,6 +330,8 @@ class StarSystem:
         data = {name: getattr(self, name, None) for name in self._SCALAR_FIELDS}
         data["civilization_stage"] = self.civilization_stage.name if self.civilization_stage else None
         data["extinct_years_ago"] = getattr(self, "extinct_years_ago", None)
+        timeline = getattr(self, "timeline", None)
+        data["timeline"] = timeline.to_dict() if timeline else None
         data["messages_sent"] = [[text, gen] for text, gen in self.messages_sent]
         data["pending_responses"] = [[text, gen] for text, gen in self.pending_responses]
         data["received_messages"] = list(self.received_messages)
@@ -272,6 +357,8 @@ class StarSystem:
         system.deception_level = data.get("deception_level", 0)
         system.civilization_type = data.get("civilization_type")
         system.civilization_attitude = data.get("civilization_attitude", 0)
+        # A save written before timelines existed has no key: that system stays static.
+        system.timeline = CivTimeline.from_dict(data.get("timeline"))
         system.knowledge = data.get("knowledge", 0)
         system.messages_sent = [tuple(item) for item in data.get("messages_sent", [])]
         system.pending_responses = [tuple(item) for item in data.get("pending_responses", [])]
@@ -283,18 +370,8 @@ class StarSystem:
         return system
 
     def _age_to_stage(self, age: float) -> CivilizationStage:
-        if age < 50:
-            return CivilizationStage.PRE_RADIO
-        elif age < 200:
-            return CivilizationStage.EARLY_RADIO
-        elif age < 1000:
-            return CivilizationStage.DIGITAL
-        elif age < 10000:
-            return CivilizationStage.INTERPLANETARY
-        elif age < 100000:
-            return CivilizationStage.INTERSTELLAR
-        else:
-            return CivilizationStage.POST_BIOLOGICAL
+        """Stage by age, from the thresholds timelines are built on (50/200/1000/10k/100k)."""
+        return stage_for_age(age)
     
     def get_round_trip_time(self) -> int:
         """Get the communication round trip time in generations (rounded up)"""
@@ -411,6 +488,9 @@ class ContactProgram:
         if seed is not None:
             random.seed(seed)
         self.seed = seed
+        # Before any system is generated: the timelines follow the game seed. Saved with the
+        # game (an unseeded game still has to reload and undo into the same histories).
+        self.civ_seed_base = set_civ_seed_base(seed)
         self.offline = bool(offline) or os.getenv("LOS_OFFLINE") == "1"
 
         # --- where star_catalog.json, tech_tree.json and templates/ are read from.
@@ -565,6 +645,7 @@ class ContactProgram:
         event = self.pending_philosophical_event
         return {
             "seed": self.seed,
+            "civ_seed_base": self.civ_seed_base,
             "state": {name: getattr(self, name) for name in self._SCALAR_STATE},
             "flags": {name: getattr(self, name) for name in self._FLAG_STATE},
             "undiscovered": list(self.undiscovered),
@@ -597,6 +678,8 @@ class ContactProgram:
         program = cls(seed=None, offline=bool(offline) if offline is not None else False, generate=False,
                       data_dir=data_dir)
         program.seed = data.get("seed")
+        # Systems discovered after the load keep the stream the game was played with.
+        program.civ_seed_base = set_civ_seed_base(data.get("civ_seed_base", data.get("seed")))
 
         for name, value in data.get("state", {}).items():
             if name in cls._SCALAR_STATE:
@@ -1727,6 +1810,7 @@ You have answered one of humanity's greatest questions.
         system.civilization_type = random.choice(["biological_pure", "digital_ascended", "hybrid_integrated"])
         system.deception_level = 0.2
         system.knowledge = 50
+        system.set_static_timeline(self.start_year + (self.generation - 1) * 25 - 100)
         self.star_systems[system.name] = system
         self.stats["systems_discovered"] += 1
         return system
@@ -1740,6 +1824,7 @@ You have answered one of humanity's greatest questions.
         if random.random() < 0.5:
             system.true_strategy = "LB"
             system.civilization_attitude = 0.8
+            system.set_static_timeline(system.timeline.origin_year)  # refresh: the profile is final now
             system.pending_responses.append((self.content.mirror_reply(False, ctx), self.generation + round_trip))
             self.public_support = min(100, self.public_support + 10)
             logging.info(f"MIRROR CONTACT: {system.name} friendly")
@@ -1747,6 +1832,7 @@ You have answered one of humanity's greatest questions.
                     f"Generation {self.generation + round_trip}. Public support +10%.")
         system.true_strategy = "LA"
         system.civilization_attitude = 0.2
+        system.set_static_timeline(system.timeline.origin_year)  # refresh: the profile is final now
         warning = self._schedule_attack(system, self.attack_arrival_generation(system), "mirror_fleet", announce=False)
         logging.warning(f"MIRROR CONTACT: {system.name} hostile")
         return (f"{intro} {self.content.mirror_reply(True, ctx)} "

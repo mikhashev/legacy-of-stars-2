@@ -229,6 +229,11 @@ class GenesisProject:
             game.add_fermi_evidence("cooperation_evidence", 2, f"our creation on {system.name} became an ally")
             game.unlock_achievement("Parents of the Stars")
 
+        # A colony we planted has a known history: a static timeline from the year it was founded,
+        # so every reader can go through `state_at()` (T1) whether the civilization was rolled or
+        # written by hand.
+        system.set_static_timeline(int(ctx["year"] - system.civilization_age))
+
     # ------------------------------------------------------------------ display / persistence
     def get_summary(self) -> str:
         """Get summary string for UI"""
