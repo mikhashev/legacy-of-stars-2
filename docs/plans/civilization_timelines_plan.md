@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-03
 **Basis:** owner's design intent — the game is about the speed of light: while a signal travels, both sides change, so every message is a bet on a future nobody has seen, and the only rational play is to accumulate knowledge, build resilience and prepare one's descendants for an answer that will arrive to them. The idea was first recorded in `../design/cosmic_game_theory_analysis.md` §7.3 H "Time-Delayed Strategy Layer" ("The Messenger in Flight Problem") and in `../design/design_notes.md` §4 "Values for Long-Term Survival" (item 4, "Patience: the ability to wait 500 years for a reply without giving up").
-**Status:** draft for discussion; owner decisions in §9
+**Status:** Approved 2026-09-03 (owner accepted all five recommendations); review amendments folded in
 
 ---
 
@@ -36,7 +36,7 @@ way and the answer really does arrive to the player's grandchildren.
 | T0 | Timeline model: deterministic dated changes per civilization, `state_at()`, serialization, migration | 1–2 days | none (static timelines by default) |
 | T1 | Observed frame: descriptions, knowledge, extinction and swan songs read `state_at(now − d)`; "sky change" events | 1–2 days | small |
 | T2 | Receipt frame: `send_message` decides from `state_at(now + d)`; replies and fleets originate at receipt time; leakage uses `state_at(now)` | 1–2 days | moderate |
-| T3 | WOW! source: an 1,800-year timeline; Gen 144 answers from the civilization as it is in year 3777 | 0.5 day | none |
+| T3 | WOW! source: origin rolled as usual; evaluation window extended to year 3777; Gen 144 answers from the civilization as it is that year | 0.5 day | none |
 | T4 | Deeper catalogue to ~150 LY, gated by detection tiers; far targets are richer and slower | 1–2 days | moderate |
 | T5 | Hazard constants, statistics, tests | 1–2 days | the calibration itself |
 | T6 | Web and console: sky-change flashes, observation history in the dossier, "what will they be when this arrives" hint | 1–2 days | none |
@@ -103,7 +103,8 @@ name (so a save reloaded and a game replayed with the same seed agree):
 - **Extinction hazard** per century of civilization age, by stage (the Great Filter is the
   transition): PRE_RADIO 0.5 %, EARLY_RADIO 2 %, DIGITAL 3 %, INTERPLANETARY 1.5 %,
   INTERSTELLAR 0.2 %, POST_BIOLOGICAL 0.1 %. Rolled century by century from the origin up to
-  `1977 + 5,000` (the horizon a 200-generation game can see, plus the WOW! source's 1,800 LY).
+  `1977 + 5,000` (the horizon a 200-generation game can see; it also covers the WOW! source's
+  evaluation window at year 3777, §5).
   Civilizations rolled extinct *before* `1977 − d` reproduce today's "extinct at start" systems
   (the current 25 % share is the calibration target for T5); those that die later are the new
   content.
@@ -164,6 +165,15 @@ in `view_state`.
    `d + d/0.1c` from now, which is the same thing.
 5. `has_detected_earth` stays per system: one committed launch per civilization.
 
+**Every message in flight gets two dated fields**, recorded at send time: `expected_reply_year`
+(`= send_year + 2d`, when a reply would arrive if one is coming) and `explanation_year` (the year
+the light that explains a silence reaches Earth). For a civilization that dies at `died_year`,
+`explanation_year = died_year + d` (we learn of the death through the observed frame, §3). For a
+system with no civilization, or one below EARLY_RADIO at receipt, `explanation_year = send_year`
+— the answer is already known, and is the existing "no response capability detected" message
+(step 2 above). These two fields are what §8's UI and dossier read to tell the three classes of
+silence apart, and what the §8 web contract exposes on `systems[].messages_sent[]`.
+
 **Passive leakage** uses `timeline.state_at(now)` (the leakage is already there; their present
 state decides). **Diplomacy** during an inbound fleet uses the state at the year the diplomatic
 signal arrives. **WOW! source**: see T3.
@@ -181,11 +191,14 @@ drift LB→LBA between send and receipt → the trap fires; RNG determinism pres
 
 ## 5. WOW! source (T3)
 
-The source gets an 1,800-year timeline from 1977 (its origin is rolled as usual, so it can be
-ancient). Generation 144 evaluates `state_at(1977 + 1800)`: silence, friendly or hostile from the
-civilization *as it is when our reply arrives*, 72 generations of their history after the burst.
-The friendly text already speaks of thirty-six centuries; the hostile text already says their
-weapons would take eighteen thousand years. No other change.
+The source's origin is rolled exactly like any other civilization's (§2) — it may be ancient,
+long predating 1977. There is no separate "1,800-year timeline"; the only special requirement is
+on the *evaluation window*: its timeline must extend at least to year 3777, the year Generation
+144 reads `state_at(1977 + 1800)`, 72 generations of their history after the burst. The global
+extinction-hazard horizon `1977 + 5,000` (§2) already covers this, so no extra rolling is needed.
+Generation 144 evaluates that state: silence, friendly or hostile from the civilization *as it is
+when our reply arrives*. The friendly text already speaks of thirty-six centuries; the hostile
+text already says their weapons would take eighteen thousand years. No other change.
 
 ---
 
@@ -221,6 +234,33 @@ Targets (measured with `scripts/auto_playtest.py --runs 30`):
 - Fermi evidence sources keep working (extinction observed during play counts as extinction
   evidence: +1 per sky-change death).
 
+**First-impression metrics** (the first minutes matter as much as the aggregate):
+
+- the median generation of the first successful reply must not rise compared with today's
+  auto-playtest baseline (drift and receipt-frame evaluation must not make first contact feel
+  slower than it does now);
+- among the first three sky-change events of a game, at least one must be a stage advancement,
+  not an extinction (the drift mechanic should read as "the galaxy is alive", not "everything out
+  there is dying").
+
+**Observability of the metrics** — the targets above are only real if they are measured the same
+way every time:
+
+- (a) the auto-playtest policy is fixed as part of T5, as two profiles: "observer" (focus research
+  every generation, few messages sent) and "talker" (a message every generation); the action mix
+  for each is written down in `scripts/auto_playtest.py` so a re-run reproduces the same behaviour;
+- (b) the "extinct at first observation" share is reported **per distance band** (≤ 20 LY, 20–60
+  LY, 60–150 LY), not as one aggregate number — far stars are seen further in the past, so their
+  band should read higher, and a flat number would hide that;
+- (c) `scripts/auto_playtest.py` records the fate of every message sent — replied / nobody there /
+  died in flight / still in flight — so the "10–20 % different outcomes" target above is actually
+  measurable rather than eyeballed.
+
+**Time-box:** two days for calibration. If the targets above cannot be met within that time, fall
+back to variant B of owner decision 2 (§9) — drift only in the observed frame, replies evaluated
+at send time as today — as the recorded escape hatch, rather than open-endedly re-tuning the
+hazard and drift tables.
+
 Knobs: the hazard table, the drift rate, the reach table. Record the final constants in
 `src/civ_timeline.py` with the measured statistics, as was done for `BASE_DETECTION`.
 
@@ -233,25 +273,50 @@ Knobs: the hazard table, the drift rate, the reach table. Record the final const
 - Dossier: an **Observations** list (year, observed year, one line), the "observed as of" line
   already present, and for in-flight messages: "arrives {year}; they will have {n} more years of
   history than we have seen".
+- **Three classes of silence.** The UI and dossier never show an undifferentiated "no reply" —
+  every sent message is in exactly one of three states, read off `expected_reply_year` and
+  `explanation_year` (§4):
+  - **"Nobody to answer"** — no civilization, or below EARLY_RADIO at receipt; known at once
+    (`explanation_year = send_year`), shown immediately as today's "no response capability
+    detected".
+  - **"They died — we will know in {explanation_year}"** — the reply-worthy civilization dies
+    before receipt; the dossier carries the message as pending until the light of the death
+    arrives, then resolves it.
+  - **"Reply in flight — arrives {expected_reply_year}"** — a reply is coming; the dossier counts
+    down to it.
+
+  The rule this enforces: **every dead letter must eventually be explained by an observation** —
+  either the sky-change that reports the death, or the reply itself. A message left with neither
+  is a lost action, not a story, and is a bug to fix rather than a state to display.
 - System picker and card: the light-time hint stays; add "last change seen: {year}" when any.
+- **Advisor.** The rule-based briefing gains one line per message whose `receipt_year` has passed
+  without a reply: "Our message to {X} reached its target in {year}; silence may mean …" — no new
+  content is generated and no new screen is added, this reuses the existing message log and the
+  three classes above to fill in the "…".
 - Console: the dossier prints the observations list; `sky_change` prints like any event.
 - Contract: `sky_change` event kind with `data {system, observed_year, change}`;
-  `systems[].observations[]`; documented in `../reference/web_contract.md`.
+  `systems[].observations[]`; `systems[].messages_sent[]` gains `expected_reply_year` and
+  `explanation_year`; documented in `../reference/web_contract.md`.
 
 ---
 
 ## 9. Owner decisions
 
-1. **Volatility.** Hazard and drift tables in §2 (recommended: "quiet but real", 3–6 visible
-   changes per game) — or a "turbulent galaxy" setting (double rates) as a difficulty option.
-2. **Receipt-frame replies** (§4) — recommended yes; the alternative (evaluate at send time,
-   drift only in observations) keeps today's balance but breaks the premise.
-3. **Deeper catalogue to ~150 LY with tier-gated reach** (§6) — recommended yes; without it the
-   delays stay within two generations and the mechanic is mostly felt through our own drift.
-4. **Fermi evidence for observed extinctions** (+1 per death seen) — recommended yes, it rewards
-   watching the sky, which is the cautious strategy.
-5. **Knowledge decay between directors** (design_notes §1, "institutional memory") — recommended
-   *not now*; it is a separate mechanic and would compound with this one.
+All five recommendations were accepted by the owner on 2026-09-03:
 
-Order if all recommendations are accepted: T0 → T1 → T2 → T3 (engine, tests green after each) →
-T4 → T5 calibration → T6 → review.
+1. **Volatility.** "Quiet but real" hazard and drift tables (§2), 3–6 visible changes per game;
+   the "turbulent galaxy" (double-rates) difficulty option is deferred until the base mode has
+   been measured against the §7 targets.
+2. **Receipt-frame replies** (§4) — adopted, with the three-classes-of-silence condition (§4, §8):
+   every reply is computed from `state_at(receipt_year)`, and every dead letter must eventually be
+   explained by an observation. The alternative (evaluate at send time, drift only in
+   observations) remains on record as the §7 time-box escape hatch, not as the shipped behaviour.
+3. **Deeper catalogue to ~150 LY with tier-gated reach** (§6) — adopted; the advisor and the map
+   legend must say out loud that far answers arrive to descendants, not to the director who sent
+   them, so the delay reads as a feature of the mechanic rather than as latency.
+4. **Fermi evidence for observed extinctions** (+1 per sky-change death) — adopted; it rewards
+   watching the sky, which is the cautious strategy.
+5. **Knowledge decay between directors** (design_notes §1, "institutional memory") — *not now*;
+   it is a separate mechanic and would compound with this one.
+
+Order: T0 → T1 → T2 → T3 (engine, tests green after each) → T4 → T5 calibration → T6 → review.
