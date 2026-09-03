@@ -344,6 +344,9 @@ Python side: `help` now works with no game in progress (the Start screen's Help 
 directly, no throwaway session needed); `technologies.available[]` carries `year_context`,
 shown in the tech dialog under each description; and `genesis.targets[]` is the exact
 sterile/habitable/unseeded/non-WOW!-source system list the Genesis picker shows, in order.
+`swan_song_targets[]` is the same idea for the deep scan: the systems already studied to
+20 % and known to be extinct, so neither the picker nor the action's label can say where a
+civilization died, or how many archives are out there.
 
 ## Measurements (Windows 11, Node 24.18, Chromium via Playwright)
 
@@ -351,7 +354,7 @@ sterile/habitable/unseeded/non-WOW!-source system list the Genesis picker shows,
 |---|---|
 | `engine.zip` | ~99 KiB (25 files) |
 | Pyodide runtime | ~13 MiB raw / ~6 MiB gzipped |
-| `dist/` (W4 build) | ~14 MiB, `index-*.js` ~645 KiB / ~167 KiB gzipped (three.js dominates) |
+| `dist/` (W4 build) | ~14 MiB. `index-*.js` ~67 KiB / ~21 KiB gzipped; `StarMap-*.js` ~590 KiB / ~149 KiB gzipped, split out because three.js dominates it and nothing before the main screen needs it (`MapPanel` imports it dynamically; the start screen prefetches it) |
 | Time to `ready` | ~1 s (worker start -> engine imported, uncached local server) |
 
 Well inside the plan's 4-second budget.

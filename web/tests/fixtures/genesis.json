@@ -1,10 +1,10 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T13:12:34",
+  "saved_at": "2026-09-03T15:13:26",
   "label": "",
   "generation": 3,
   "year": 2027,
-  "director": "Dr. Noah Davis",
+  "director": "Dr. Benjamin Johnson",
   "game_over": false,
   "program": {
     "seed": 1,
@@ -22,8 +22,8 @@
       "philosophical_victory": false,
       "self_destruct_risk": 0.001,
       "ecological_risk": 0.008,
-      "action_points": 3,
-      "max_action_points": 3,
+      "action_points": 4,
+      "max_action_points": 4,
       "ap_modifier": 0,
       "advisor_consulted_this_gen": false,
       "broadcast_radius": 92.0,
@@ -255,7 +255,7 @@
         "generation": 1
       },
       {
-        "name": "Dr. Benjamin Wilson",
+        "name": "Dr. Sophia Jones",
         "skills": {
           "diplomacy": 0.8384242699249872,
           "science": 0.8804738687709103,
@@ -267,16 +267,14 @@
         "generation": 2
       },
       {
-        "name": "Dr. Noah Davis",
+        "name": "Dr. Benjamin Johnson",
         "skills": {
-          "diplomacy": 0.8146764524003245,
-          "science": 0.8618195051697884,
-          "administration": 0.6481951963934673
+          "diplomacy": 0.5929531329473589,
+          "science": 0.9962717060880326,
+          "administration": 0.9299732643976449
         },
         "traits": [
-          "Direct",
-          "Visionary",
-          "Patient"
+          "Direct"
         ],
         "generation": 3
       }
@@ -323,6 +321,7 @@
       "next_tech_discount": 0.0,
       "swan_songs": []
     },
+    "scanned_for_swan_song": [],
     "integration": {
       "integration_level": 0.0,
       "integration_events": []

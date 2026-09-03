@@ -5,7 +5,7 @@ import os
 import json
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pathlib import Path
 import logging
 import datetime
@@ -24,6 +24,12 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CATALOG_PATH = DATA_DIR / "star_catalog.json"
 
 START_YEAR = 1977  # WOW! Signal era; base year for Technology.year_context calculations
+
+# Knowledge a system must have before the player may point a deep scan at it. It is the same
+# threshold `StarSystem.describe_civilization` reveals extinction at: below it, offering (or
+# refusing) a swan-song scan would tell the player a system is dead before a telescope was
+# ever pointed at it.
+SWAN_SONG_KNOWLEDGE_REQUIRED = 20
 
 # Chance that a star with a perfectly habitable spectral class (G/K main sequence) hosts a
 # civilization. Calibrated so the full 53-star catalog still averages ~8 civilizations, as the
@@ -446,6 +452,10 @@ class ContactProgram:
         self.wow_signal = WOWSignalEvent(self)
         self.pending_attack_warnings: List[AttackWarning] = []
         self.swan_song_manager = SwanSongManager(self.ai, self.content)
+        # Systems a deep scan has already been pointed at and found nothing in. Kept so the
+        # candidate list shrinks after a fruitless scan instead of offering the same silent
+        # system forever (a discovered swan song leaves the list via the manager instead).
+        self.scanned_for_swan_song: Set[str] = set()
         self.leakage_system = PassiveLeakageSystem()
         self.broadcast_radius = 0.0  # leakage front, recalculated each generation
         self.leakage_multiplier = 1.0  # 1.0 = full leakage, 0.0 = complete silence
@@ -546,6 +556,7 @@ class ContactProgram:
             "pending_info_attacks": [[name, arrival] for name, arrival in self.pending_info_attacks],
             "wow_signal": self.wow_signal.to_dict(),
             "swan_songs": self.swan_song_manager.to_dict(),
+            "scanned_for_swan_song": sorted(self.scanned_for_swan_song),
             "integration": self.integration.to_dict(),
             "philosophical_events": self.philosophical_events.to_dict(),
             "pending_philosophical_event": event.id if event else None,
@@ -601,6 +612,7 @@ class ContactProgram:
 
         program.wow_signal = WOWSignalEvent.from_dict(data.get("wow_signal", {}), program)
         program.swan_song_manager = SwanSongManager.from_dict(data.get("swan_songs", {}), program.ai, program.content)
+        program.scanned_for_swan_song = set(data.get("scanned_for_swan_song", []))
         for system in program.star_systems.values():
             program._register_swan_song(system)
         program.integration = IntegrationProgress.from_dict(data.get("integration", {}))
@@ -661,7 +673,16 @@ class ContactProgram:
         last_names = ["Smith", "Johnson", "Williams", "Jones", "Brown", "Davis", "Miller", "Wilson",
                       "Taylor", "Clark", "Lewis", "Lee", "Walker", "Hall", "Young", "Harris"]
         
-        name = f"Dr. {random.choice(first_names)} {random.choice(last_names)}"
+        # A new director who shares the outgoing one's surname reads as a dynasty, or as a bug.
+        # With 16 names either half repeats about once every six successions, so exclude the
+        # previous director's own first name and surname from the pools.
+        previous = self.directors[-1].name.split() if self.directors else []
+        previous_first = previous[1] if len(previous) > 2 else None
+        previous_last = previous[-1] if len(previous) > 2 else None
+        firsts = [n for n in first_names if n != previous_first] or first_names
+        lasts = [n for n in last_names if n != previous_last] or last_names
+
+        name = f"Dr. {random.choice(firsts)} {random.choice(lasts)}"
         director = Director(name)
         director.generation = self.generation
         return director
@@ -1745,6 +1766,7 @@ You have answered one of humanity's greatest questions.
             "genesis": {"unlocked": self.genesis.unlocked, "summary": self.genesis.get_summary(),
                         "worlds": self.genesis.to_dict()["worlds"],
                         "targets": self.genesis_targets()},
+            "swan_song_targets": self.swan_song_targets(),
             "pending_event": None if event is None else {
                 "id": event.id, "name": event.name, "description": event.description,
                 "choices": [{"name": c["name"], "description": c["description"]} for c in event.choices],
@@ -1819,9 +1841,29 @@ You have answered one of humanity's greatest questions.
 
     # ------------------------------------------------------------------ UI-facing queries
     def undiscovered_swan_songs(self) -> List[str]:
-        """Extinct systems with a swan song the player has not found yet."""
+        """Extinct systems with a swan song the player has not found yet.
+
+        Omniscient: it knows which systems hold an archive whether or not the player has
+        looked. Never show it (or its length) to the player - use `swan_song_targets()`.
+        """
         return [name for name, system in self.star_systems.items()
                 if system.has_civilization and system.is_extinct and system.has_swan_song
+                and not self.swan_song_manager.is_discovered(name)]
+
+    def swan_song_targets(self) -> List[str]:
+        """Systems a deep scan may be pointed at: studied to 20 % knowledge, known to be
+        extinct, not scanned to a null result, and not already recovered.
+
+        Unlike `undiscovered_swan_songs()` this leaks nothing: whether the system holds an
+        archive is exactly what the scan is for, so a silent system stays on the list until
+        the player spends the point that empties it. The knowledge floor is what keeps the
+        list honest - it is the level at which `describe_civilization` says "EXTINCT", so the
+        list only ever names systems the player has already been told are dead.
+        """
+        return [name for name, system in self.star_systems.items()
+                if system.knowledge >= SWAN_SONG_KNOWLEDGE_REQUIRED
+                and system.has_civilization and system.is_extinct
+                and name not in self.scanned_for_swan_song
                 and not self.swan_song_manager.is_discovered(name)]
 
     def available_technologies(self) -> List[Technology]:
@@ -1849,10 +1891,13 @@ You have answered one of humanity's greatest questions.
             actions.append(ActionSpec("defend", "Defensive Actions (Respond to Threats)", "", ("threat", "defense")))
         if self.ai_advisor_unlocked:
             actions.append(ActionSpec("consult_advisor", "Consult AI Strategic Advisor", "Free, once/gen"))
-        undiscovered = self.undiscovered_swan_songs()
-        if undiscovered:
+        # Candidates, not archives: the label may only count systems the player already knows
+        # are extinct, never the (hidden) systems that actually hold a swan song.
+        candidates = self.swan_song_targets()
+        if candidates:
             actions.append(ActionSpec("listen_swan_song",
-                                      f"Listen for Swan Song ({len(undiscovered)} undiscovered)", "1 AP", ("system",)))
+                                      f"Listen for Swan Song ({len(candidates)} candidate systems)",
+                                      "1 AP", ("system",)))
         if self.genesis.unlocked:
             actions.append(ActionSpec("genesis_seed", "Genesis Ark Program (Launch Ark)",
                                       f"1 AP + {self.genesis.seed_cost_rp} RP", ("system",)))
@@ -2129,32 +2174,41 @@ Use Defensive Actions in the menu to prepare.
     
     def listen_for_swan_song(self, system_name: str):
         """Listen for Swan Song - Attempt to discover final transmission from extinct civilization"""
-        
-        if self.action_points < 1:
-            self.message = "Not enough Action Points!"
-            return
-        
+
         if system_name not in self.star_systems:
             self.message = f"System {system_name} not found in database."
             return
-        
+
         system = self.star_systems[system_name]
-        
-        # Must be an extinct civilization
-        if not system.has_civilization or not system.is_extinct:
-            self.message = f"{system_name} does not contain an extinct civilization."
+
+        # Before the extinction check, deliberately: "X does not contain an extinct
+        # civilization" is a fact about the system, and answering it for an unstudied one
+        # would hand the player free reconnaissance (and, refused for free, at no cost at
+        # all). 20 % is the same threshold `describe_civilization` reveals extinction at.
+        if system.knowledge < SWAN_SONG_KNOWLEDGE_REQUIRED:
+            self.message = "Study the system first: 20% knowledge is needed before a deep scan."
             return
-        
+
+        # Only reachable through the API: `swan_song_targets()` never lists these.
+        if not system.has_civilization or not system.is_extinct:
+            self.message = f"{system_name} is not a candidate for a deep scan."
+            return
+
+        if self.action_points < 1:
+            self.message = "Not enough Action Points!"
+            return
+
         # Check if swan song exists
         if not system.has_swan_song:
             self.message = f"""Deep scan of {system_name} complete.
-            
+
 No data archives detected. This civilization left no final transmission.
 Their ending remains a mystery."""
             self.action_points -= 1
+            self.scanned_for_swan_song.add(system_name)
             logging.info(f"Swan song scan of {system_name}: None found")
             return
-        
+
         # Consume action point
         self.action_points -= 1
         

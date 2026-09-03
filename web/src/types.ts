@@ -318,6 +318,13 @@ export interface ViewState {
   victory: boolean;
   philosophical_victory: boolean;
   genesis: GenesisInfo;
+  /**
+   * Systems a deep scan may be pointed at: studied to 20 % knowledge or more (the level at
+   * which `systems[].description` says EXTINCT), known to be extinct, not already scanned to
+   * a null result, not already recovered. The swan-song picker lists exactly these - whether
+   * a system holds an archive is what the scan is for, so the list never says how many exist.
+   */
+  swan_song_targets: string[];
   pending_event: PendingEvent | null;
   wow: WowState;
   achievements: string[];

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T13:12:34",
+  "saved_at": "2026-09-03T15:13:26",
   "label": "",
   "generation": 1,
   "year": 1977,
@@ -311,6 +311,7 @@
       "next_tech_discount": 0.0,
       "swan_songs": []
     },
+    "scanned_for_swan_song": [],
     "integration": {
       "integration_level": 0.0,
       "integration_events": []

@@ -126,13 +126,11 @@ class AutoPlayer:
             elif roll < msg_w + outreach_w:
                 p.public_outreach()
             elif roll < msg_w + outreach_w + swan_w:
-                extinct = [
-                    name for name, s in p.star_systems.items()
-                    if s.has_civilization and s.is_extinct and s.has_swan_song
-                    and not p.swan_song_manager.is_discovered(name)
-                ]
-                if extinct:
-                    target = random.choice(extinct)
+                # Only what a player can see: systems already studied to 20 % and known to be
+                # extinct. With none, study instead - that is how the list gets populated.
+                candidates = p.swan_song_targets()
+                if candidates:
+                    target = random.choice(candidates)
                     p.listen_for_swan_song(target)
                     self.log(f"Listened for swan song at {target}")
                 else:

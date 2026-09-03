@@ -198,7 +198,7 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
             recs.append("Defend against incoming fleets (Defensive Actions).")
         if support < 50:
             recs.append("Public Outreach to restore support.")
-        if program.undiscovered_swan_songs():
+        if program.swan_song_targets():
             recs.append("Study extinct systems to 30%+ knowledge, then listen for their swan songs.")
         unknown = [n for n, s in program.star_systems.items() if s.knowledge < 20]
         if unknown:

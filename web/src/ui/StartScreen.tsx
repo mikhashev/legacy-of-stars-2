@@ -1,4 +1,4 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../store";
 import { importSaveFile, listSaves, loadSaveText, type SaveMeta } from "../saves";
 
@@ -8,6 +8,13 @@ function formatDate(iso: string): string {
 }
 
 export function StartScreen({ store }: { store: Store }) {
+  // The map's Three.js chunk is loaded lazily by MapPanel (see its comment). The player is
+  // idle here for as long as it takes to pick a seed, so warm it now and the main screen has
+  // it in cache when it mounts. A failure is nothing: MapPanel awaits its own import().
+  useEffect(() => {
+    void import("../scene/StarMap").catch(() => {});
+  }, []);
+
   const [seed, setSeed] = useState("");
   const [saves, setSaves] = useState<SaveMeta[]>(() => listSaves());
   const fileInput = useRef<HTMLInputElement>(null);

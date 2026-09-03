@@ -361,6 +361,30 @@ class SituationalActionsTest(unittest.TestCase):
         self.assertTrue(result["ok"])            # the scan ran and cost 1 AP
         self.assertEqual(program.action_points, 2)
 
+    def test_an_unstudied_system_is_never_a_swan_song_target(self):
+        session = new_session(seed=41)
+        program = session.program
+        studied, unstudied = list(program.star_systems.values())[:2]
+        for system in (studied, unstudied):
+            system.has_civilization = True
+            system.is_extinct = True
+            system.has_swan_song = True
+            program._register_swan_song(system)
+        studied.knowledge, unstudied.knowledge = 40, 0
+        program.action_points = program.max_action_points = 3
+
+        state = call(session, "help")["state"]
+        self.assertEqual(state["swan_song_targets"], [studied.name])
+        label = next(a["label"] for a in state["actions"] if a["id"] == "listen_swan_song")
+        self.assertIn("1 candidate systems", label)
+
+        # The refusal costs nothing and says nothing about what is (or is not) out there.
+        refused = call(session, "listen_swan_song", system=unstudied.name)
+        self.assertFalse(refused["ok"])
+        self.assertIn("Study the system first", refused["message"])
+        self.assertNotIn("extinct", refused["message"].lower())
+        self.assertEqual(program.action_points, 3)
+
     def test_genesis_seed(self):
         session = new_session(seed=51)
         program = session.program
@@ -635,4 +659,7 @@ class StartScreenAndViewStateTest(unittest.TestCase):
         self.assertIsInstance(targets, list)
         names = {s["name"] for s in state["systems"]}
         self.assertTrue(set(targets) <= names)
+        swan_targets = state["swan_song_targets"]
+        self.assertIsInstance(swan_targets, list)
+        self.assertTrue(set(swan_targets) <= names)
 

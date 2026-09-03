@@ -1,10 +1,10 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T13:12:34",
+  "saved_at": "2026-09-03T15:13:26",
   "label": "",
   "generation": 2,
   "year": 2002,
-  "director": "Dr. Benjamin Wilson",
+  "director": "Dr. Sophia Jones",
   "game_over": true,
   "program": {
     "seed": 1,
@@ -255,7 +255,7 @@
         "generation": 1
       },
       {
-        "name": "Dr. Benjamin Wilson",
+        "name": "Dr. Sophia Jones",
         "skills": {
           "diplomacy": 0.8384242699249872,
           "science": 0.8804738687709103,
@@ -309,6 +309,7 @@
       "next_tech_discount": 0.0,
       "swan_songs": []
     },
+    "scanned_for_swan_song": [],
     "integration": {
       "integration_level": 0.0,
       "integration_events": []

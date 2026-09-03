@@ -7,7 +7,11 @@
  * engine did not state (docs/web_contract.md 6).
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { StarMap } from "../scene/StarMap";
+// `StarMap` pulls in Three.js (~600 kB), which nothing before the main screen needs, so it is
+// imported for its type only and fetched with a dynamic import() when this panel mounts. Vite
+// splits it into its own chunk; `scene/coords` is a handful of pure functions with no imports
+// of its own, so it stays static.
+import type { StarMap } from "../scene/StarMap";
 import { formatDistance } from "../scene/coords";
 import type { Store } from "../store";
 import type { ActionId, ActionSpec, StarSystem, ViewState } from "../types";
@@ -81,28 +85,43 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<StarMap | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Flips once the scene chunk has loaded and the map exists; the update effects below wait
+  // on it so the first `view` is pushed into the map the moment it is there.
+  const [ready, setReady] = useState(false);
 
   const { selectedSystem, mapScale, showSystemList, reduceEffects, lastEvents } = store.state;
 
-  // One StarMap for the lifetime of the main screen; it owns the WebGL context.
+  // One StarMap for the lifetime of the main screen; it owns the WebGL context. Loading the
+  // module and constructing it are the same failure path: a chunk that will not load and a
+  // browser without WebGL both end in the list-overlay fallback below.
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    try {
-      mapRef.current = new StarMap(host, {
-        onSelect: (name) => store.selectSystem(name),
-        onAutoReduce: () => {
-          store.toggleReduceEffects(true);
-          store.showToast("The map was running slowly, so effects were reduced. Turn them back on in the toolbar.");
-        },
-      });
-    } catch (cause: unknown) {
-      // No WebGL (a locked-down browser, a headless run without a GPU): the list overlay is
-      // the fallback, and the rest of the HUD is unaffected.
-      setError(cause instanceof Error ? cause.message : String(cause));
-      store.toggleSystemList(true);
-    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { StarMap } = await import("../scene/StarMap");
+        if (cancelled) return;
+        mapRef.current = new StarMap(host, {
+          onSelect: (name) => store.selectSystem(name),
+          onAutoReduce: () => {
+            store.toggleReduceEffects(true);
+            store.showToast("The map was running slowly, so effects were reduced. Turn them back on in the toolbar.");
+          },
+        });
+        setReady(true);
+      } catch (cause: unknown) {
+        // No WebGL (a locked-down browser, a headless run without a GPU) or no chunk (an
+        // offline first load): the list overlay is the fallback, and the rest of the HUD is
+        // unaffected.
+        if (cancelled) return;
+        setError(cause instanceof Error ? cause.message : String(cause));
+        store.toggleSystemList(true);
+      }
+    })();
     return () => {
+      cancelled = true;
+      setReady(false);
       mapRef.current?.dispose();
       mapRef.current = null;
     };
@@ -121,14 +140,14 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
       scale: mapScale,
       reduced: reduceEffects,
     });
-  }, [view, selectedSystem, mapScale, reduceEffects]);
+  }, [ready, view, selectedSystem, mapScale, reduceEffects]);
 
   // The flashes for the last action's events, after the state above is in place so every
   // star the events name already has a position. `lastEvents` is a fresh array per
   // `perform()`, so this fires once per action and never replays an old batch.
   useEffect(() => {
     if (lastEvents.length > 0) mapRef.current?.playEvents(lastEvents);
-  }, [lastEvents]);
+  }, [ready, lastEvents]);
 
   const selected = selectedSystem ? view.systems.find((s) => s.name === selectedSystem) : undefined;
 
@@ -175,6 +194,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
 
       <div class="star-map-viewport">
         <div class="star-map-host" ref={hostRef} />
+        {!ready && !error && <p class="star-map-loading">Loading star map&hellip;</p>}
         {error && (
           <p class="star-map-error">
             The 3D map could not start ({error}). Use the List panel instead.

@@ -88,9 +88,13 @@ class SwanSongActionTest(unittest.TestCase):
 
     def test_listening_applies_rewards_evidence_and_achievement(self):
         p, system = self._extinct_program()
-        self.assertIn(system.name, p.undiscovered_swan_songs())
-        self.assertIn("listen_swan_song", [a.id for a in p.available_actions()])
+        # Unstudied: neither the candidate list nor the action mentions it yet.
+        system.knowledge = 0
+        self.assertNotIn(system.name, p.swan_song_targets())
+        self.assertNotIn("listen_swan_song", [a.id for a in p.available_actions()])
         system.knowledge = 100
+        self.assertIn(system.name, p.swan_song_targets())
+        self.assertIn("listen_swan_song", [a.id for a in p.available_actions()])
         p.action_points = 2
         rp, knowledge = p.research_points, p.knowledge_base
         with mock.patch(SONG_RANDOM, return_value=0.0):
@@ -103,26 +107,82 @@ class SwanSongActionTest(unittest.TestCase):
         self.assertEqual(p.stats["swan_songs_found"], 1)
         self.assertIn("Archivist", p.achievements)
         self.assertNotIn(system.name, p.undiscovered_swan_songs())
+        self.assertNotIn(system.name, p.swan_song_targets())
         p.listen_for_swan_song(system.name)
         self.assertIn("already discovered", p.message.lower())
 
-    def test_listening_needs_knowledge_and_action_points(self):
+    def test_an_unstudied_system_is_refused_for_free_and_says_nothing_about_it(self):
         p, system = self._extinct_program()
         system.knowledge = 10
         p.action_points = 1
         p.listen_for_swan_song(system.name)
-        self.assertIn("Insufficient knowledge", p.message)
-        self.assertEqual(p.action_points, 0)
+        self.assertIn("Study the system first", p.message)
+        self.assertNotIn("extinct", p.message.lower())
+        self.assertEqual(p.action_points, 1)  # the refusal is free: it reveals nothing
+
+    def test_listening_needs_knowledge_and_action_points(self):
+        p, system = self._extinct_program()
+        system.knowledge = 40
+        p.action_points = 0
         p.listen_for_swan_song(system.name)
         self.assertIn("Not enough Action Points", p.message)
+        p.action_points = 1
+        with mock.patch(SONG_RANDOM, return_value=0.9):  # the roll fails at 40 % knowledge
+            p.listen_for_swan_song(system.name)
+        self.assertIn("Deep scan in progress", p.message)
+        self.assertEqual(p.action_points, 0)
+        self.assertIn(system.name, p.swan_song_targets())  # a failed roll may be retried
 
     def test_non_extinct_system_has_nothing_to_hear(self):
         p, _ = self._extinct_program()
         other = list(p.star_systems.values())[1]
         other.has_civilization = False
+        other.knowledge = 50
         p.action_points = 1
         p.listen_for_swan_song(other.name)
-        self.assertIn("does not contain an extinct civilization", p.message)
+        self.assertIn("not a candidate for a deep scan", p.message)
+        self.assertEqual(p.action_points, 1)
+        self.assertNotIn(other.name, p.swan_song_targets())
+
+    def test_a_silent_system_is_a_candidate_until_one_scan_empties_it(self):
+        p, system = self._extinct_program()
+        system.has_swan_song = False
+        p.swan_song_manager.swan_songs.pop(system.name, None)
+        system.knowledge = 50
+        p.action_points = 2
+        # Nothing about the missing archive is visible before the scan is paid for.
+        self.assertIn(system.name, p.swan_song_targets())
+        p.listen_for_swan_song(system.name)
+        self.assertIn("No data archives detected", p.message)
+        self.assertEqual(p.action_points, 1)
+        self.assertNotIn(system.name, p.swan_song_targets())
+
+    def test_the_action_label_counts_candidates_not_archives(self):
+        p, system = self._extinct_program()
+        system.knowledge = 50
+        silent = list(p.star_systems.values())[1]
+        silent.has_civilization, silent.is_extinct = True, False
+        silent.knowledge = 50
+        label = next(a.label for a in p.available_actions() if a.id == "listen_swan_song")
+        self.assertEqual(label, "Listen for Swan Song (1 candidate systems)")
+
+    def test_scanned_systems_survive_a_save_round_trip(self):
+        p, system = self._extinct_program()
+        system.has_swan_song = False
+        p.swan_song_manager.swan_songs.pop(system.name, None)
+        system.knowledge = 50
+        p.action_points = 1
+        p.listen_for_swan_song(system.name)
+        restored = ContactProgram.from_dict(p.to_dict(), offline=True)
+        self.assertIn(system.name, restored.scanned_for_swan_song)
+        self.assertNotIn(system.name, restored.swan_song_targets())
+
+    def test_view_state_exposes_the_candidate_list(self):
+        p, system = self._extinct_program()
+        system.knowledge = 0
+        self.assertEqual(p.view_state()["swan_song_targets"], [])
+        system.knowledge = 30
+        self.assertEqual(p.view_state()["swan_song_targets"], [system.name])
 
 
 if __name__ == "__main__":

@@ -27,14 +27,23 @@ function DialogFrame({ title, onClose, children }: { title: string; onClose: () 
 
 export function SystemDialog({ view, spec, store }: { view: ViewState; spec: ActionSpec; store: Store }) {
   const isGenesis = spec.id === "genesis_seed";
-  // genesis_seed: the engine hands back the exact eligible list (sterile, habitable,
-  // unseeded, not the WOW! source) as `genesis.targets`, in order; look each one up in
-  // `systems` for its distance/type rather than re-deriving eligibility here.
-  const eligible = isGenesis
-    ? view.genesis.targets
+  const isSwanSong = spec.id === "listen_swan_song";
+  // genesis_seed and listen_swan_song: the engine hands back the exact eligible list
+  // (`genesis.targets` / `swan_song_targets`), in order, and both lists are drawn so they
+  // leak nothing the player has not already been told. Look each name up in `systems` for
+  // its distance/type rather than re-deriving eligibility here - a picker that listed every
+  // system would let a player scan an unstudied one and read the refusal as reconnaissance.
+  const names = isGenesis ? view.genesis.targets : isSwanSong ? view.swan_song_targets : null;
+  const eligible = names
+    ? names
         .map((name) => view.systems.find((s) => s.name === name))
         .filter((s): s is (typeof view.systems)[number] => s !== undefined)
     : view.systems;
+  const emptyMessage = isGenesis
+    ? "No habitable sterile worlds within reach"
+    : isSwanSong
+      ? "No candidate systems: study extinct systems to 20% knowledge first"
+      : "No systems to choose from.";
   // W3: the star picked on the map is the default. It is only a default - every eligible
   // system is still listed below and one click changes it.
   const preselected = store.state.selectedSystem;
@@ -47,7 +56,7 @@ export function SystemDialog({ view, spec, store }: { view: ViewState; spec: Act
         </button>
       )}
       {eligible.length === 0 ? (
-        <p class="empty">{isGenesis ? "No habitable sterile worlds within reach" : "No systems to choose from."}</p>
+        <p class="empty">{emptyMessage}</p>
       ) : (
         <ul class="picker-list">
           {eligible.map((s) => (

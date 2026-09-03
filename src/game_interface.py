@@ -508,12 +508,14 @@ class GameInterface:
         self.program.consult_advisor()
 
     def _act_swan_song(self) -> None:
-        names = self.program.undiscovered_swan_songs()
+        # swan_song_targets(), never undiscovered_swan_songs(): the latter knows which systems
+        # actually hold an archive, and printing it would answer the question the scan asks.
+        names = self.program.swan_song_targets()
         if not names:
-            self.program.message = "No undiscovered transmissions."
+            self.program.message = "No candidate systems: study extinct systems to 20% knowledge first."
             return
         print("\n🕊️ === SWAN SONG DISCOVERY === 🕊️")
-        print("\nExtinct civilizations with undiscovered transmissions:")
+        print("\nKnown extinct civilizations not yet deep-scanned:")
         for i, name in enumerate(names, 1):
             system = self.program.star_systems[name]
             print(f"{i}. {name} ({system.distance:.1f} LY) - Knowledge: {int(system.knowledge)}%")

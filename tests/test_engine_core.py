@@ -202,6 +202,23 @@ class StarSystemTest(unittest.TestCase):
             self.assertFalse(system.is_wow_source)
 
 
+class DirectorSuccessionTest(unittest.TestCase):
+    def test_a_new_director_never_repeats_the_outgoing_one_s_name(self):
+        """A succession that hands the program back to "Dr. Smith" reads as a bug, not a dynasty."""
+        p = make_program(seed=9)
+        for _ in range(200):
+            previous = p.current_director.name.split()
+            director = p.generate_director()
+            p.directors.append(director)
+            p.current_director = director
+            current = director.name.split()
+            self.assertNotEqual(current[-1], previous[-1], f"{director.name} follows {' '.join(previous)}")
+            self.assertNotEqual(current[1], previous[1], f"{director.name} follows {' '.join(previous)}")
+        # The pools are unchanged: over 200 successions most of the 16 surnames still appear.
+        surnames = {d.name.split()[-1] for d in p.directors}
+        self.assertGreater(len(surnames), 10)
+
+
 class AlienReplyTest(unittest.TestCase):
     def test_offline_replies_are_templates_not_errors(self):
         p = make_program(seed=6)
