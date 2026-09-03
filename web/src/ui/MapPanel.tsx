@@ -171,7 +171,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
             onClick={() => store.toggleScale()}
             title={
               mapScale === "compressed"
-                ? "Radii are compressed logarithmically so 4 LY and 51 LY both fit"
+                ? "Radii are compressed logarithmically so 4 LY and 160 LY both fit"
                 : "Radii are proportional to distance"
             }
           >
@@ -202,7 +202,7 @@ export function MapPanel({ view, store }: { view: ViewState; store: Store }) {
           </p>
         )}
         <p class="star-map-legend">
-          {view.catalog.known} of {view.catalog.total} catalogued &middot; rings at 5 / 10 / 20 / 50 LY &middot;
+          {view.catalog.known} of {view.catalog.total} catalogued &middot; rings at 5 / 10 / 20 / 50 / 100 LY &middot;
           cyan = our signal, warm = a reply, red = a fleet
         </p>
         {selected && <SelectedCard system={selected} view={view} store={store} />}

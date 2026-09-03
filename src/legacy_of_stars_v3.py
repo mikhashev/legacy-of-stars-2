@@ -63,6 +63,19 @@ OBSERVATION_KNOWLEDGE_REQUIRED = 20
 # How many dated observations one system keeps (the dossier shows a history, not an archive).
 MAX_OBSERVATIONS = 30
 
+# How far the telescopes reach, in light-years, by the highest researched Detection tier
+# (`ContactProgram.detection_reach_ly`). The catalogue runs to 159 LY; without the instruments
+# its far half is simply not resolvable, so each tier opens a band of sky and with it a longer
+# light-time: 20 LY is one generation each way, 100 LY is four.
+#
+# Note that `data/tech_tree.json` currently tops the Detection category out at tier 3, so the
+# unlimited band is reserved for a future tier-4 instrument; until one exists, HD 10180 (127 LY)
+# and HD 209458 (159 LY) are catalogued but out of reach.
+DETECTION_REACH_BY_TIER = {0: 20.0, 1: 35.0, 2: 60.0, 3: 100.0}
+
+# The reach of tier 4 and above: the whole catalogue, however deep it grows.
+UNLIMITED_REACH_LY = float("inf")
+
 
 def stage_phrase(stage: Optional[CivilizationStage]) -> str:
     """A stage as prose: `DIGITAL` -> "digital era"."""
@@ -148,9 +161,15 @@ def public_explanation_year(entry: Dict[str, Any], year_now: int) -> Optional[in
 
 
 # Chance that a star with a perfectly habitable spectral class (G/K main sequence) hosts a
-# civilization. Calibrated so the full 53-star catalog still averages ~8 civilizations, as the
-# flat 0.15 model did: the mean habitability weight of the catalog is 30.8 / 53 = 0.581, and
-# 0.26 x 30.8 = 8.0.
+# civilization. Calibrated on the original 53-star catalog so it still averaged ~8 civilizations,
+# as the flat 0.15 model did: the mean habitability weight of that catalog was 30.8 / 53 = 0.581,
+# and 0.26 x 30.8 = 8.0.
+#
+# T4 deepened the catalog to 94 stars out to ~160 LY. The per-star chance is deliberately
+# unchanged (T5 owns calibration), so the *density* is the same and the totals simply follow the
+# larger sky: the summed habitability weight is now 62.8, i.e. ~16.2 civilizations over the whole
+# catalog, of which ~8.5 lie within 20 LY - the near field the player starts in is what it was,
+# plus the six nearby stars the science audit listed as missing.
 BASE_CIV_CHANCE = 0.26
 
 # Habitability by spectral class. Longer-lived, more stable stars get a higher weight; evolved
@@ -170,6 +189,9 @@ def habitability_weight(spectral_type: Optional[str]) -> float:
         return 1.0
     if core.startswith("D"):
         return 0.0  # white dwarf: the former habitable zone was swallowed by the red giant phase
+    if core[0] in ("O", "B"):
+        return 0.0  # a few million years of main-sequence life, whatever the luminosity class:
+        #             checked before the subgiant rule so Regulus (B8IV) is not scored as one
     # Luminosity class: check III before IV before V, and treat "IV-V" as main sequence.
     if "III" in core:
         return 0.0  # giant: post-main-sequence, the old habitable zone is gone
@@ -2157,15 +2179,16 @@ You have answered one of humanity's greatest questions.
     def _spawn_mirror_system(self) -> StarSystem:
         """A newly resolved technosignature at exactly our level (the Mirror Civilization event)."""
         # A mirror of ourselves cannot live around a red giant or a white dwarf: take the nearest
-        # habitable star still undiscovered and leave the others for normal discovery.
+        # habitable star still undiscovered and leave the others for normal discovery. The
+        # detection reach applies here too - a technosignature we could not have resolved yet
+        # must not appear just because an event fired.
         entry = None
-        for name in list(self.undiscovered):
-            candidate = self._catalog_entry(name)
-            if candidate is None or name in self.star_systems:
-                self.undiscovered.remove(name)
+        reach = self.detection_reach_ly()
+        for candidate in self._pending_catalog_entries():
+            if float(candidate["distance"]) > reach:
                 continue
             if habitability_weight(candidate.get("spectral_type")) > 0:
-                self.undiscovered.remove(name)
+                self.undiscovered.remove(candidate["name"])
                 entry = candidate
                 break
         if entry is None:
@@ -2266,6 +2289,7 @@ You have answered one of humanity's greatest questions.
         """Everything the player may see, as plain data. Hidden strategies never appear here."""
         year = self.start_year + (self.generation - 1) * 25
         director = self.current_director
+        reach_ly = self.detection_reach_ly()
         systems = []
         for index, (name, s) in enumerate(self.star_systems.items(), 1):
             systems.append({
@@ -2352,7 +2376,9 @@ You have answered one of humanity's greatest questions.
             "active_effects": self.active_effects(),
             "systems": systems,
             "catalog": {"known": len(self.star_systems), "total": max(len(self.catalog), len(self.star_systems)),
-                        "undiscovered": len(self.undiscovered), "discovery_chance": round(self.discovery_chance(), 2)},
+                        "undiscovered": len(self.undiscovered), "discovery_chance": round(self.discovery_chance(), 2),
+                        "reach_ly": None if math.isinf(reach_ly) else round(reach_ly, 1),
+                        "within_reach": self.undiscovered_within_reach()},
             "threats": threats,
             "technologies": {
                 "researched": [t.id for t in self.technologies.values() if t.researched],
@@ -2402,16 +2428,49 @@ You have answered one of humanity's greatest questions.
         bonus = sum(t.detection_bonus for t in self.technologies.values() if t.researched)
         return min(0.85, 0.10 + bonus)
 
+    def detection_tier(self) -> int:
+        """The highest tier among the researched Detection technologies (0 if none)."""
+        return max((t.tier for t in self.technologies.values()
+                    if t.researched and t.category == "Detection"), default=0)
+
+    def detection_reach_ly(self) -> float:
+        """How far out the telescopes can resolve a new star, in light-years.
+
+        The deep sky is a reward of the technology tree, not of patience: without the
+        instruments the catalogue's far half is simply not there, and each Detection tier
+        opens a band of it (DETECTION_REACH_BY_TIER). This is what puts the 4-6 generation
+        one-way delays in the mid-game rather than in the first ten turns.
+        """
+        return DETECTION_REACH_BY_TIER.get(self.detection_tier(), UNLIMITED_REACH_LY)
+
     def _next_catalog_entry(self) -> Optional[Dict[str, Any]]:
-        """Pop the nearest catalogued star the player has not resolved yet."""
-        while self.undiscovered:
-            name = self.undiscovered.pop(0)
-            if name in self.star_systems:
-                continue
-            entry = self._catalog_entry(name)
-            if entry:
+        """Pop the nearest catalogued star within detection reach that is not resolved yet.
+
+        Stars beyond the reach stay in `undiscovered` untouched: a later Detection tier
+        brings them into range, and the nearest-first order is kept within the reach.
+        """
+        reach = self.detection_reach_ly()
+        for index, entry in enumerate(self._pending_catalog_entries()):
+            if float(entry["distance"]) <= reach:
+                del self.undiscovered[index]
                 return entry
         return None
+
+    def _pending_catalog_entries(self) -> List[Dict[str, Any]]:
+        """The catalogue entries `undiscovered` names, nearest first, stale names pruned.
+
+        Pruning here (rather than on the way past) keeps `undiscovered` and the list this
+        returns index-aligned, which is what lets `_next_catalog_entry` delete by position.
+        """
+        self.undiscovered = [n for n in self.undiscovered
+                             if n not in self.star_systems and self._catalog_entry(n) is not None]
+        return [self._catalog_entry(n) for n in self.undiscovered]
+
+    def undiscovered_within_reach(self) -> int:
+        """Catalogued stars still unresolved and inside the current detection reach."""
+        reach = self.detection_reach_ly()
+        return sum(1 for entry in self._pending_catalog_entries()
+                   if float(entry["distance"]) <= reach)
 
     def add_star_system(self, entry: Dict[str, Any], announce: bool = True) -> StarSystem:
         """Add a catalogued star to the known systems (its civilization, if any, is rolled on creation)."""

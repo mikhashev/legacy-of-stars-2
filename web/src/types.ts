@@ -228,8 +228,16 @@ export interface StarSystem {
 export interface CatalogInfo {
   known: number;
   total: number;
+  /** Not yet resolved, whether or not the telescopes can reach them. */
   undiscovered: number;
   discovery_chance: number;
+  /**
+   * How far the telescopes resolve a new star, in LY, from the highest researched Detection
+   * tier (0 -> 20, 1 -> 35, 2 -> 60, 3 -> 100). `null` means the whole catalogue is in range.
+   */
+  reach_ly: number | null;
+  /** Of `undiscovered`, how many are inside `reach_ly`; the rest await a deeper tier. */
+  within_reach: number;
 }
 
 export interface Threat {

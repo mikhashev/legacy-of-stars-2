@@ -13,7 +13,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LOS_OFFLINE", "1")
 
-from src.legacy_of_stars_v3 import CATALOG_PATH, CivilizationStage, ContactProgram, load_star_catalog  # noqa: E402
+from src.legacy_of_stars_v3 import (  # noqa: E402
+    CATALOG_PATH, DETECTION_REACH_BY_TIER, CivilizationStage, ContactProgram, load_star_catalog)
 from src.wow_signal_event import WOW_SOURCE_NAME  # noqa: E402
 
 RANDOM = "src.legacy_of_stars_v3.random.random"
@@ -90,13 +91,20 @@ class DiscoveryTest(unittest.TestCase):
 
     def test_discovered_extinct_systems_get_swan_songs_and_catalog_exhausts(self):
         p = make_program(seed=4)
-        while p.undiscovered:
-            p.add_star_system(p._next_catalog_entry(), announce=False)
-        self.assertEqual(len(p.star_systems), len(p.catalog))
+        for tech in p.technologies.values():
+            tech.researched = True          # the deepest detection reach the tech tree offers
+        reach = p.detection_reach_ly()
+        while (entry := p._next_catalog_entry()) is not None:
+            p.add_star_system(entry, announce=False)
+        in_reach = [s for s in p.catalog if s["distance"] <= reach]
+        self.assertEqual(len(p.star_systems), len(in_reach))
         for system in p.star_systems.values():
             if system.has_civilization and system.is_extinct and system.has_swan_song:
                 self.assertTrue(p.swan_song_manager.has_swan_song(system.name))
         self.assertEqual(p.discover_systems(), [])
+        # What is left is exactly the catalogue beyond the reach; it is not lost, only unreachable.
+        self.assertEqual(sorted(p.undiscovered),
+                         sorted(s["name"] for s in p.catalog if s["distance"] > reach))
 
     def test_mirror_contact_uses_catalog_star(self):
         p = make_program(seed=5)
@@ -114,6 +122,83 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(catalog["known"], 5)
         self.assertEqual(catalog["total"], len(p.catalog))
         self.assertAlmostEqual(catalog["discovery_chance"], 0.25)
+        self.assertEqual(catalog["reach_ly"], 20.0)
+        self.assertEqual(catalog["within_reach"],
+                         sum(1 for name in p.undiscovered
+                             if p._catalog_entry(name)["distance"] <= 20.0))
+        self.assertLess(catalog["within_reach"], catalog["undiscovered"])
+
+
+class DetectionReachTest(unittest.TestCase):
+    """The deep sky is a reward of the technology tree: each Detection tier opens a band of it."""
+
+    TIER_TECHS = {1: "deep_space_network", 2: "ska_telescope", 3: "neutrino_telescope"}
+
+    def test_reach_follows_the_highest_researched_detection_tier(self):
+        p = make_program(seed=7)
+        self.assertEqual(p.detection_tier(), 0)      # Arecibo and Project Ozma are tier 0
+        self.assertEqual(p.detection_reach_ly(), 20.0)
+        for tier, tech_id in sorted(self.TIER_TECHS.items()):
+            p.technologies[tech_id].researched = True
+            self.assertEqual(p.detection_tier(), tier)
+            self.assertEqual(p.detection_reach_ly(), DETECTION_REACH_BY_TIER[tier])
+        # Theory technologies help the discovery chance but never the reach.
+        p.technologies["dyson_sphere_detection"].researched = True
+        self.assertEqual(p.detection_reach_ly(), DETECTION_REACH_BY_TIER[3])
+
+    def test_an_unresearched_detection_tree_still_reaches_the_first_band(self):
+        p = make_program(seed=7)
+        for tech in p.technologies.values():
+            tech.researched = False
+        self.assertEqual(p.detection_tier(), 0)
+        self.assertEqual(p.detection_reach_ly(), 20.0)
+
+    def test_discovery_never_draws_a_star_beyond_the_reach(self):
+        p = make_program(seed=8)
+        with mock.patch(RANDOM, return_value=0.0):
+            for _ in range(40):
+                p.discover_systems()
+        self.assertTrue(p.undiscovered, "reach gating must leave the far catalogue unresolved")
+        for system in p.star_systems.values():
+            self.assertLessEqual(system.distance, 20.0)
+
+    def test_a_new_tier_brings_the_next_band_into_range(self):
+        p = make_program(seed=8)
+        with mock.patch(RANDOM, return_value=0.0):
+            for _ in range(40):
+                p.discover_systems()
+        known = len(p.star_systems)
+        p.technologies["ska_telescope"].researched = True   # tier 2: 60 LY
+        with mock.patch(RANDOM, return_value=0.0):
+            for _ in range(40):
+                p.discover_systems()
+        self.assertGreater(len(p.star_systems), known)
+        distances = [s.distance for s in p.star_systems.values()]
+        self.assertGreater(max(distances), 20.0)
+        self.assertLessEqual(max(distances), 60.0)
+
+    def test_discovery_stays_nearest_first_inside_the_reach(self):
+        p = make_program(seed=9)
+        p.technologies["ska_telescope"].researched = True
+        seen = []
+        while (entry := p._next_catalog_entry()) is not None:
+            seen.append(entry["distance"])
+            p.add_star_system(entry, announce=False)
+        self.assertEqual(seen, sorted(seen))
+        self.assertLessEqual(max(seen), 60.0)
+
+    def test_mirror_contact_respects_the_reach(self):
+        p = make_program(seed=10)
+        with mock.patch(RANDOM, return_value=0.1):
+            system = p._spawn_mirror_system()
+        self.assertLessEqual(system.distance, 20.0)
+
+    def test_the_advisor_names_the_reach_once(self):
+        p = make_program(seed=11)
+        briefing = p.ai_advisor._rule_based_briefing(p)
+        notes = briefing.split("SYSTEM NOTES:")[1]
+        self.assertEqual(notes.count("Detection reach"), 1)
+        self.assertIn("Detection reach 20 LY;", notes)
 
 
 class WowSourceSystemTest(unittest.TestCase):

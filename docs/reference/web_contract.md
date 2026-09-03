@@ -232,9 +232,11 @@ strategies, deception levels) ever appears here.
 | `systems[].contacted` | bool | at least one reply received |
 | `systems[].is_seeded` | bool | a Genesis ark is on its way or has landed |
 | `catalog.known` | int | systems on the target list |
-| `catalog.total` | int | catalogued stars (53 in `data/star_catalog.json`) |
-| `catalog.undiscovered` | int | catalogued stars not yet resolved |
+| `catalog.total` | int | catalogued stars (94 in `data/star_catalog.json`, out to ~160 LY) |
+| `catalog.undiscovered` | int | catalogued stars not yet resolved, in reach or not |
 | `catalog.discovery_chance` | float | chance per generation of resolving one |
+| `catalog.reach_ly` | float \| null | how far the telescopes can resolve a new star, in light-years: the highest researched **Detection** tier decides it (tier 0 -> 20, 1 -> 35, 2 -> 60, 3 -> 100, 4+ -> the whole catalogue, reported as `null`). Stars beyond it stay in `undiscovered` and cannot be drawn until a deeper tier is researched, which is what puts the 4-6 generation one-way delays in the mid-game rather than at generation one |
+| `catalog.within_reach` | int | of `undiscovered`, how many lie inside `reach_ly`; `undiscovered - within_reach` is what a new Detection tier would unlock |
 | `threats[]` | list | inbound attacks |
 | `threats[].index` | int | 1-based; `defend` takes `index - 1` |
 | `threats[].source` | str | system name |

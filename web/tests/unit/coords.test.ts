@@ -10,6 +10,7 @@ import {
   CATALOG_EDGE_LY,
   CATALOG_EDGE_RADIUS,
   EDGE_RADIUS,
+  RING_DISTANCES_LY,
   direction,
   fallbackDirection,
   formatDistance,
@@ -25,6 +26,8 @@ import {
 const SIRIUS = { ra: 101.29, dec: -16.72, distance: 8.6 };
 const VEGA = { ra: 279.23, dec: 38.78, distance: 25.0 };
 const PROXIMA = { ra: 217.43, dec: -62.68, distance: 4.24 };
+/** The deepest star in the T4 catalogue (data/star_catalog.json). */
+const HD_209458 = { ra: 330.8, dec: 18.88, distance: 159 };
 /** The 1977 burst's disputed source (src/wow_signal_event.py). */
 const WOW = { ra: 293.7, dec: -27.0, distance: 1800 };
 
@@ -64,7 +67,7 @@ describe("direction", () => {
 
 describe("radiusFor", () => {
   it("is strictly increasing with distance in both scales", () => {
-    const distances = [0, 1, 4.24, 8.6, 11.9, 25, 40, 51];
+    const distances = [0, 1, 4.24, 8.6, 11.9, 25, 40, 51, 64.5, 100, 127, 159, 160];
     for (const mode of ["compressed", "true"] as const) {
       const radii = distances.map((d) => radiusFor(d, mode));
       for (let i = 1; i < radii.length; i += 1) {
@@ -74,8 +77,36 @@ describe("radiusFor", () => {
   });
 
   it("pins the catalogue's outer edge to the same radius in both scales", () => {
+    expect(CATALOG_EDGE_LY).toBe(160);
     expect(radiusFor(CATALOG_EDGE_LY, "compressed")).toBeCloseTo(CATALOG_EDGE_RADIUS, 10);
     expect(radiusFor(CATALOG_EDGE_LY, "true")).toBeCloseTo(CATALOG_EDGE_RADIUS, 10);
+  });
+
+  it("keeps the whole T4 catalogue inside the edge radius, short of the rim", () => {
+    // 159 LY is the deepest catalogue star; it must land just inside the edge, not on the rim,
+    // so the WOW! source at the rim stays visibly further out than anything catalogued.
+    const deepest = radiusFor(HD_209458.distance, "compressed");
+    expect(deepest).toBeLessThan(CATALOG_EDGE_RADIUS);
+    expect(deepest).toBeGreaterThan(CATALOG_EDGE_RADIUS - 1);
+    expect(isBeyondRim(HD_209458.distance, "compressed")).toBe(false);
+    expect(isBeyondRim(HD_209458.distance, "true")).toBe(false);
+  });
+
+  it("still separates the detection-reach bands the rings mark", () => {
+    // Each Detection tier opens a band (20 / 35 / 60 / 100 LY); the map has to show that as
+    // real distance, not as four stars in a heap on the rim.
+    const bands = [20, 35, 60, 100].map((ly) => radiusFor(ly, "compressed"));
+    for (let i = 1; i < bands.length; i += 1) {
+      expect(bands[i]! - bands[i - 1]!).toBeGreaterThan(3);
+    }
+  });
+
+  it("draws every orientation ring inside the scene", () => {
+    expect([...RING_DISTANCES_LY]).toEqual([5, 10, 20, 50, 100]);
+    for (const ly of RING_DISTANCES_LY) {
+      expect(radiusFor(ly, "compressed")).toBeLessThan(CATALOG_EDGE_RADIUS);
+      expect(isBeyondRim(ly, "compressed")).toBe(false);
+    }
   });
 
   it("spreads the nearby stars out that true scale crowds together", () => {
@@ -144,6 +175,7 @@ describe("formatDistance", () => {
     expect(formatDistance(1800)).toBe("1,800 LY");
     expect(formatDistance(4.24)).toBe("4.2 LY");
     expect(formatDistance(51)).toBe("51 LY");
+    expect(formatDistance(159)).toBe("159 LY");
   });
 });
 

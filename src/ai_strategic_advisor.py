@@ -181,6 +181,13 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
                 break
         if not noted:
             lines.append("  - No systems studied yet. Focus Research reveals who is out there.")
+        in_reach = program.undiscovered_within_reach()   # prunes stale names, so count it first
+        beyond_reach = len(program.undiscovered) - in_reach
+        if beyond_reach > 0:
+            # Said once, not per star: the deep sky is a technology problem, and the answers it
+            # holds come back to the director's descendants, not to the one who sends.
+            lines.append(f"  - Detection reach {program.detection_reach_ly():.0f} LY; {beyond_reach} "
+                         "catalogued stars lie beyond it - Detection technologies extend it.")
         overdue = self._unanswered_message_lines(program)
         for line in overdue[:self.MAX_OVERDUE_LINES]:
             lines.append(f"  - {line}")

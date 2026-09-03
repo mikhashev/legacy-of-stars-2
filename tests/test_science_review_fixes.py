@@ -105,6 +105,7 @@ class HabitabilityEdgeCasesTest(unittest.TestCase):
 class MirrorSpawnTest(unittest.TestCase):
     def test_mirror_skips_evolved_stars_without_cataloguing_them(self):
         p = program()
+        p.technologies["ska_telescope"].researched = True  # tier 2: 60 LY, so all three are in reach
         for name in ("Pollux", "Arcturus", "Vega"):
             p.star_systems.pop(name, None)
         p.undiscovered = ["Pollux", "Arcturus", "Vega"]

@@ -126,8 +126,8 @@ declare global {
   }
 }
 
-/** Hard ceiling on drawn systems (the catalogue is 53 stars plus the WOW! source). */
-const MAX_SYSTEMS = 60;
+/** Hard ceiling on drawn systems (the catalogue is 94 stars plus the WOW! source). */
+const MAX_SYSTEMS = 100;
 
 /** World-unit diameter of an average main-sequence star sprite (W4: 1.6x the W3 value of 5). */
 const BASE_STAR_SIZE = 8;

@@ -49,6 +49,9 @@ _AP_WEIGHTS = {
 # one studied past this knowledge floor. Everything else gets studied instead.
 _CAREFUL_MESSAGE_STRATEGIES = {"observer"}
 OBSERVER_KNOWLEDGE_FLOOR = 40
+# The distance that makes a one-way signal a multi-generation bet: 80 LY is more than three
+# generations of light-time each way, so the director who sends will not read the answer.
+FAR_SYSTEM_LY = 80.0
 _PRIORITY_CATEGORIES = {"integration": ("Transcendence", "Computing", "Social")}
 _SKIPPED_CATEGORIES = {"neglect": ("Transcendence",)}
 
@@ -68,6 +71,10 @@ class AutoPlayer:
         # Sky changes seen during the run (T1): new light showing a watched system advance a
         # stage or fall silent. Counted from the event stream, which nothing else here reads.
         self.sky_changes = 0
+        # T4: the generation the deep sky first opened - the first star catalogued at or beyond
+        # FAR_SYSTEM_LY. It measures the detection tiers, not luck: reach gating means a star
+        # that far can only be drawn once the Detection tree has been pushed to tier 3.
+        self.first_far_system_gen = None
 
     def log(self, msg: str) -> None:
         self.logs.append(f"[Gen {self.program.generation}] {msg}")
@@ -203,7 +210,12 @@ class AutoPlayer:
             self.resolve_pending_event()
             self.make_decisions()
             p.advance_generation()
-            self.sky_changes += sum(1 for event in p.drain_events() if event.kind == "sky_change")
+            for event in p.drain_events():
+                if event.kind == "sky_change":
+                    self.sky_changes += 1
+                elif (event.kind == "system_discovered" and self.first_far_system_gen is None
+                      and event.data.get("distance", 0) >= FAR_SYSTEM_LY):
+                    self.first_far_system_gen = p.generation
             if p.generation % 20 == 0:
                 status = p.integration.get_integration_status(p.generation)
                 self.log(
@@ -242,6 +254,10 @@ class AutoPlayer:
             "contact_names": contacts,
             "swan_songs_found": swan_found,
             "sky_changes": self.sky_changes,
+            "first_far_system_gen": self.first_far_system_gen,
+            "detection_reach_ly": p.detection_reach_ly(),
+            "farthest_known_ly": max((s.distance for s in p.star_systems.values()
+                                      if not s.is_wow_source), default=0.0),
             "systems_known": len(p.star_systems),
             "passive_detections": p.stats.get("passive_detections", 0),
             "info_attacks": p.stats.get("info_attacks", 0),
@@ -302,6 +318,7 @@ def main(argv=None) -> int:
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
                 "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "sky_changes": 0,
                 "systems_known": 0, "messages_sent": 0, "message_fates": {},
+                "first_far_system_gen": None, "detection_reach_ly": 0.0, "farthest_known_ly": 0.0,
                 "passive_detections": 0, "info_attacks": 0,
                 "end_reason": f"EXCEPTION: {exc!r}", "exception": repr(exc),
             }
@@ -309,15 +326,16 @@ def main(argv=None) -> int:
 
     print("\n=== PLAYTEST SUMMARY ===")
     print(f"{'Run':<4}{'Seed':<6}{'Strat':<11}{'Gen':<5}{'Win':<6}{'Integ':<7}{'Seed':<6}{'Cont':<6}"
-          f"{'Swan':<6}{'Sky':<5}{'Sys':<5}{'Leak':<6}{'Info':<6}End reason")
-    print("-" * 110)
+          f"{'Swan':<6}{'Sky':<5}{'Sys':<5}{'Leak':<6}{'Info':<6}{'FarSys':<8}End reason")
+    print("-" * 120)
     for r in results:
         win = "PHIL" if r["philosophical_victory"] else ("YES" if r["victory"] else "NO")
         print(
             f"{r['run_id']:<4}{r['seed']:<6}{r['strategy']:<11}{r['generations']:<5}{win:<6}"
             f"{r['integration_level']:<7.2f}{r['seeded_worlds']:<6}{r['contacts']:<6}"
             f"{r['swan_songs_found']:<6}{r.get('sky_changes', 0):<5}{r['systems_known']:<5}"
-            f"{r['passive_detections']:<6}{r['info_attacks']:<6}{r['end_reason'][:45]}"
+            f"{r['passive_detections']:<6}{r['info_attacks']:<6}"
+            f"{str(r.get('first_far_system_gen') or '-'):<8}{r['end_reason'][:40]}"
         )
     total_leak = sum(r["passive_detections"] for r in results)
     total_info = sum(r["info_attacks"] for r in results)
@@ -331,6 +349,20 @@ def main(argv=None) -> int:
         for fate, count in (r.get("message_fates") or {}).items():
             totals[fate] = totals.get(fate, 0) + count
     sent = sum(totals.values())
+    far_gens = sorted(r["first_far_system_gen"] for r in results
+                      if r.get("first_far_system_gen") is not None)
+    if far_gens:
+        median = far_gens[len(far_gens) // 2] if len(far_gens) % 2 else (
+            (far_gens[len(far_gens) // 2 - 1] + far_gens[len(far_gens) // 2]) / 2)
+        print(f"First star at {FAR_SYSTEM_LY:.0f}+ LY: {len(far_gens)}/{len(results)} run(s) got one, "
+              f"median generation {median}, range {far_gens[0]}-{far_gens[-1]}.")
+    else:
+        print(f"First star at {FAR_SYSTEM_LY:.0f}+ LY: none in {len(results)} run(s) - the "
+              "Detection tree never opened that band.")
+    reaches = [r.get("detection_reach_ly") for r in results if r.get("detection_reach_ly")]
+    if reaches:
+        print(f"  Final detection reach: {min(reaches):.0f}-{max(reaches):.0f} LY; farthest star "
+              f"catalogued: {max(r.get('farthest_known_ly', 0.0) for r in results):.1f} LY.")
     print(f"Message fates over {sent} message(s): {format_fates(totals)}")
     if sent:
         decided_by_the_future = totals.get("died_in_flight", 0)

@@ -96,18 +96,34 @@ class HabitabilityWeightTest(unittest.TestCase):
 
 
 class CatalogCivilizationCountTest(unittest.TestCase):
-    """BASE_CIV_CHANCE is calibrated so the whole catalog still averages ~8 civilizations."""
+    """What BASE_CIV_CHANCE produces over the real catalogue, near field and whole sky.
 
-    def test_full_catalog_averages_about_eight_civilizations(self):
+    The per-star chance was calibrated on the original 53-star catalogue, where it averaged
+    ~8 civilizations. T4 deepened the catalogue to 94 stars out to ~160 LY without touching
+    the constant (T5 owns calibration), so the *density* is unchanged and the totals simply
+    follow the larger sky: ~16.2 over the whole catalogue, of which ~8.5 lie within 20 LY -
+    i.e. the near field the player starts in is what it always was, plus the six nearby stars
+    the science accuracy audit listed as missing. The far field is the new content, and it is
+    gated behind the detection tiers, so it arrives over the course of a game rather than at
+    generation one.
+    """
+
+    def test_full_catalog_averages_about_sixteen_civilizations(self):
         random.seed(2026)
         runs = 300
         total = 0
+        near = 0
         for _ in range(runs):
-            total += sum(1 for star in CATALOG
-                         if StarSystem(star["name"], star["distance"],
-                                       star["spectral_type"]).has_civilization)
+            for star in CATALOG:
+                if StarSystem(star["name"], star["distance"], star["spectral_type"]).has_civilization:
+                    total += 1
+                    if star["distance"] <= 20.0:
+                        near += 1
         mean = total / runs
-        self.assertTrue(6.5 <= mean <= 9.5, f"mean civilizations per catalog: {mean}")
+        near_mean = near / runs
+        self.assertTrue(14.5 <= mean <= 18.0, f"mean civilizations per catalog: {mean}")
+        # The near field must not have drifted away from the original calibration target.
+        self.assertTrue(7.0 <= near_mean <= 9.5, f"mean civilizations within 20 LY: {near_mean}")
 
     def test_evolved_stars_never_host_anyone(self):
         random.seed(7)

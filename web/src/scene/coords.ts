@@ -11,14 +11,17 @@
  *     z = d * cos(dec) * sin(ra)
  *
  * Distance is compressed before it becomes a radius, because the catalogue spans 4.24 LY
- * (Proxima) to 51 LY and the WOW! source sits at 1,800 LY; drawn to scale the near stars
- * would collapse into one pixel at the middle of the screen.
+ * (Proxima) to 159 LY (HD 209458) and the WOW! source sits at 1,800 LY; drawn to scale the
+ * near stars would collapse into one pixel at the middle of the screen.
  */
 
 const DEG = Math.PI / 180;
 
-/** `data/star_catalog.json` tops out here; both scales pin this distance to the same radius. */
-export const CATALOG_EDGE_LY = 51;
+/**
+ * `data/star_catalog.json` tops out here; both scales pin this distance to the same radius.
+ * The T4 catalogue runs to 159 LY, so the edge is rounded up to a round 160.
+ */
+export const CATALOG_EDGE_LY = 160;
 
 /** Scene radius the catalogue edge maps to. The default camera frames a little more than this. */
 export const CATALOG_EDGE_RADIUS = 60;
@@ -32,14 +35,14 @@ export const EDGE_RADIUS = 72;
 /** `d0` in `r = k * ln(1 + d/d0)`: the scale below which distances stay nearly linear. */
 export const LOG_SOFTENING_LY = 4;
 
-/** `k`, solved from `k * ln(1 + 51/4) = 60`, so the catalogue edge lands on CATALOG_EDGE_RADIUS. */
+/** `k`, solved from `k * ln(1 + 160/4) = 60`, so the catalogue edge lands on CATALOG_EDGE_RADIUS. */
 export const LOG_K = CATALOG_EDGE_RADIUS / Math.log(1 + CATALOG_EDGE_LY / LOG_SOFTENING_LY);
 
-/** `k2`, solved from `51 * k2 = 60`: the "true scale" toggle keeps the same outer ring. */
+/** `k2`, solved from `160 * k2 = 60`: the "true scale" toggle keeps the same outer ring. */
 export const TRUE_K = CATALOG_EDGE_RADIUS / CATALOG_EDGE_LY;
 
-/** Distances (LY) the orientation rings are drawn at. */
-export const RING_DISTANCES_LY = [5, 10, 20, 50] as const;
+/** Distances (LY) the orientation rings are drawn at; 20 and 100 are also detection reaches. */
+export const RING_DISTANCES_LY = [5, 10, 20, 50, 100] as const;
 
 export type ScaleMode = "compressed" | "true";
 
