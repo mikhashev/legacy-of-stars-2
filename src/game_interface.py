@@ -469,6 +469,14 @@ class GameInterface:
         # set out, not as it is now (view_state states the year, the engine does the arithmetic).
         print(f"Observed as of {format_year(s['observed_year'])} ({s['distance']} LY of light-time)")
         print(f"Knowledge: {s['knowledge']}%  -  {s['description'] or 'nothing studied yet'}")
+        observations = s.get("observations") or []
+        if observations:
+            # The dossier's memory: what each arriving wave of light showed, dated in both
+            # frames (the year we looked, and the year that light left the system).
+            shown = observations[-8:]
+            print(f"\nObservations ({len(observations)}, showing the last {len(shown)}):")
+            for entry in shown:
+                print(f"  {entry['year']} (light of {format_year(entry['observed_year'])}): {entry['summary']}")
         if s["is_seeded"]:
             print("Genesis Ark Program: an ark from Earth is on its way to this world, or already landed.")
         print(f"\nAssessment: {self.program.ai_advisor.get_system_risk_assessment(self.program, s['name'])}")

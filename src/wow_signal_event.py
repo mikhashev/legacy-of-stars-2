@@ -53,7 +53,7 @@ def create_wow_source_system(program):
 
     system.is_wow_source = True
     program.star_systems[system.name] = system
-    program._register_swan_song(system)
+    program._observe_system(system)  # the observed frame decides whether the death is visible yet
     program._log_system_profile(system)
     logging.info(f"WOW! source catalogued: {system.name} at {system.distance:.0f} LY "
                  f"(civilization: {'yes' if system.has_civilization else 'no'})")

@@ -55,6 +55,40 @@ def civ_rng(name: str) -> random.Random:
 # ever pointed at it.
 SWAN_SONG_KNOWLEDGE_REQUIRED = 20
 
+# Knowledge a system must have before Earth keeps watching it: below it nobody is pointing a
+# telescope at that star from one generation to the next, so no observation is recorded and no
+# sky change is noticed. The same 20 % at which a civilization is named at all.
+OBSERVATION_KNOWLEDGE_REQUIRED = 20
+
+# How many dated observations one system keeps (the dossier shows a history, not an archive).
+MAX_OBSERVATIONS = 30
+
+
+def stage_phrase(stage: Optional[CivilizationStage]) -> str:
+    """A stage as prose: `DIGITAL` -> "digital era"."""
+    return f"{stage.name.replace('_', ' ').lower()} era" if stage else "unknown era"
+
+
+def observed_change(before: Optional[CivState], after: Optional[CivState],
+                    has_beacon: bool = False) -> Optional[str]:
+    """What a watcher would notice between two observations of the same system, or None.
+
+    Only what a telescope can actually see counts: whether anyone is broadcasting, and how far
+    along they are. A strategy or an attitude never shows up here - those are inferences, not
+    observations, and T1 keeps them hidden.
+    """
+    if before is None or after is None:
+        return None
+    if before.alive and not after.alive and after.died_year is not None:
+        # An automated beacon is still carrying, so what stopped is the civilization, not the star.
+        return "silence" if has_beacon else "extinction"
+    if not before.alive and after.alive:
+        return "activity"
+    if before.alive and after.alive and before.stage and after.stage and after.stage.value > before.stage.value:
+        return "stage_up"
+    return None
+
+
 # Chance that a star with a perfectly habitable spectral class (G/K main sequence) hosts a
 # civilization. Calibrated so the full 53-star catalog still averages ~8 civilizations, as the
 # flat 0.15 model did: the mean habitability weight of the catalog is 30.8 / 53 = 0.581, and
@@ -156,6 +190,14 @@ class Technology:
         self.chosen_doctrine = None
 
 class StarSystem:
+    """One catalogued star, and whatever lives (or lived) around it.
+
+    Three of its fields are the *observed* frame from T1 on - `is_extinct`, `extinct_years_ago`
+    and `has_swan_song` mean "as our telescopes show it in the current year", not "as the
+    civilization truly is". `ContactProgram` keeps them current with `refresh_observation()`;
+    the truth is in `timeline`, and `observed(year)` is the one way to read it honestly.
+    """
+
     def __init__(self, name: str, distance: float, spectral_type: Optional[str] = None,
                  ra: Optional[float] = None, dec: Optional[float] = None):
         self.name = name
@@ -177,6 +219,8 @@ class StarSystem:
         self.messages_sent = []
         self.pending_responses = []
         self.received_messages = []
+        # Dated telescope observations: {"year", "observed_year", "summary"}, oldest first.
+        self.observations: List[Dict[str, Any]] = []
         self.pending_attack = None
         self.is_seeded = False           # Genesis Project marker
         self.has_detected_earth = False  # hostile civ already found us (no double attacks)
@@ -309,6 +353,99 @@ class StarSystem:
             return self._state_from_fields()
         return timeline.state_at(year)
 
+    # ------------------------------------------------------------------ the observed frame (T1)
+    def observed_year(self, year_now: int) -> int:
+        """The year of the light that reaches Earth in `year_now`: `year_now - round(distance)`."""
+        return int(year_now) - int(round(self.distance))
+
+    def observed(self, year_now: int) -> CivState:
+        """This civilization as our telescopes show it in `year_now`.
+
+        Everything the player may see goes through here: the light left this system
+        `round(distance)` years ago, so a civilization the timeline has already killed is still
+        seen alive until that light arrives. A system without a timeline (an old save) keeps
+        reporting its cached fields, which is exactly how the engine behaved before T1.
+        """
+        return self.timeline_state(self.observed_year(year_now))
+
+    def observed_silent_years(self, year_now: int) -> Optional[int]:
+        """How long the last living light of a dead civilization has been past us, or None.
+
+        `(year_now - round(distance)) - died_year`: the death is only ever counted in Earth's
+        reception frame, so the number is never negative while the death is observable at all
+        (which is what retires the v1.1 clamp). A system without a timeline keeps its cached
+        `extinct_years_ago`.
+        """
+        if getattr(self, "timeline", None) is None:
+            return getattr(self, "extinct_years_ago", None)
+        state = self.observed(year_now)
+        if state.alive or state.died_year is None:
+            return None
+        return max(0, self.observed_year(year_now) - int(state.died_year))
+
+    def observed_swan_song(self, year_now: Optional[int] = None) -> bool:
+        """Whether a beacon left by an *observable* death is already reaching us."""
+        timeline = getattr(self, "timeline", None)
+        if timeline is None or year_now is None:
+            return bool(getattr(self, "has_swan_song", False))
+        state = self.observed(year_now)
+        return bool(timeline.has_swan_song and not state.alive and state.died_year is not None)
+
+    def refresh_observation(self, year_now: int) -> Optional[str]:
+        """Bring the "as observed now" attributes up to date; return what just became visible.
+
+        `is_extinct`, `extinct_years_ago` and `has_swan_song` are kept as plain attributes
+        because half the engine reads them, but from T1 on they mean *as observed from Earth in
+        the current year*, not as the civilization truly is. `ContactProgram` refreshes them at
+        the start of every generation and whenever a system is created or loaded.
+
+        Returns `"extinct"` the first time a death becomes observable (the caller registers the
+        swan song then), otherwise None. A system without a timeline is static: nothing is
+        refreshed and nothing is returned.
+        """
+        if getattr(self, "timeline", None) is None or not self.has_civilization:
+            return None
+        state = self.observed(year_now)
+        dead = (not state.alive) and state.died_year is not None
+        was_extinct = bool(getattr(self, "is_extinct", False))
+        self.is_extinct = dead
+        self.extinct_years_ago = self.observed_silent_years(year_now) if dead else None
+        self.has_swan_song = bool(dead and self.timeline.has_swan_song)
+        return "extinct" if dead and not was_extinct else None
+
+    def observation_summary(self, year_now: int) -> str:
+        """One line for the dossier's observation history ("digital era, cautious")."""
+        if not self.has_civilization:
+            return "No artificial signals."
+        state = self.observed(year_now)
+        if not state.alive:
+            if state.died_year is None:
+                return "No artificial signals."
+            silent = self.observed_silent_years(year_now) or 0
+            return f"Silent for {int(silent)} years."
+        summary = stage_phrase(state.stage)
+        if self.knowledge >= 40:
+            attitude = "cautious"
+            if state.attitude < 0.4:
+                attitude = "potentially hostile"
+            elif state.attitude > 0.6:
+                attitude = "seemingly friendly"
+            summary = f"{summary}, {attitude}"
+        return summary
+
+    def record_observation(self, year_now: int, summary: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Append one dated observation, unless it repeats the last one verbatim."""
+        entry = {"year": int(year_now), "observed_year": self.observed_year(year_now),
+                 "summary": summary if summary is not None else self.observation_summary(year_now)}
+        history = getattr(self, "observations", None)
+        if history is None:
+            history = self.observations = []
+        if history and history[-1] == entry:
+            return None
+        history.append(entry)
+        del history[:-MAX_OBSERVATIONS]
+        return entry
+
     def _clear_civilization(self) -> None:
         """Reset the civilization fields to the 'nobody lives here' defaults."""
         self.civilization_age = 0
@@ -332,6 +469,7 @@ class StarSystem:
         data["extinct_years_ago"] = getattr(self, "extinct_years_ago", None)
         timeline = getattr(self, "timeline", None)
         data["timeline"] = timeline.to_dict() if timeline else None
+        data["observations"] = [dict(entry) for entry in getattr(self, "observations", [])]
         data["messages_sent"] = [[text, gen] for text, gen in self.messages_sent]
         data["pending_responses"] = [[text, gen] for text, gen in self.pending_responses]
         data["received_messages"] = list(self.received_messages)
@@ -360,6 +498,8 @@ class StarSystem:
         # A save written before timelines existed has no key: that system stays static.
         system.timeline = CivTimeline.from_dict(data.get("timeline"))
         system.knowledge = data.get("knowledge", 0)
+        # A save written before the observed frame has no history: the dossier starts empty.
+        system.observations = [dict(entry) for entry in data.get("observations", [])]
         system.messages_sent = [tuple(item) for item in data.get("messages_sent", [])]
         system.pending_responses = [tuple(item) for item in data.get("pending_responses", [])]
         system.received_messages = list(data.get("received_messages", []))
@@ -380,34 +520,55 @@ class StarSystem:
         return max(1, int(generations + 0.999))  # Round up to nearest generation
     
     
-    def describe_civilization(self) -> str:
-        """Get description of civilization based on current knowledge"""
+    def describe_civilization(self, year_now: Optional[int] = None) -> str:
+        """What the player is told about this system, read in the observed frame.
+
+        With `year_now` everything below comes from `observed(year_now)`: the light our
+        telescopes are looking at left this system `round(distance)` years ago, so a
+        civilization the timeline has already killed is still described as alive until that
+        light arrives, and the "silent for N years" number is counted from the death in
+        Earth's reception frame (`observed_year - died_year`), never below zero.
+
+        Without `year_now` the cached fields are used, which is what the engine did before the
+        observed frame existed - the fallback for old callers and for systems written by hand.
+        """
         if not self.has_civilization:
             return "No signs of civilization detected."
-        
-        # Handle extinct civilizations (civilization_stage is None)
-        if self.is_extinct:
+
+        state = self.observed(year_now) if year_now is not None else self._state_from_fields()
+
+        if not state.alive and state.died_year is None:
+            # Nothing has reached us yet: this civilization is younger than the light we are
+            # looking at. An empty sky is the honest description of that.
+            return "No signs of civilization detected."
+
+        # Handle extinct civilizations (their stage is cleared at the death)
+        if not state.alive:
+            silent = (self.observed_silent_years(year_now) if year_now is not None
+                      else getattr(self, "extinct_years_ago", None))
+            silent = max(0, int(silent or 0))
             if self.knowledge < 20:
                 return "Faint signals detected. System appears lifeless."
             elif self.knowledge < 60:
-                return f"EXTINCT CIVILIZATION detected. Silent for ~{self.extinct_years_ago} years (as seen from Earth)."
+                return f"EXTINCT CIVILIZATION detected. Silent for ~{silent} years (as seen from Earth)."
             else:
-                swan_info = " Data archives may exist." if self.has_swan_song else " No archives detected."
-                return f"EXTINCT: Civilization went silent {self.extinct_years_ago} years ago; automated transmissions continue.{swan_info}"
-            
+                beacon = self.observed_swan_song(year_now)
+                swan_info = " Data archives may exist." if beacon else " No archives detected."
+                return f"EXTINCT: Civilization went silent {silent} years ago; automated transmissions continue.{swan_info}"
+
         if self.knowledge < 20:
             return "Possible artificial signals detected."
         elif self.knowledge < 40:
-            return f"Civilization detected at {self.civilization_stage.name} stage."
+            return f"Civilization detected at {state.stage.name} stage."
         elif self.knowledge < 60:
             attitude = "cautious"
-            if self.civilization_attitude < 0.4:
+            if state.attitude < 0.4:
                 attitude = "potentially hostile"
-            elif self.civilization_attitude > 0.6:
+            elif state.attitude > 0.6:
                 attitude = "seemingly friendly"
-            return f"{self.civilization_stage.name} civilization. Attitude: {attitude}."
+            return f"{state.stage.name} civilization. Attitude: {attitude}."
         elif self.knowledge < 80:
-            return f"{self.civilization_stage.name} civilization with {int(self.civilization_attitude * 100)}% positive attitude toward contact."
+            return f"{state.stage.name} civilization with {int(state.attitude * 100)}% positive attitude toward contact."
         else:
             # Full knowledge
             stage_descriptions = {
@@ -418,7 +579,8 @@ class StarSystem:
                 CivilizationStage.INTERSTELLAR: "Advanced interstellar civilization with probes and settlements in several star systems.",
                 CivilizationStage.POST_BIOLOGICAL: "Post-biological intelligence transcending physical limitations."
             }
-            return stage_descriptions[self.civilization_stage]
+            return stage_descriptions[state.stage]
+
 
 class Director:
     """Represents a generation's director of the contact program"""
@@ -610,7 +772,7 @@ class ContactProgram:
         logging.debug("=" * 60)
         for system in self.star_systems.values():
             self._log_system_profile(system)
-            self._register_swan_song(system)
+            self._observe_system(system)
         logging.debug("=" * 60)
 
         self.current_director = self.generate_director()
@@ -721,7 +883,7 @@ class ContactProgram:
         program.swan_song_manager = SwanSongManager.from_dict(data.get("swan_songs", {}), program.ai, program.content)
         program.scanned_for_swan_song = set(data.get("scanned_for_swan_song", []))
         for system in program.star_systems.values():
-            program._register_swan_song(system)
+            program._observe_system(system)
         program.integration = IntegrationProgress.from_dict(data.get("integration", {}))
         program.philosophical_events = PhilosophicalEvents.from_dict(data.get("philosophical_events", {}))
         pending_id = data.get("pending_philosophical_event")
@@ -827,13 +989,69 @@ class ContactProgram:
         logging.debug("")
 
     def _register_swan_song(self, system) -> None:
-        """Give an extinct civilization its swan song record (text comes later, on discovery)."""
+        """Give an extinct civilization its swan song record (text comes later, on discovery).
+
+        The fields it reads are the observed ones (`StarSystem.refresh_observation`), so a
+        beacon is only registered once the death itself is visible from Earth - which is also
+        the year the beacon's own signal arrives. Idempotent: it runs for every system in
+        every generation, and a death that happens mid-game registers when its light lands.
+        """
         if (system.has_civilization and system.is_extinct and system.has_swan_song
                 and not self.swan_song_manager.has_swan_song(system.name)):
             self.swan_song_manager.create_swan_song(
                 system.name, system.extinct_years_ago, system.civilization_age, system.civilization_type
             )
             logging.info(f"Swan Song created for {system.name}")
+
+    # ------------------------------------------------------------------ the observed frame (T1)
+    def _observe_system(self, system) -> Optional[str]:
+        """Refresh one system's "as observed now" fields and register a death that just became
+        visible. Returns what changed for the caller ("extinct", or None)."""
+        change = system.refresh_observation(self.current_year)
+        self._register_swan_song(system)  # a no-op unless the death is observable and left a beacon
+        return change
+
+    def _observe_sky(self, previous_year: int) -> None:
+        """New light arrives: refresh every system and report what a watcher would notice.
+
+        The sky changes on its own - a civilization we are watching advances a stage, or the
+        light of its death finally reaches us - so this runs once per generation, after the
+        year has advanced and before any reply is delivered. Only systems studied to
+        `OBSERVATION_KNOWLEDGE_REQUIRED` are being watched closely enough to notice; the rest
+        still have their fields refreshed, they just make no news.
+        """
+        year = self.current_year
+        for name, system in list(self.star_systems.items()):
+            timeline = getattr(system, "timeline", None)
+            before = system.observed(previous_year) if timeline is not None else None
+            self._observe_system(system)
+            if timeline is None or system.knowledge < OBSERVATION_KNOWLEDGE_REQUIRED:
+                continue
+            after = system.observed(year)
+            change = observed_change(before, after, has_beacon=system.observed_swan_song(year))
+            if change is None:
+                continue
+            observed_year = system.observed_year(year)
+            system.record_observation(year)
+            self.emit("sky_change", self._sky_change_text(name, observed_year, change, after),
+                      system=name, observed_year=observed_year, change=change)
+            logging.info(f"SKY CHANGE: {name} ({change}) as of {format_year(observed_year)}")
+            if change in ("extinction", "silence"):
+                # Owner decision 4: watching the sky is the cautious strategy, and a death seen
+                # with our own telescopes is evidence about the Fermi paradox.
+                self.add_fermi_evidence("extinction_evidence", 1,
+                                        f"{name} observed to fall silent")
+
+    @staticmethod
+    def _sky_change_text(name: str, observed_year: int, change: str, after: CivState) -> str:
+        bodies = {
+            "stage_up": f"they have entered the {stage_phrase(after.stage)}.",
+            "silence": "their broadcasts have stopped; only an automated beacon still carries.",
+            "extinction": "their broadcasts have stopped, and nothing has followed.",
+            "activity": "artificial signals have appeared where the sky was quiet.",
+        }
+        return (f"🔭 New light from {name} (as of {format_year(observed_year)}): "
+                f"{bodies.get(change, 'something has changed.')}")
 
     # ------------------------------------------------------------------ events, evidence, achievements
     FERMI_LABELS = {
@@ -954,6 +1172,15 @@ class ContactProgram:
         base_ap = max(1, base_ap + self.ap_modifier)
         self.max_action_points = base_ap
         self.action_points = base_ap
+
+    @property
+    def current_year(self) -> int:
+        """The in-game year of the current generation (one generation = 25 years).
+
+        The observed frame is built on it: what a telescope shows of a system `d` light-years
+        away is `state_at(current_year - round(d))`.
+        """
+        return self.start_year + (self.generation - 1) * 25
 
     @property
     def tech_level(self) -> int:
@@ -1428,6 +1655,10 @@ YOUR CHOICE:
         year = self.start_year + (self.generation - 1) * 25
         logging.info(f"--- Advanced to Generation {self.generation} (Year {year}) ---")
         self.emit("generation_start", f"── Generation {self.generation} begins (Year {year}) ──", year=year)
+
+        # Twenty-five more years of light have arrived: bring every system's observed state up
+        # to date and report the differences before anything else happens this generation.
+        self._observe_sky(year - 25)
 
         # Support decay
         decay_amount = 0.5
@@ -1905,11 +2136,14 @@ You have answered one of humanity's greatest questions.
                 "ra": getattr(s, "ra", None),
                 "dec": getattr(s, "dec", None),
                 "knowledge": int(s.knowledge),
-                "description": s.describe_civilization() if s.knowledge > 0 else "",
+                "description": s.describe_civilization(year) if s.knowledge > 0 else "",
                 "round_trip_generations": s.get_round_trip_time(),
                 # Light-time honesty: what our telescopes see of this system left it
                 # `distance` years ago, so everything `description` says describes that year.
-                "observed_year": year - int(round(s.distance)),
+                "observed_year": s.observed_year(year),
+                # The dated history of what that light showed, oldest first (Focus Research
+                # writes one, and so does every generation whose new light changed something).
+                "observations": [dict(entry) for entry in getattr(s, "observations", [])],
                 "messages_sent": [{"text": m, "generation": g, "arrival_gen": g + one_way} for m, g in s.messages_sent],
                 "responses": list(s.received_messages),
                 "next_response_gen": min((a for _, a in s.pending_responses), default=None),
@@ -2001,7 +2235,9 @@ You have answered one of humanity's greatest questions.
 
         The knowledge floor is not a cost, it is what keeps this list honest: without it the
         list named every sterile system in the catalogue, which told the player where nobody
-        lives before a single telescope was pointed at it.
+        lives before a single telescope was pointed at it. `has_civilization` is a fact about
+        the star, not an observation, so it needs no light-time correction; the extinction
+        fields around it are the observed ones.
         """
         return [s.name for s in self.star_systems.values()
                 if s.knowledge >= GENESIS_KNOWLEDGE_REQUIRED
@@ -2029,7 +2265,7 @@ You have answered one of humanity's greatest questions.
         """Add a catalogued star to the known systems (its civilization, if any, is rolled on creation)."""
         system = self._make_system(entry)
         self.star_systems[system.name] = system
-        self._register_swan_song(system)
+        self._observe_system(system)
         self._log_system_profile(system)
         self.stats["systems_discovered"] += 1
         if announce:
@@ -2058,6 +2294,9 @@ You have answered one of humanity's greatest questions.
     def undiscovered_swan_songs(self) -> List[str]:
         """Extinct systems with a swan song the player has not found yet.
 
+        "Extinct" is the observed frame: a death only appears here once its light has reached
+        Earth, i.e. from `current_year >= died_year + round(distance)` on.
+
         Omniscient: it knows which systems hold an archive whether or not the player has
         looked. Never show it (or its length) to the player - use `swan_song_targets()`.
         """
@@ -2073,7 +2312,9 @@ You have answered one of humanity's greatest questions.
         archive is exactly what the scan is for, so a silent system stays on the list until
         the player spends the point that empties it. The knowledge floor is what keeps the
         list honest - it is the level at which `describe_civilization` says "EXTINCT", so the
-        list only ever names systems the player has already been told are dead.
+        list only ever names systems the player has already been told are dead - which, from
+        the observed frame on, means dead *as observed*: `is_extinct` turns true in the
+        generation the light of the death arrives, not in the year the civilization died.
         """
         return [name for name, system in self.star_systems.items()
                 if system.knowledge >= SWAN_SONG_KNOWLEDGE_REQUIRED
@@ -2299,7 +2540,11 @@ Use Defensive Actions in the menu to prepare.
         # Research points
         self.research_points += 5 * science_factor
         
-        observed_year = self.start_year + (self.generation - 1) * 25 - int(round(system.distance))
+        # What this study saw goes into the dossier, dated in both frames: the year we looked
+        # and the year the light left. It reads the same observed state `describe_civilization`
+        # does, so the history can never contradict the description.
+        observed_year = system.observed_year(self.current_year)
+        system.record_observation(self.current_year)
         self.message = (f"Research focused on {system_name}. Knowledge increased by {int(knowledge_gain)} points.\n"
                         f"The light we studied left {system_name} in {format_year(observed_year)}.")
         logging.info(f"Research Focused on {system_name}. Knowledge +{int(knowledge_gain)}")
@@ -2411,7 +2656,9 @@ Use Defensive Actions in the menu to prepare.
             self.message = "Study the system first: 20% knowledge is needed before a deep scan."
             return
 
-        # Only reachable through the API: `swan_song_targets()` never lists these.
+        # Only reachable through the API: `swan_song_targets()` never lists these. `is_extinct`
+        # is the observed frame: a civilization that dies during the game becomes a candidate in
+        # the generation the light of its death (and of its beacon) reaches Earth.
         if not system.has_civilization or not system.is_extinct:
             self.message = f"{system_name} is not a candidate for a deep scan."
             return

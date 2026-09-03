@@ -55,6 +55,9 @@ class AutoPlayer:
         self.max_gen = max_gen
         self.program = ContactProgram(seed=seed, offline=True)
         self.logs = []
+        # Sky changes seen during the run (T1): new light showing a watched system advance a
+        # stage or fall silent. Counted from the event stream, which nothing else here reads.
+        self.sky_changes = 0
 
     def log(self, msg: str) -> None:
         self.logs.append(f"[Gen {self.program.generation}] {msg}")
@@ -158,6 +161,7 @@ class AutoPlayer:
             self.resolve_pending_event()
             self.make_decisions()
             p.advance_generation()
+            self.sky_changes += sum(1 for event in p.drain_events() if event.kind == "sky_change")
             if p.generation % 20 == 0:
                 status = p.integration.get_integration_status(p.generation)
                 self.log(
@@ -195,6 +199,7 @@ class AutoPlayer:
             "contacts": len(contacts),
             "contact_names": contacts,
             "swan_songs_found": swan_found,
+            "sky_changes": self.sky_changes,
             "systems_known": len(p.star_systems),
             "passive_detections": p.stats.get("passive_detections", 0),
             "info_attacks": p.stats.get("info_attacks", 0),
@@ -241,7 +246,8 @@ def main(argv=None) -> int:
             result = {
                 "run_id": i + 1, "seed": seed, "strategy": strategy, "generations": "?",
                 "victory": False, "philosophical_victory": False, "integration_level": 0.0,
-                "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "systems_known": 0,
+                "seeded_worlds": 0, "contacts": 0, "swan_songs_found": 0, "sky_changes": 0,
+                "systems_known": 0,
                 "passive_detections": 0, "info_attacks": 0,
                 "end_reason": f"EXCEPTION: {exc!r}", "exception": repr(exc),
             }
@@ -249,20 +255,23 @@ def main(argv=None) -> int:
 
     print("\n=== PLAYTEST SUMMARY ===")
     print(f"{'Run':<4}{'Seed':<6}{'Strat':<11}{'Gen':<5}{'Win':<6}{'Integ':<7}{'Seed':<6}{'Cont':<6}"
-          f"{'Swan':<6}{'Sys':<5}{'Leak':<6}{'Info':<6}End reason")
+          f"{'Swan':<6}{'Sky':<5}{'Sys':<5}{'Leak':<6}{'Info':<6}End reason")
     print("-" * 110)
     for r in results:
         win = "PHIL" if r["philosophical_victory"] else ("YES" if r["victory"] else "NO")
         print(
             f"{r['run_id']:<4}{r['seed']:<6}{r['strategy']:<11}{r['generations']:<5}{win:<6}"
             f"{r['integration_level']:<7.2f}{r['seeded_worlds']:<6}{r['contacts']:<6}"
-            f"{r['swan_songs_found']:<6}{r['systems_known']:<5}"
+            f"{r['swan_songs_found']:<6}{r.get('sky_changes', 0):<5}{r['systems_known']:<5}"
             f"{r['passive_detections']:<6}{r['info_attacks']:<6}{r['end_reason'][:45]}"
         )
     total_leak = sum(r["passive_detections"] for r in results)
     total_info = sum(r["info_attacks"] for r in results)
+    total_sky = sum(r.get("sky_changes", 0) for r in results)
     print(f"\nPassive detections: {total_leak} total, {total_leak / max(1, len(results)):.2f} per game. "
           f"Information attacks: {total_info} total, {total_info / max(1, len(results)):.2f} per game.")
+    print(f"Sky changes (new light showing a watched system change): {total_sky} total, "
+          f"{total_sky / max(1, len(results)):.2f} per game.")
     if failures:
         print(f"\n{failures} run(s) raised exceptions.")
         return 1

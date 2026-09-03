@@ -167,6 +167,7 @@ the generation the event was emitted in. `data` keys per kind:
 | `attack_warning` | `system` (str), `arrival_gen` (int), `eta` (int), `attack_type` (str) | a hostile launch is detected |
 | `attack_resolved` | `system` (str), `support_loss` (int), `funding_loss` (int), `severity` (str) | a fleet strikes Earth |
 | `info_attack` | `system` (str), `attack_type` (`corrupted_technology` \| `societal_manipulation` \| `false_hope_signal` \| `philosophical_weapon`) | an information weapon lands |
+| `sky_change` | `system` (str), `observed_year` (int), `change` (`stage_up` \| `silence` \| `extinction` \| `activity`) | new light from a system studied to 20 % knowledge shows it changed: it advanced a stage (`stage_up`), fell silent leaving an automated beacon (`silence`) or leaving nothing (`extinction`), or first appeared where the sky was quiet (`activity`). Emitted at the start of `advance_generation`, before replies are delivered; a `silence` or `extinction` also adds +1 extinction Fermi evidence. Strategy and attitude changes are never observable and never emitted |
 | `philosophical_event` | `event_id` (str) | a crisis needs an answer |
 | `briefing` | `idle_generations` (int) | the mission analyst volunteers a briefing after 2, 4, 6 … generations in which the player took no action; the text is the advisor's rule-based briefing under one "Mission analyst's briefing (the program has been idle for N generations):" line. Needs neither the AI Strategic Advisor technology nor the once-per-generation consultation, and changes no rule |
 | `fermi_evidence` | `kind` (str), `amount` (int), `total` (int), `reason` (str) | evidence gained (announced ones only) |
@@ -180,7 +181,8 @@ the generation the event was emitted in. `data` keys per kind:
 `mirror_fleet` (labels in `state.threats[].type_label`).
 
 Suggested UI weight: modal for `wow`, `victory`, `game_over`, `attack_warning`,
-`philosophical_event`, `attack_resolved`, `briefing`; journal line for the rest.
+`philosophical_event`, `attack_resolved`, `briefing`; journal line for the rest (a `sky_change`
+is a journal line plus a flash on the star, never a modal).
 
 ---
 
@@ -220,9 +222,10 @@ strategies, deception levels) ever appears here.
 | `systems[].spectral_type` | str \| null | e.g. `"M5.5V"`; drives the map colour |
 | `systems[].ra`, `.dec` | float \| null | J2000 degrees, for the 3D map |
 | `systems[].knowledge` | int | 0–100; 0 hides the description, 20 reveals a civilization (and lists an extinct one in `swan_song_targets`), 30 enables swan song recovery |
-| `systems[].description` | str | what is known (empty while `knowledge` is 0) |
+| `systems[].description` | str | what is known (empty while `knowledge` is 0), read in the observed frame: it describes the system as of `observed_year`, so a civilization that has already died on its own timeline is still described as alive until the light of that death arrives |
 | `systems[].round_trip_generations` | int | generations for a message and its reply |
 | `systems[].observed_year` | int | the year the light we are looking at left this system: `year - round(distance)`. Everything `description` says describes the system in *that* year, not now - show it as "observed as of {observed_year}". It can be at or below zero for a distant source (the WOW! source is 1,800 LY away), which the front-end writes as "{n} BC" on the astronomical convention (year 0 = 1 BC). `focus_research` states the same fact in its `message` |
+| `systems[].observations[]` | `{year, observed_year, summary}` | the dated history of what this system's light showed, oldest first (at most 30 kept). `year` is the in-game year we looked, `observed_year` the year that light left the system, `summary` one line ("digital era, cautious", "Silent for 0 years."). Written by Focus Research and by every generation whose new light changed something for a system at 20 %+ knowledge; empty for a save written before the observed frame |
 | `systems[].messages_sent[]` | `{text, generation, arrival_gen}` | our transmissions and when they land |
 | `systems[].responses` | list[str] | replies received so far |
 | `systems[].next_response_gen` | int \| null | generation the next reply arrives |

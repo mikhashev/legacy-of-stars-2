@@ -223,7 +223,12 @@ Keep each section brief (2-3 sentences max). Be direct and actionable."""
         return "\n".join(lines)
 
     def get_system_risk_assessment(self, program, system_name: str) -> str:
-        """Assess the risk of a specific star system from visible evidence only."""
+        """Assess the risk of a specific star system from visible evidence only.
+
+        "Visible" is literal: the extinction fields it reads are the observed frame the engine
+        refreshes every generation, so the advisor can only ever call a civilization dead once
+        the light of its death has reached Earth.
+        """
         if system_name not in program.star_systems:
             return "System not found."
         system = program.star_systems[system_name]

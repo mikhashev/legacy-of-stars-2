@@ -251,7 +251,10 @@ class EngineWiringTest(unittest.TestCase):
                 if not (system.has_civilization and system.is_extinct):
                     continue
                 found += 1
-                self.assertEqual(system.timeline.died_year, START_YEAR - system.extinct_years_ago)
+                # `extinct_years_ago` is the observed frame (T1): the death counted from the
+                # year of the light we are looking at, not from the current year.
+                self.assertEqual(system.timeline.died_year,
+                                 system.observed_year(START_YEAR) - system.extinct_years_ago)
                 self.assertEqual(system.timeline.has_swan_song, system.has_swan_song)
         self.assertGreater(found, 0)
 

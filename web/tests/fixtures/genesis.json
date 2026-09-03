@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "saved_at": "2026-09-03T17:07:52",
+  "saved_at": "2026-09-03T19:22:17",
   "label": "",
   "generation": 3,
   "year": 2027,
@@ -8,6 +8,7 @@
   "game_over": false,
   "program": {
     "seed": 1,
+    "civ_seed_base": 1,
     "state": {
       "generation": 3,
       "start_year": 1977,
@@ -117,6 +118,8 @@
         "is_wow_source": false,
         "civilization_stage": null,
         "extinct_years_ago": null,
+        "timeline": null,
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
@@ -141,6 +144,8 @@
         "is_wow_source": false,
         "civilization_stage": null,
         "extinct_years_ago": null,
+        "timeline": null,
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
@@ -165,6 +170,8 @@
         "is_wow_source": false,
         "civilization_stage": null,
         "extinct_years_ago": null,
+        "timeline": null,
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
@@ -189,6 +196,8 @@
         "is_wow_source": false,
         "civilization_stage": null,
         "extinct_years_ago": null,
+        "timeline": null,
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
@@ -202,7 +211,7 @@
         "has_civilization": true,
         "civilization_age": 4203.460754011368,
         "is_extinct": false,
-        "has_swan_song": null,
+        "has_swan_song": false,
         "true_strategy": "L",
         "deception_level": 0.611771035838361,
         "civilization_type": "digital_ascended",
@@ -213,6 +222,28 @@
         "is_wow_source": false,
         "civilization_stage": "INTERPLANETARY",
         "extinct_years_ago": null,
+        "timeline": {
+          "origin_year": -2226,
+          "initial": {
+            "alive": true,
+            "stage": "INTERPLANETARY",
+            "strategy": "L",
+            "attitude": 0.33725733276227166,
+            "civ_type": "digital_ascended",
+            "deception": 0.611771035838361,
+            "died_year": null
+          },
+          "events": [
+            {
+              "year": 4189,
+              "kind": "extinct",
+              "value": {
+                "has_swan_song": true
+              }
+            }
+          ]
+        },
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
@@ -237,6 +268,8 @@
         "is_wow_source": true,
         "civilization_stage": null,
         "extinct_years_ago": null,
+        "timeline": null,
+        "observations": [],
         "messages_sent": [],
         "pending_responses": [],
         "received_messages": []
