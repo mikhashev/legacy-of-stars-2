@@ -1,6 +1,10 @@
 import type { GameEvent, GameEventKind } from "../types";
 import { Collapsible } from "./Collapsible";
 
+/** These two carry fixed-width, multi-line reports (rulers, indented lines): they need a
+ *  monospace block that wraps anywhere rather than the normal prose wrap the other kinds get. */
+const MONOSPACE_KINDS: ReadonlySet<GameEventKind> = new Set(["briefing", "wow"]);
+
 const KIND_ICON: Record<GameEventKind, string> = {
   generation_start: "\u{1F4C5}", // calendar
   crisis: "⚠️",
@@ -35,7 +39,9 @@ export function EventLog({ events }: { events: GameEvent[] }) {
             <li key={i} class={`event-row event-${event.kind}`}>
               <span class="event-icon">{KIND_ICON[event.kind]}</span>
               <span class="event-gen">Gen {event.generation}</span>
-              <span class="event-text">{event.text}</span>
+              <span class={`event-text${MONOSPACE_KINDS.has(event.kind) ? " event-text-mono" : ""}`}>
+                {event.text}
+              </span>
             </li>
           ))}
         </ul>

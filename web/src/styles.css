@@ -323,7 +323,21 @@ input[type="text"], input[type="number"], textarea {
 .event-list { display: flex; flex-direction: column; gap: 0.35rem; overflow-y: auto; }
 .event-row { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
 .event-gen { color: var(--text-dim); flex: 0 0 auto; }
-.event-text { flex: 1 1 auto; white-space: pre-wrap; }
+/* `min-width: 0` lets the flex item actually shrink below its content's natural width - without
+   it a long unbroken line (a briefing's "====" ruler) pushes the journal column wider than the
+   page instead of wrapping. */
+.event-text { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: break-word; }
+/* T6 quick-win: the mission analyst's briefing and the WOW! report are fixed-width, multi-line
+   text (rulers, indented columns) - they need a monospace block that preserves line breaks and
+   can break mid-word, or the journal column overflows sideways instead of wrapping. */
+.event-text-mono {
+  display: block;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* ---------------------------------------------------------------- modals */
 .modal-backdrop {
@@ -559,6 +573,7 @@ kbd {
   border-radius: 4px;
   text-shadow: 0 0 4px #000, 0 0 2px #000;
   user-select: none;
+  z-index: 2;
 }
 .star-label:hover, .star-label.is-hovered { color: var(--text); background: rgba(10, 14, 22, 0.55); }
 .star-label.is-selected {
@@ -613,8 +628,10 @@ kbd {
 /* T6: the brief "no reply" tag a star wears for one generation once a message goes unanswered. */
 .message-label.unanswered-tag { color: var(--text-dim); font-style: italic; opacity: 0.85; }
 
-/* T6: the dashed detection-reach ring (StarMap.buildReachRing). */
-.star-map-reach-label { color: #5fb0ff; }
+/* T6: the dashed detection-reach ring (StarMap.buildReachRing). Decoration, not data - it sits
+   below every star label (z-index) and reads as secondary (opacity) so a collision (declutter
+   still tries to avoid one first) never reads as it winning over a star's own label. */
+.star-map-reach-label { color: #5fb0ff; opacity: 0.7; z-index: 1; }
 
 /* the selected-system card */
 .map-card {

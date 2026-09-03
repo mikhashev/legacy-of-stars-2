@@ -528,7 +528,13 @@ export class StarMap {
     const el = document.createElement("div");
     el.className = "star-map-ring-label star-map-reach-label";
     const label = new CSS2DObject(el);
-    label.center.set(0, 0.5);
+    // (0.5, 1): bottom-centred on its anchor point, the same convention `declutterLabels` uses
+    // for star labels - it needs that to reason about the label's box when the reach label
+    // joins the same declutter pass (plan §8 UI fix: it used to sit on the ring's +x side,
+    // the same spot the orientation rings label themselves, and could land squarely on a
+    // star's own label with nothing to push either of them apart).
+    label.center.set(0.5, 1);
+    label.visible = false;
 
     this.ringsGroup.add(loop, label);
     this.reachRing = loop;
@@ -541,13 +547,21 @@ export class StarMap {
     this.reachLy = ly;
     if (ly === null) {
       this.reachRing.visible = false;
+      this.reachLabel.visible = false;
       return;
     }
     const r = radiusFor(ly, this.scale);
     this.reachRing.scale.setScalar(r);
     this.reachRing.visible = true;
     this.reachLabelEl.textContent = `detection reach ${Math.round(ly)} LY`;
-    this.reachLabel.position.set(r, 0, 0);
+    // A fixed spot on the ring's far side from the home camera (-z), deliberately different
+    // from the +x side the orientation rings label themselves on: real stars cluster all over
+    // the ring in their actual sky directions, so parking this one label somewhere nothing else
+    // is anchored to is most of the fix on its own; `declutterLabels` (which it now takes part
+    // in, always yielding to a star) covers the rest.
+    this.reachLabel.position.set(0, 0, -r);
+    this.reachLabel.visible = true;
+    this.labelSizesStale = true;
   }
 
   /* ------------------------------------------------------------ public API */
@@ -1065,7 +1079,7 @@ export class StarMap {
     const items: { el: HTMLElement; x: number; y: number; depth: number; w: number; h: number }[] = [];
     const projected = new Vector3();
 
-    const consider = (object: CSS2DObject): void => {
+    const consider = (object: CSS2DObject, forceLast = false): void => {
       const el = object.element as HTMLElement;
       if (el.style.display === "none") return;
       if (this.labelSizesStale || !this.labelSizes.has(el)) {
@@ -1079,7 +1093,11 @@ export class StarMap {
         el,
         x: ((projected.x + 1) / 2) * this.viewWidth,
         y: ((1 - projected.y) / 2) * this.viewHeight,
-        depth: projected.z,
+        // `forceLast` (the reach ring's label only) always sorts after every star and Earth:
+        // the loop below places nearest-first and lets whatever is already placed keep its
+        // spot, so this guarantees a star's label wins any clash instead of the two fighting
+        // over who was "nearer" this frame.
+        depth: forceLast ? Number.POSITIVE_INFINITY : projected.z,
         w: size.w,
         h: size.h,
       });
@@ -1087,6 +1105,7 @@ export class StarMap {
 
     consider(this.earthLabel);
     for (const entry of this.entries.values()) consider(entry.label);
+    if (this.reachRing.visible) consider(this.reachLabel, true);
     this.labelSizesStale = false;
 
     // Nearest first: the star in front keeps the spot it earned, the ones behind move.

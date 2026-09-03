@@ -69,31 +69,37 @@ function GameOverPanel({ view, store }: { view: ViewState; store: Store }) {
 export function ActionsPanel({ view, store }: { view: ViewState; store: Store }) {
   if (view.game_over) return <GameOverPanel view={view} store={store} />;
   const keyed = assignKeys(view.actions);
+  // Menu is key 6, between the core actions (1-5) and the situational ones (7+) - matching the
+  // console's numbering, so the list reads 1..6 then 7+ instead of 1-5, 7+, 6.
+  const core = keyed.filter(({ key }) => Number(key) <= 5);
+  const situational = keyed.filter(({ key }) => Number(key) > 5);
   const disabled = store.state.busy || store.state.pendingDoctrine !== null;
   // The AP counter sits with the buttons that spend it: the status panel is collapsible and
   // may be closed (or scrolled away) exactly when the player is choosing what to spend on.
   const ap = `AP ${view.status.action_points}/${view.status.max_action_points}`;
+  const renderAction = ({ spec, key }: KeyedAction) => (
+    <button
+      key={spec.id}
+      class="action-button"
+      disabled={disabled}
+      onClick={() => store.openAction(spec)}
+      title={spec.needs.length ? `needs: ${spec.needs.join(", ")}` : undefined}
+    >
+      <span class="action-key">{key}</span>
+      <span class="action-label">{spec.label}</span>
+      {spec.cost && <span class="action-cost">{spec.cost}</span>}
+    </button>
+  );
   return (
     <Collapsible id="actions" title="Actions" badge={ap} extraClass="actions-panel">
       <div class="action-buttons">
-        {keyed.map(({ spec, key }) => (
-          <button
-            key={spec.id}
-            class="action-button"
-            disabled={disabled}
-            onClick={() => store.openAction(spec)}
-            title={spec.needs.length ? `needs: ${spec.needs.join(", ")}` : undefined}
-          >
-            <span class="action-key">{key}</span>
-            <span class="action-label">{spec.label}</span>
-            {spec.cost && <span class="action-cost">{spec.cost}</span>}
-          </button>
-        ))}
+        {core.map(renderAction)}
         <button class="action-button" disabled={disabled} onClick={() => store.openMenu()}>
           <span class="action-key">6</span>
           <span class="action-label">Menu</span>
           <span class="action-cost">save / load / help</span>
         </button>
+        {situational.map(renderAction)}
       </div>
       {view.pending_event && (
         <p class="actions-hint">
