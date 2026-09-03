@@ -49,16 +49,16 @@ models (see each file's header note where present).
 
 | File | Description | Status |
 |------|-------------|--------|
-| [history/phase_2a_complete.md](history/phase_2a_complete.md) | Phase 2A implementation notes: attack warning, tech tree redesign, AI advisor. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/phase_3a_implementation_plan.md](history/phase_3a_implementation_plan.md) | Phase 3A implementation plan: philosophical-depth events. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/tech_tree_redesign.md](history/tech_tree_redesign.md) | Original tech-tree redesign notes (27 technologies / 5 tiers), since superseded by the 44/6 tree. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/attack_warning_implementation.md](history/attack_warning_implementation.md) | Attack early-warning system notes, from the pre-0.1c fleet-speed model. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/passive_leakage_implementation.md](history/passive_leakage_implementation.md) | Passive signal leakage system notes, from the pre-0.1c fleet-speed model. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/swan_song_implementation_summary.md](history/swan_song_implementation_summary.md) | Implementation summary for the swan-song (extinct-civilization final message) feature. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/swan_song_messages.md](history/swan_song_messages.md) | Full feature documentation for swan-song messages. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/ai_advisor_implementation.md](history/ai_advisor_implementation.md) | AI strategic advisor implementation notes. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/personal_context_guide.md](history/personal_context_guide.md) | Guide to using a personal-context JSON template with an AI assistant during development; the origin of this project. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
-| [history/game_development_context_template.json](history/game_development_context_template.json) | The personal-context JSON template referenced by `personal_context_guide.md`. | pre-v1.1 implementation notes, kept for the record; formulas in them may describe superseded models |
+| [history/phase_2a_complete.md](history/phase_2a_complete.md) | Phase 2A implementation notes: attack warning, tech tree redesign, AI advisor. | Historical |
+| [history/phase_3a_implementation_plan.md](history/phase_3a_implementation_plan.md) | Phase 3A implementation plan: philosophical-depth events. | Historical |
+| [history/tech_tree_redesign.md](history/tech_tree_redesign.md) | Original tech-tree redesign notes (27 technologies / 5 tiers), since superseded by the 44/6 tree. | Historical |
+| [history/attack_warning_implementation.md](history/attack_warning_implementation.md) | Attack early-warning system notes, from the pre-0.1c fleet-speed model. | Historical |
+| [history/passive_leakage_implementation.md](history/passive_leakage_implementation.md) | Passive signal leakage system notes, from the pre-0.1c fleet-speed model. | Historical |
+| [history/swan_song_implementation_summary.md](history/swan_song_implementation_summary.md) | Implementation summary for the swan-song (extinct-civilization final message) feature. | Historical |
+| [history/swan_song_messages.md](history/swan_song_messages.md) | Full feature documentation for swan-song messages. | Historical |
+| [history/ai_advisor_implementation.md](history/ai_advisor_implementation.md) | AI strategic advisor implementation notes. | Historical |
+| [history/personal_context_guide.md](history/personal_context_guide.md) | Guide to using a personal-context JSON template with an AI assistant during development; the origin of this project. | Historical |
+| [history/game_development_context_template.json](history/game_development_context_template.json) | The personal-context JSON template referenced by `personal_context_guide.md`. | Historical |
 
 ## Conventions
 
